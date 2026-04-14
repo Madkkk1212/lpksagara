@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { upsertProfile, getProfileByEmail } from "@/lib/db";
+import { upsertProfile, getProfileByEmail, getTheme } from "@/lib/db";
+import { AppTheme } from "@/lib/types";
+import { useEffect } from "react";
 
 export default function RegisterClient() {
   const router = useRouter();
@@ -18,6 +20,11 @@ export default function RegisterClient() {
   });
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [theme, setTheme] = useState<AppTheme | null>(null);
+
+  useEffect(() => {
+    getTheme().then(setTheme);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +64,13 @@ export default function RegisterClient() {
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f0fdfa,_#f8fbff_42%,_#ffffff_100%)] px-4 py-8 md:px-12 flex items-center justify-center">
       <div className="max-w-xl w-full bg-white rounded-[3rem] p-8 md:p-12 shadow-[0_40px_100px_rgba(15,23,42,0.1)] ring-1 ring-slate-100">
         <div className="text-center mb-10">
-          <div className="h-16 w-16 bg-teal-500 text-white rounded-2xl flex items-center justify-center text-2xl font-black mx-auto mb-6 shadow-xl shadow-teal-500/20">L</div>
+          <div className="h-16 w-16 bg-teal-500 text-white rounded-2xl flex items-center justify-center text-2xl font-black mx-auto mb-6 shadow-xl shadow-teal-500/20 overflow-hidden">
+             {theme?.header_use_logo_image && theme?.header_logo_url ? (
+               <img src={theme.header_logo_url} alt="Logo" className="w-full h-full object-contain p-2" />
+             ) : (
+               theme?.logo_text || 'L'
+             )}
+          </div>
           <h1 className="text-3xl font-black text-slate-800">Daftar Akun Baru</h1>
           <p className="text-slate-500 font-medium mt-2">Mulai perjalanan belajar JLPT Anda hari ini.</p>
         </div>

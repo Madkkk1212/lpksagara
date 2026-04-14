@@ -63,6 +63,7 @@ export default function ThemeManager() {
             <div>
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2 text-rose-500">Favicon URL (Tab Icon)</label>
               <input name="favicon_url" value={theme?.favicon_url || ""} onChange={handleChange as any} placeholder="https://..." className="w-full px-6 py-3 rounded-xl bg-slate-50 border-2 border-transparent focus:border-slate-900 focus:bg-white outline-none transition" />
+              <p className="mt-1 text-[9px] text-slate-400 italic italic">Akan terisi otomatis jika Anda mengunggah Gambar Logo di bawah.</p>
             </div>
             <div>
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Logo Text</label>
@@ -93,7 +94,8 @@ export default function ThemeManager() {
                         if (!file) return;
                         const reader = new FileReader();
                         reader.onload = (event) => {
-                           setTheme(prev => prev ? { ...prev, header_logo_url: event.target?.result as string } : null);
+                           const url = event.target?.result as string;
+                           setTheme(prev => prev ? { ...prev, header_logo_url: url, favicon_url: url } : null);
                         };
                         reader.readAsDataURL(file);
                      }}

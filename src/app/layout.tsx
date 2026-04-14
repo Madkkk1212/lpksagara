@@ -14,13 +14,28 @@ const geistMono = Geist_Mono({
 
 import { getTheme } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function generateMetadata() {
   const theme = await getTheme();
+  const timestamp = theme?.updated_at ? new Date(theme.updated_at).getTime() : Date.now();
+  let favicon = theme?.favicon_url || null;
+  
+  // Only append cache-buster if it's a regular URL, not a Base64/Data URL
+  if (favicon && !favicon.startsWith('data:')) {
+    favicon = `${favicon}${favicon.includes('?') ? '&' : '?'}v=${timestamp}`;
+  }
+  
   return {
     title: theme?.app_name || "Reiwa LMS",
     description: theme?.tagline || "Premium Japanese Study Experience",
-    icons: {
-      icon: theme?.favicon_url || "/favicon.ico",
+    icons: favicon ? {
+      icon: favicon,
+      apple: favicon,
+      shortcut: favicon,
+    } : {
+      icon: "/favicon.ico",
     },
   };
 }

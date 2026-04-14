@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { getProfileByEmail } from "@/lib/db";
+import { getProfileByEmail, getTheme } from "@/lib/db";
+import { AppTheme } from "@/lib/types";
+import { useEffect } from "react";
 
 const redirectLabels: Record<string, string> = {
   dashboard: "Dashboard",
@@ -20,6 +22,11 @@ export default function LoginClient() {
   const [emailInput, setEmailInput] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [theme, setTheme] = useState<AppTheme | null>(null);
+
+  useEffect(() => {
+    getTheme().then(setTheme);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,11 +66,15 @@ export default function LoginClient() {
 
       <div className="relative z-10 w-full max-w-[450px] animate-in fade-in slide-in-from-bottom-4 duration-700">
         <header className="mb-10 text-center">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-white shadow-xl ring-1 ring-slate-100 mb-6">
-               <span className="text-4xl font-black text-teal-600 italic">L</span>
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-white shadow-xl ring-1 ring-slate-100 mb-6 overflow-hidden">
+               {theme?.header_use_logo_image && theme?.header_logo_url ? (
+                 <img src={theme.header_logo_url} alt="Logo" className="w-full h-full object-contain p-3" />
+               ) : (
+                 <span className="text-4xl font-black text-teal-600 italic">{theme?.logo_text || 'L'}</span>
+               )}
             </div>
             <p className="text-[10px] font-black uppercase tracking-[0.5em] text-teal-600/60 mb-1">
-               Reiwa LMS Hub
+               {theme?.app_name || 'Reiwa LMS'} Hub
             </p>
             <h1 className="text-4xl font-black tracking-tight text-slate-800 mb-2 italic">
                Welcome Back
