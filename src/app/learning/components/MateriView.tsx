@@ -132,9 +132,160 @@ export default function MateriView({ user, theme, onUpgrade }: { user: Profile, 
                   </div>
                   <h2 className="text-4xl font-black text-slate-900 italic mb-8">{selectedMaterial.title}</h2>
                   
-                  {/* Content would go here - handled by rich text or special components */}
-                  <div className="prose prose-slate max-w-none prose-p:font-medium prose-headings:font-black italic">
-                    <div dangerouslySetInnerHTML={{ __html: typeof selectedMaterial.content === 'string' ? selectedMaterial.content : JSON.stringify(selectedMaterial.content) }} />
+                  {/* Dynamic Content Renderer */}
+                  <div className="w-full">
+                    {(() => {
+                      const content = typeof selectedMaterial.content === 'string' 
+                          ? JSON.parse(selectedMaterial.content) 
+                          : selectedMaterial.content;
+                      const mType = selectedMaterial.material_type;
+                      
+                      // 1. MOJI & GOI
+                      if (mType === 'moji_goi') {
+                         return (
+                           <div className="grid gap-4 md:grid-cols-2">
+                              {content?.items?.map((item: any, idx: number) => (
+                                 <div key={idx} className="bg-slate-50 rounded-[2rem] p-6 border border-slate-100 flex items-center justify-between gap-4 shadow-sm hover:shadow-md transition-shadow group">
+                                    <div>
+                                      <h3 className="text-3xl font-black text-slate-800 mb-1">{item.jp}</h3>
+                                      <p className="text-sm font-bold text-teal-600 uppercase tracking-widest">{item.id}</p>
+                                      {item.example && <p className="text-xs text-slate-500 font-medium mt-2">Contoh: {item.example}</p>}
+                                    </div>
+                                    {item.audioUrl ? (
+                                       <button className="h-12 w-12 bg-white rounded-full shadow-sm flex items-center justify-center text-teal-500 border border-slate-100 group-hover:bg-teal-500 group-hover:text-white transition-colors text-xl">
+                                         🔊
+                                       </button>
+                                    ) : (
+                                       <div className="h-12 w-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-300 border border-slate-200 text-xl">
+                                         🔈
+                                       </div>
+                                    )}
+                                 </div>
+                              ))}
+                           </div>
+                         );
+                      }
+
+                      // 2. BUNPOU
+                      if (mType === 'bunpou') {
+                         return (
+                           <div className="space-y-6">
+                              {content?.items?.map((item: any, idx: number) => (
+                                 <div key={idx} className="bg-indigo-50 border border-indigo-100/50 rounded-[2.5rem] p-8 shadow-sm relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-8 opacity-5">
+                                      <span className="text-8xl font-black">文法</span>
+                                    </div>
+                                    <div className="relative z-10">
+                                      <div className="inline-block bg-indigo-600 shadow-[0_10px_30px_rgba(79,70,229,0.3)] text-white px-5 py-3 rounded-2xl text-xl font-black tracking-widest mb-6">
+                                        {item.pattern}
+                                      </div>
+                                      <p className="text-slate-600 font-medium mb-8 leading-relaxed text-lg max-w-2xl">{item.explanation}</p>
+                                      
+                                      <div className="space-y-4 bg-white/80 p-8 rounded-[2rem] shadow-sm border border-white">
+                                         <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] block mb-2">Contoh Kalimat:</span>
+                                         {item.examples?.map((ex: any, i: number) => (
+                                            <div key={i} className="flex flex-col border-b border-indigo-50 pb-4 last:border-0 last:pb-0">
+                                               <span className="text-slate-800 font-black text-xl mb-1">{ex.jp}</span>
+                                               <span className="text-slate-500 text-sm font-medium">{ex.id}</span>
+                                            </div>
+                                         ))}
+                                      </div>
+                                    </div>
+                                 </div>
+                              ))}
+                           </div>
+                         );
+                      }
+
+                      // 3. DOKKAI
+                      if (mType === 'dokkai') {
+                         return (
+                           <div className="space-y-10">
+                              <div className="bg-slate-50 p-10 md:p-14 rounded-[3rem] border border-slate-100 shadow-inner">
+                                 <p className="text-2xl md:text-3xl font-medium leading-loose text-slate-800 mb-8">{content.text_jp}</p>
+                                 <div className="h-px w-16 bg-slate-200 mb-8" />
+                                 <p className="text-base font-medium text-slate-500 italic border-l-4 border-slate-200 pl-6 leading-relaxed">{content.text_id}</p>
+                              </div>
+                              
+                              {content.exercises && content.exercises.length > 0 && (
+                                 <div className="space-y-6 pt-4">
+                                    <h3 className="text-xl font-black italic text-slate-800 flex items-center gap-3">
+                                      <span className="p-3 bg-teal-50 text-teal-500 rounded-2xl">✏️</span> 
+                                      Latihan Pemahaman
+                                    </h3>
+                                    {content.exercises.map((ex: any, idx: number) => (
+                                       <div key={idx} className="bg-white border-2 border-slate-100 rounded-[2rem] p-8 shadow-sm">
+                                          <p className="text-xl font-black text-slate-800 mb-8">{ex.q}</p>
+                                          <div className="grid gap-3">
+                                             {ex.options?.map((opt: string, i: number) => (
+                                                <button key={i} className="text-left w-full px-6 py-4 rounded-2xl border-2 border-slate-100 hover:border-teal-500 hover:bg-teal-50 hover:shadow-md transition-all font-bold text-slate-700 text-lg group">
+                                                  <span className="inline-block w-10 text-slate-300 group-hover:text-teal-500 transition-colors font-black mr-4 tabular-nums">{i+1}.</span> 
+                                                  {opt}
+                                                </button>
+                                             ))}
+                                          </div>
+                                       </div>
+                                    ))}
+                                 </div>
+                              )}
+                           </div>
+                         );
+                      }
+
+                      // 4. CHOUKAI
+                      if (mType === 'choukai') {
+                         return (
+                           <div className="space-y-10">
+                              <div className="bg-gradient-to-br from-teal-500 via-emerald-500 to-teal-400 p-12 rounded-[3.5rem] shadow-[0_20px_50px_rgba(20,184,166,0.3)] text-center relative overflow-hidden">
+                                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
+                                 <div className="relative z-10">
+                                   <div className="h-24 w-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-5xl mx-auto mb-8 shadow-inner ring-4 ring-white/10">🎧</div>
+                                   <h3 className="text-white font-black text-3xl italic tracking-tight mb-8">Dengarkan Audio Berikut</h3>
+                                   {content.audioUrl ? (
+                                      <div className="bg-white/10 backdrop-blur-xl p-4 rounded-3xl shadow-inner max-w-md mx-auto">
+                                        <audio controls className="w-full outline-none" src={content.audioUrl}></audio>
+                                      </div>
+                                   ) : (
+                                      <div className="bg-black/20 text-white rounded-2xl px-6 py-3 inline-block font-bold text-sm tracking-widest uppercase">Audio tidak tersedia (Data Dummy)</div>
+                                   )}
+                                 </div>
+                              </div>
+                              
+                              {content.exercises && content.exercises.length > 0 && (
+                                 <div className="space-y-6 pt-4">
+                                    <h3 className="text-xl font-black italic text-slate-800 flex items-center gap-3">
+                                      <span className="p-3 bg-emerald-50 text-emerald-500 rounded-2xl">📝</span> 
+                                      Sesi Tanya Jawab
+                                    </h3>
+                                    {content.exercises.map((ex: any, idx: number) => (
+                                       <div key={idx} className="bg-white border-2 border-slate-100 rounded-[2rem] p-8 shadow-sm">
+                                          <p className="text-xl font-black text-slate-800 mb-8">{ex.q}</p>
+                                          <div className="grid gap-3">
+                                             {ex.options?.map((opt: string, i: number) => (
+                                                <button key={i} className="text-left w-full px-6 py-4 rounded-2xl border-2 border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 hover:shadow-md transition-all font-bold text-slate-700 text-lg group">
+                                                  <span className="inline-block w-10 text-slate-300 group-hover:text-emerald-500 transition-colors font-black mr-4 tabular-nums">{String.fromCharCode(65 + i)}.</span> 
+                                                  {opt}
+                                                </button>
+                                             ))}
+                                          </div>
+                                       </div>
+                                    ))}
+                                 </div>
+                              )}
+                           </div>
+                         );
+                      }
+                      
+                      // Fallback for raw/unknown JSON
+                      return (
+                         <div className="bg-slate-900 border border-slate-800 p-8 rounded-[2rem] shadow-xl overflow-auto relative group">
+                            <span className="absolute top-4 right-6 text-xs font-black text-rose-500 tracking-widest">RAW JSON DATA</span>
+                            <pre className="font-mono text-sm text-teal-300 leading-relaxed opacity-90 group-hover:opacity-100 transition-opacity">
+                              {JSON.stringify(content, null, 2)}
+                            </pre>
+                         </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
