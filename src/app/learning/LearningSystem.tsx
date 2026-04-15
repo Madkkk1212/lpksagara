@@ -18,6 +18,7 @@ export type LearningTab = "dashboard" | "materi" | "latihan" | "profile";
 export default function LearningSystem({ user, onLogout, theme }: LearningSystemProps) {
   const [activeTab, setActiveTab] = useState<LearningTab>("dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [upgradeMessage, setUpgradeMessage] = useState<string | null>(null);
 
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: "🚀" },
@@ -193,13 +194,43 @@ export default function LearningSystem({ user, onLogout, theme }: LearningSystem
         {/* Dynamic View Rendering */}
         <div className="animate-in fade-in slide-in-from-bottom-6 duration-1000 flex-1">
            <div className="max-w-[1400px] mx-auto pb-10">
-             {activeTab === "dashboard" && <DashboardView user={user} theme={theme} />}
-             {activeTab === "materi" && <MateriView user={user} theme={theme} />}
-             {activeTab === "latihan" && <LatihanView user={user} theme={theme} />}
+             {activeTab === "dashboard" && <DashboardView user={user} theme={theme} onUpgrade={setUpgradeMessage} />}
+             {activeTab === "materi" && <MateriView user={user} theme={theme} onUpgrade={setUpgradeMessage} />}
+             {activeTab === "latihan" && <LatihanView user={user} theme={theme} onUpgrade={setUpgradeMessage} />}
              {activeTab === "profile" && <ProfileView user={user} onLogout={onLogout} />}
            </div>
         </div>
       </main>
+
+      {/* Global Upgrade Modal Overlay */}
+      {upgradeMessage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md animate-in fade-in" onClick={() => setUpgradeMessage(null)} />
+           <div className="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg p-10 text-center animate-in zoom-in-95 duration-500 overflow-hidden">
+               <div className="absolute -top-40 -right-40 w-80 h-80 bg-amber-400/20 blur-[60px] rounded-full pointer-events-none" />
+               <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-400/20 blur-[60px] rounded-full pointer-events-none" />
+               <div className="relative z-10 flex flex-col items-center">
+                  <div className="h-24 w-24 bg-gradient-to-br from-amber-200 to-orange-100 rounded-[2rem] flex items-center justify-center text-5xl mb-6 shadow-inner ring-4 ring-white rotate-3">👑</div>
+                  <h3 className="text-3xl font-black text-slate-800 italic uppercase tracking-tight mb-3">Premium Only</h3>
+                  <p className="text-slate-500 font-medium mb-8">Anda membutuhkan akses <strong className="text-amber-500">Premium</strong> untuk menggunakan fitur atau level ini. Upgrade akun Anda sekarang dan raih sertifikasi dengan lebih cepat!</p>
+                  <div className="flex flex-col w-full gap-3">
+                    <a 
+                      href={`https://wa.me/6281273010793?text=${encodeURIComponent(upgradeMessage)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setUpgradeMessage(null)}
+                      className="w-full py-5 bg-gradient-to-r from-teal-500 to-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-lg hover:shadow-xl hover:translate-y-[-2px] transition-all"
+                    >
+                      Buka via WhatsApp →
+                    </a>
+                    <button onClick={() => setUpgradeMessage(null)} className="w-full py-5 text-slate-400 font-black uppercase tracking-widest text-[11px] hover:text-slate-600 transition-colors">
+                      Nanti Saja
+                    </button>
+                  </div>
+               </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

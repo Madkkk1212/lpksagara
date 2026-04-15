@@ -4,11 +4,11 @@ import { useEffect, useState, useMemo } from "react";
 import { Profile, AppTheme } from "@/lib/types";
 import { getLeaderboard, getUserLastProgressDetails } from "@/lib/db";
 
-const ADMIN_WA_NUMBER = "6281273010793";
-
-export default function DashboardView({ user, theme }: { user: Profile, theme: AppTheme | null }) {
+export default function DashboardView({ user, theme, onUpgrade }: { user: Profile, theme: AppTheme | null, onUpgrade?: (msg: string) => void }) {
   const [leaderboard, setLeaderboard] = useState<Profile[]>([]);
   const [lastProgress, setLastProgress] = useState<any[]>([]);
+  const [isLeaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   
   const currentExp = user.exp || 0;
   // Progress formula: assuming levels are 1000 exp each
@@ -36,10 +36,6 @@ export default function DashboardView({ user, theme }: { user: Profile, theme: A
       value: Math.floor(Math.random() * 60) + 20 + (i === 6 ? 20 : 0) // Peak on Saturday
     }));
   }, []);
-
-  const waLink = `https://wa.me/${ADMIN_WA_NUMBER}?text=${encodeURIComponent(
-    `Halo Admin, saya ${user.full_name} ingin upgrade ke Premium di ${theme?.app_name || 'Reiwa LMS'}`
-  )}`;
 
   return (
     <div className="space-y-12 pb-20">
@@ -99,7 +95,10 @@ export default function DashboardView({ user, theme }: { user: Profile, theme: A
                    </div>
                  ))}
               </div>
-              <button className="w-full mt-6 py-3 bg-white/10 text-white/40 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-slate-900 transition-all duration-500">
+              <button 
+                onClick={() => setLeaderboardOpen(true)}
+                className="w-full mt-6 py-3 bg-white/10 text-white/40 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-slate-900 transition-all duration-500"
+              >
                 View Full Ranking
               </button>
            </div>
@@ -117,14 +116,12 @@ export default function DashboardView({ user, theme }: { user: Profile, theme: A
                     <p className="text-slate-500 font-medium max-w-md">Buka semua level, akses bank soal terlengkap, dan raih sertifikasi impianmu lebih cepat!</p>
                  </div>
               </div>
-              <a 
-                href={waLink}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button 
+                onClick={() => onUpgrade?.(`Halo Admin, saya ${user.full_name} ingin upgrade ke Premium di ${theme?.app_name || 'Reiwa LMS'}`)}
                 className="px-12 py-5 bg-slate-900 text-white rounded-2xl font-black text-sm tracking-widest shadow-[0_20px_50px_rgba(15,23,42,0.3)] hover:shadow-none hover:translate-y-1 transition-all duration-500 block text-center min-w-[200px]"
               >
                 HUBUNGI ADMIN
-              </a>
+              </button>
            </div>
         </div>
       )}
@@ -225,6 +222,95 @@ export default function DashboardView({ user, theme }: { user: Profile, theme: A
             </div>
          </div>
       </div>
+
+       {/* FULL LEADERBOARD MODAL */}
+       {isLeaderboardOpen && (
+         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+           {/* Backdrop */}
+           <div 
+             className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300" 
+             onClick={() => setLeaderboardOpen(false)} 
+           />
+           
+           {/* Modal Container */}
+           <div className="relative w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl p-8 animate-in zoom-in-95 duration-500 overflow-hidden flex flex-col max-h-[85vh]">
+              <div className="flex items-center justify-between mb-6">
+                 <div>
+                    <h3 className="text-2xl font-black italic text-slate-800 tracking-tight flex items-center gap-2">
+                       <span className="text-3xl">🏆</span> Full Ranking
+                    </h3>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Cari dan lihat posisi seluruh siswa</p>
+                 </div>
+                 <button 
+                   onClick={() => setLeaderboardOpen(false)}
+                   className="h-10 w-10 flex items-center justify-center bg-slate-100 text-slate-400 hover:bg-rose-100 hover:text-rose-500 rounded-full transition-colors"
+                 >
+                   ✕
+                 </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative mb-6">
+                 <input 
+                   type="text" 
+                   placeholder="Cari nama siswa..." 
+                   value={searchQuery}
+                   onChange={(e) => setSearchQuery(e.target.value)}
+                   className="w-full py-4 px-6 pl-12 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 transition-all shadow-inner"
+                 />
+                 <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+              </div>
+
+              {/* Leaderboard List */}
+              <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-200">
+                 {leaderboard
+                   .filter(p => p.full_name.toLowerCase().includes(searchQuery.toLowerCase()))
+                   .map((player, idx) => {
+                     const originalIdx = leaderboard.findIndex(l => l.email === player.email);
+                     const rank = originalIdx + 1;
+                     const isMe = player.email === user.email;
+                     
+                     return (
+                       <div 
+                         key={player.email} 
+                         className={`flex items-center justify-between p-4 rounded-3xl border transition-all ${
+                           isMe ? 'bg-teal-50 border-teal-200 shadow-md scale-[1.02]' : 'bg-white border-slate-100 hover:border-slate-300'
+                         }`}
+                       >
+                          <div className="flex items-center gap-4">
+                             <div className={`w-10 h-10 rounded-[1rem] flex items-center justify-center font-black text-sm shadow-sm ${
+                               rank === 1 ? 'bg-amber-400 text-slate-900 ring-4 ring-amber-100' :
+                               rank === 2 ? 'bg-slate-200 text-slate-700' :
+                               rank === 3 ? 'bg-orange-200 text-orange-800' : 'bg-slate-50 text-slate-400 border border-slate-200'
+                             }`}>
+                               {rank}
+                             </div>
+                             
+                             <div className="flex flex-col">
+                               <span className={`text-sm font-black tracking-tight ${isMe ? 'text-teal-900' : 'text-slate-700'}`}>
+                                 {player.full_name} {isMe && '(Anda)'}
+                               </span>
+                               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{player.target_level || 'Belum Set Target'}</span>
+                             </div>
+                          </div>
+                          
+                          <div className={`px-4 py-2 rounded-xl text-xs font-black tracking-wider ${isMe ? 'bg-teal-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                             {player.exp || 0} XP
+                          </div>
+                       </div>
+                     );
+                 })}
+                 
+                 {leaderboard.filter(p => p.full_name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                   <div className="py-20 text-center">
+                      <span className="text-4xl opacity-50 mb-4 block">🏜️</span>
+                      <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Siswa tidak ditemukan</p>
+                   </div>
+                 )}
+              </div>
+           </div>
+         </div>
+       )}
     </div>
   );
 }

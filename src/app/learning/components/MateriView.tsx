@@ -4,9 +4,7 @@ import { useEffect, useState } from "react";
 import { Profile, MaterialCategory, StudyLevel, StudyChapter, StudyMaterial, AppTheme } from "@/lib/types";
 import { getMaterialCategories, getStudyLevels, getStudyChapters, getStudyMaterials, upsertProfile } from "@/lib/db";
 
-const ADMIN_WA_NUMBER = "6281273010793";
-
-export default function MateriView({ user, theme }: { user: Profile, theme: AppTheme | null }) {
+export default function MateriView({ user, theme, onUpgrade }: { user: Profile, theme: AppTheme | null, onUpgrade?: (msg: string) => void }) {
   const [categories, setCategories] = useState<MaterialCategory[]>([]);
   const [levels, setLevels] = useState<StudyLevel[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -30,10 +28,6 @@ export default function MateriView({ user, theme }: { user: Profile, theme: AppT
     
     return unlocked.includes(lvlId);
   };
-
-  const waLink = (target: string) => `https://wa.me/${ADMIN_WA_NUMBER}?text=${encodeURIComponent(
-    `Halo Admin, saya ${user.full_name} ingin membuka akses ke ${target} di ${theme?.app_name || 'Reiwa LMS'}`
-  )}`;
 
   useEffect(() => {
     async function loadInitial() {
@@ -245,18 +239,14 @@ export default function MateriView({ user, theme }: { user: Profile, theme: AppT
                              </div>
                           </button>
                           
-                          {!unlocked && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-slate-900/5 backdrop-blur-[2px] rounded-[3.5rem] opacity-0 hover:opacity-100 transition-opacity duration-500 pointer-events-none group-hover:pointer-events-auto">
-                              <a 
-                                href={waLink(level.title)}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <button 
+                                onClick={() => onUpgrade?.(`Halo Admin, saya ${user.full_name} ingin membuka akses ke ${level.title} di ${theme?.app_name || 'Reiwa LMS'}`)}
                                 className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:bg-teal-600 transition-colors pointer-events-auto"
                               >
                                 Buka Level Sekarang →
-                              </a>
+                              </button>
                             </div>
-                          )}
                         </div>
                      );
                    })}

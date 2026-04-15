@@ -2,9 +2,7 @@
 
 import { Profile, AppTheme } from "@/lib/types";
 
-const ADMIN_WA_NUMBER = "6281273010793";
-
-export default function LatihanView({ user, theme }: { user: Profile, theme: AppTheme | null }) {
+export default function LatihanView({ user, theme, onUpgrade }: { user: Profile, theme: AppTheme | null, onUpgrade?: (msg: string) => void }) {
   const practiceCards = [
     {
       id: "jlpt",
@@ -44,10 +42,6 @@ export default function LatihanView({ user, theme }: { user: Profile, theme: App
     }
   ];
 
-  const waLink = (target: string) => `https://wa.me/${ADMIN_WA_NUMBER}?text=${encodeURIComponent(
-    `Halo Admin, saya ${user.full_name} ingin berlangganan Premium untuk akses ${target} di ${theme?.app_name || 'Reiwa LMS'}`
-  )}`;
-
   return (
     <div className="space-y-12 pb-20">
       <div className="px-4">
@@ -85,14 +79,12 @@ export default function LatihanView({ user, theme }: { user: Profile, theme: App
                   <span className="text-4xl">💎</span>
                   <h5 className="text-xl font-black text-slate-900 italic uppercase">Premium Only</h5>
                   <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">Upgrade untuk akses fitur ini</p>
-                  <a 
-                    href={waLink(card.title)}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button 
+                    onClick={() => onUpgrade?.(`Halo Admin, saya ${user.full_name} ingin berlangganan Premium untuk akses ${card.title} di ${theme?.app_name || 'Reiwa LMS'}`)}
                     className="inline-block bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:bg-indigo-600 transition-colors"
                   >
                     Hubungi Admin →
-                  </a>
+                  </button>
                 </div>
               </div>
             )}
