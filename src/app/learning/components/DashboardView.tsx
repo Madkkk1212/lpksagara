@@ -1,0 +1,230 @@
+"use client";
+
+import { useEffect, useState, useMemo } from "react";
+import { Profile, AppTheme } from "@/lib/types";
+import { getLeaderboard, getUserLastProgressDetails } from "@/lib/db";
+
+const ADMIN_WA_NUMBER = "6281273010793";
+
+export default function DashboardView({ user, theme }: { user: Profile, theme: AppTheme | null }) {
+  const [leaderboard, setLeaderboard] = useState<Profile[]>([]);
+  const [lastProgress, setLastProgress] = useState<any[]>([]);
+  
+  const currentExp = user.exp || 0;
+  // Progress formula: assuming levels are 1000 exp each
+  const levelProgress = currentExp % 1000;
+  const progressPercent = Math.min(levelProgress / 10, 100);
+
+  useEffect(() => {
+    async function loadDashboard() {
+      const [lb, lp] = await Promise.all([
+        getLeaderboard(),
+        getUserLastProgressDetails(user.email)
+      ]);
+      setLeaderboard(lb);
+      setLastProgress(lp);
+    }
+    loadDashboard();
+  }, [user.email]);
+
+  // Simulated Weekly Activity Data
+  const weeklyActivity = useMemo(() => {
+    const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+    // Generate values based on current XP to make it look "live"
+    return days.map((day, i) => ({
+      day,
+      value: Math.floor(Math.random() * 60) + 20 + (i === 6 ? 20 : 0) // Peak on Saturday
+    }));
+  }, []);
+
+  const waLink = `https://wa.me/${ADMIN_WA_NUMBER}?text=${encodeURIComponent(
+    `Halo Admin, saya ${user.full_name} ingin upgrade ke Premium di ${theme?.app_name || 'Reiwa LMS'}`
+  )}`;
+
+  return (
+    <div className="space-y-12 pb-20">
+      {/* 1. Stat Cards & Welcome */}
+      <div className="grid lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-white/60 backdrop-blur-xl rounded-[3rem] p-10 shadow-[0_20px_60px_rgba(0,0,0,0.03)] border border-white/80 flex flex-col md:flex-row items-center justify-between gap-10 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-teal-400/10 to-indigo-400/10 blur-[60px] rounded-full -mr-40 -mt-40 transition-transform duration-1000 group-hover:scale-110" />
+          
+          <div className="relative z-10 space-y-4">
+             <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center text-xs">🎉</span>
+                <span className="text-[10px] font-black text-teal-600 uppercase tracking-[0.3em]">Student Dashboard</span>
+             </div>
+             <h2 className="text-4xl font-black text-slate-800 leading-tight">
+                Selamat Belajar,<br/>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-indigo-600">{user.full_name}!</span>
+             </h2>
+             <p className="text-slate-400 text-sm font-medium italic">"Teruslah berlatih, kesuksesan menantimu."</p>
+          </div>
+
+          <div className="w-full md:w-72 p-6 bg-white/50 backdrop-blur-md rounded-[2rem] border border-white/60 shadow-inner relative z-10">
+            <div className="flex justify-between items-end mb-4">
+               <div>
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Level Progress</p>
+                 <h4 className="text-2xl font-black text-slate-800 italic">Lvl {user.level || 1}</h4>
+               </div>
+               <span className="text-xl">✨</span>
+            </div>
+            <div className="h-4 bg-slate-100/50 rounded-full overflow-hidden p-0.5">
+               <div 
+                 className="h-full bg-gradient-to-r from-teal-500 via-emerald-400 to-indigo-600 rounded-full transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(20,184,166,0.3)]" 
+                 style={{ width: `${progressPercent}%` }} 
+               />
+            </div>
+            <div className="mt-3 flex justify-between">
+              <span className="text-[9px] font-black text-teal-600">{levelProgress} XP</span>
+              <span className="text-[9px] font-black text-slate-300">Target Level: {user.target_level || 'N5'}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Leaderboard Fast Look */}
+        <div className="bg-slate-900 rounded-[3rem] p-8 shadow-2xl relative overflow-hidden group">
+           <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:rotate-12 transition-transform duration-700">
+             <span className="text-8xl">🏆</span>
+           </div>
+           <div className="relative z-10">
+              <h3 className="text-white text-xl font-black italic mb-6">Top Performers</h3>
+              <div className="space-y-4">
+                 {leaderboard.slice(0, 4).map((player, idx) => (
+                   <div key={idx} className={`flex items-center justify-between p-3 rounded-2xl transition-all ${player.email === user.email ? 'bg-white/10 ring-1 ring-white/20' : ''}`}>
+                      <div className="flex items-center gap-3">
+                         <span className={`text-xs font-black w-5 h-5 rounded-md flex items-center justify-center ${idx === 0 ? 'bg-amber-400 text-slate-900' : 'bg-white/5 text-white/40'}`}>{idx + 1}</span>
+                         <span className="text-xs font-bold text-white/80 truncate max-w-[100px]">{player.full_name}</span>
+                      </div>
+                      <span className="text-[10px] font-black text-teal-400 tabular-nums">{player.exp} XP</span>
+                   </div>
+                 ))}
+              </div>
+              <button className="w-full mt-6 py-3 bg-white/10 text-white/40 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-slate-900 transition-all duration-500">
+                View Full Ranking
+              </button>
+           </div>
+        </div>
+      </div>
+
+      {/* 2. Premium Upgrade Banner (Visible for Free Users) */}
+      {!user.is_premium && (
+        <div className="relative overflow-hidden rounded-[3rem] bg-gradient-to-r from-amber-400 to-orange-500 p-1 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-1000">
+           <div className="bg-white/95 backdrop-blur-3xl rounded-[2.8rem] p-8 md:p-12 flex flex-col lg:flex-row items-center justify-between gap-10">
+              <div className="flex flex-col md:flex-row items-center gap-8 text-center md:text-left">
+                 <div className="h-24 w-24 rounded-[2rem] bg-amber-100 flex items-center justify-center text-5xl shadow-inner rotate-3">👑</div>
+                 <div className="space-y-2">
+                    <h3 className="text-3xl font-black text-slate-800 italic leading-none">Upgrade ke Premium</h3>
+                    <p className="text-slate-500 font-medium max-w-md">Buka semua level, akses bank soal terlengkap, dan raih sertifikasi impianmu lebih cepat!</p>
+                 </div>
+              </div>
+              <a 
+                href={waLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-12 py-5 bg-slate-900 text-white rounded-2xl font-black text-sm tracking-widest shadow-[0_20px_50px_rgba(15,23,42,0.3)] hover:shadow-none hover:translate-y-1 transition-all duration-500 block text-center min-w-[200px]"
+              >
+                HUBUNGI ADMIN
+              </a>
+           </div>
+        </div>
+      )}
+
+      <div className="grid lg:grid-cols-3 gap-8">
+        {/* Weekly Activity Chart */}
+        <div className="lg:col-span-2 space-y-6">
+           <h3 className="text-xl font-black text-slate-800 italic uppercase tracking-wider flex items-center gap-3 px-2">
+             <span className="p-2 bg-white rounded-xl shadow-sm border border-slate-100">📊</span>
+             Aktivitas Belajar
+           </h3>
+           <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-sm relative overflow-hidden">
+              <div className="flex items-end justify-between h-48 gap-4 px-4">
+                 {weeklyActivity.map((item, idx) => (
+                   <div key={idx} className="flex-1 flex flex-col items-center group">
+                      <div 
+                        className="w-full max-w-[40px] bg-slate-50 rounded-t-2xl relative transition-all duration-1000 ease-out group-hover:bg-teal-50"
+                        style={{ height: `${item.value}%` }}
+                      >
+                         <div 
+                           className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-teal-500 to-teal-300 rounded-t-2xl shadow-[0_0_20px_rgba(20,184,166,0.2)] transition-all duration-1000 group-hover:from-indigo-500 group-hover:to-indigo-300" 
+                           style={{ height: '0%' }}
+                           ref={(el) => {
+                             if (el) setTimeout(() => el.style.height = '100%', 100 * idx);
+                           }}
+                         />
+                         <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                            {Math.round(item.value * 1.5)} XP
+                         </div>
+                      </div>
+                      <span className="text-[10px] font-black text-slate-400 mt-4 uppercase tracking-tighter">{item.day}</span>
+                   </div>
+                 ))}
+              </div>
+           </div>
+        </div>
+
+        {/* Weekly Quest */}
+        <div className="space-y-6">
+           <h3 className="text-xl font-black text-slate-800 italic uppercase tracking-wider flex items-center gap-3 px-2">
+             <span className="p-2 bg-white rounded-xl shadow-sm border border-slate-100">📅</span>
+             Quest Mingguan
+           </h3>
+           <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[3rem] p-8 space-y-4">
+              {[
+                { label: "Video Materi Bab 1", exp: 50, completed: true },
+                { label: "Quiz Moji-Goi Bab 1", exp: 50, completed: false },
+                { label: "Kaiwa AI 10 Menit", exp: 50, completed: false },
+              ].map((target, idx) => (
+                <div key={idx} className={`p-5 rounded-3xl border flex items-center justify-between transition-all duration-500 ${target.completed ? 'bg-white/20 border-teal-100 opacity-60' : 'bg-white border-white/80 shadow-sm hover:shadow-lg'}`}>
+                   <div className="flex items-center gap-4">
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center border-2 transition-all ${target.completed ? 'bg-teal-500 border-teal-500 text-white' : 'bg-slate-50 border-slate-100 text-slate-200'}`}>
+                        {target.completed && '✓'}
+                      </div>
+                      <span className={`text-xs font-black ${target.completed ? 'text-slate-400 line-through italic' : 'text-slate-700'}`}>{target.label}</span>
+                   </div>
+                   {!target.completed && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-2 py-1 rounded-md">+{target.exp} XP</span>}
+                </div>
+              ))}
+           </div>
+        </div>
+      </div>
+
+      {/* Lanjutkan Belajar Section */}
+      <div className="space-y-6">
+         <div className="flex items-center justify-between px-2">
+            <h3 className="text-xl font-black text-slate-800 italic uppercase tracking-wider flex items-center gap-3">
+              <span className="p-2 bg-white rounded-xl shadow-sm border border-slate-100">📖</span>
+              Lanjutkan Belajar
+            </h3>
+         </div>
+         
+         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="p-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:translate-y-[-8px] transition-all duration-700 group cursor-pointer relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-10 transition-opacity duration-700">
+                 <span className="text-6xl">🎓</span>
+               </div>
+               <div className="relative z-10">
+                  <span className="px-3 py-1 bg-teal-50 text-teal-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-teal-100 mb-4 inline-block">Materi Terakhir</span>
+                  <h4 className="text-2xl font-black text-slate-800 leading-tight mb-2 group-hover:text-teal-600 transition-colors">
+                    {lastProgress[0]?.study_materials?.title || 'Mulailah Belajar!'}
+                  </h4>
+                  <p className="text-xs text-slate-400 font-medium">Klik untuk melanjutkan bagian yang tertinggal.</p>
+               </div>
+            </div>
+
+            <div className="p-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:translate-y-[-8px] transition-all duration-700 group cursor-pointer relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-10 transition-opacity duration-700">
+                 <span className="text-6xl">✍️</span>
+               </div>
+               <div className="relative z-10">
+                  <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-amber-100 mb-4 inline-block">Latihan Rekomendasi</span>
+                  <h4 className="text-2xl font-black text-slate-800 leading-tight mb-2 group-hover:text-amber-600 transition-colors">
+                    Simulasi JLPT N5
+                  </h4>
+                  <p className="text-xs text-slate-400 font-medium">Uji kemampuan Anda sebelum naik level.</p>
+               </div>
+            </div>
+         </div>
+      </div>
+    </div>
+  );
+}

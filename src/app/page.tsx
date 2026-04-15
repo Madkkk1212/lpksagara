@@ -645,6 +645,9 @@ export default function Home() {
                        </div>
                        
                        <div className="grid gap-4 font-black tracking-widest text-[10px] uppercase">
+                          <button onClick={() => router.push('/learning')} className="w-full py-5 bg-teal-500 text-white rounded-2xl shadow-xl shadow-teal-500/20 active:scale-95 transition flex items-center justify-center gap-3">
+                             <span className="text-lg">📊</span> LEARNING SYSTEM (RIWAYAT)
+                          </button>
                           <button onClick={() => setActiveTab("soal")} className="w-full py-5 bg-slate-900 text-white rounded-2xl shadow-xl active:scale-95 transition">Lanjut Belajar</button>
                           <button onClick={() => { localStorage.removeItem("luma-auth"); window.location.reload(); }} className="w-full py-5 bg-rose-50 text-rose-500 rounded-2xl border border-rose-100 active:scale-95 transition">Keluar Akun</button>
                        </div>

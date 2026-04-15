@@ -307,3 +307,13 @@ export async function getUserLastProgressDetails(userEmail: string): Promise<any
   if (error || !data) return [];
   return data as any[];
 }
+
+export async function getLeaderboard(limit = 10): Promise<Profile[]> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('exp', { ascending: false })
+    .limit(limit);
+  if (error) return [];
+  return data;
+}
