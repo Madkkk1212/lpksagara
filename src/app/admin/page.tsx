@@ -2,10 +2,15 @@ import AdminClient from "./AdminClient";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Admin Panel | Reiwa LMS",
-  description: "Reiwa LMS Management Dashboard",
-};
+import { getTheme } from "@/lib/db";
+
+export async function generateMetadata() {
+  const theme = await getTheme();
+  return {
+    title: `Admin Panel | ${theme?.app_name || "Reiwa LMS"}`,
+    description: theme?.tagline || "Management Dashboard",
+  };
+}
 
 export default function AdminPage() {
   return <AdminClient />;

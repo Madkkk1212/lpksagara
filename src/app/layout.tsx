@@ -46,6 +46,8 @@ export const viewport = {
   viewportFit: "cover",
 };
 
+import SmoothScroll from "@/app/components/SmoothScroll";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -56,7 +58,10 @@ export default function RootLayout({
       lang="id"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <SmoothScroll />
+        {children}
+      </body>
     </html>
   );
 }

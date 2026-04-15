@@ -1,10 +1,15 @@
 import { Suspense } from "react";
 import RegisterClient from "./RegisterClient";
 
-export const metadata = {
-  title: "Register - Reiwa LMS",
-  description: "Daftar akun Reiwa LMS untuk mengakses materi dan ujian.",
-};
+import { getTheme } from "@/lib/db";
+
+export async function generateMetadata() {
+  const theme = await getTheme();
+  return {
+    title: `Register - ${theme?.app_name || "Reiwa LMS"}`,
+    description: theme?.tagline || "Daftar akun untuk mengakses materi dan ujian.",
+  };
+}
 
 export default function RegisterPage() {
   return (

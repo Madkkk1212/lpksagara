@@ -655,20 +655,6 @@ export default function Home() {
           </section>
 
           <aside className="hidden lg:block space-y-8 animate-in fade-in slide-in-from-right-4 duration-1000">
-             <div className="rounded-[3rem] bg-white shadow-xl overflow-hidden group">
-                <div className="h-72 relative overflow-hidden">
-                   <img src="https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1200&q=80" className="w-full h-full object-cover grayscale transition-all duration-1000 group-hover:scale-110 group-hover:grayscale-0" alt="Sidebar" />
-                   <div className="absolute inset-0 bg-slate-900/10" />
-                </div>
-                <div className="p-10">
-                   <p className="text-[10px] font-black uppercase tracking-[0.4em] text-teal-600 mb-4 italic">Study Insights</p>
-                   <h3 className="text-3xl font-black italic text-slate-800 leading-tight mb-6">Master Japanese with Style.</h3>
-                   <p className="text-slate-400 font-medium leading-relaxed leading-7">Desain premium yang berfokus pada ketenangan belajar. Kurikulum kami dirancang untuk membantu Anda menguasai Nihongo dengan cepat dan tepat.</p>
-                </div>
-             </div>
-
-             <JapanNews />
-             
              <div className="rounded-[3rem] bg-slate-900 p-10 text-white shadow-2xl">
                 <h4 className="text-xl font-black italic mb-6">Target Minggu Ini</h4>
                 <div className="space-y-6">
@@ -688,6 +674,8 @@ export default function Home() {
                    ))}
                 </div>
              </div>
+
+             <JapanNews />
           </aside>
         </div>
 

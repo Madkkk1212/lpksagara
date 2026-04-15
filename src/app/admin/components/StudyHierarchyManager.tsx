@@ -7,7 +7,7 @@ import {
   upsertStudyChapter, deleteStudyChapter, 
   upsertStudyMaterial, deleteStudyMaterial,
   getIconCategories, getIconLibrary,
-  getMaterialCategories
+  getMaterialCategories, upsertMaterialCategory, deleteMaterialCategory
 } from "@/lib/db";
 import { StudyLevel, StudyChapter, StudyMaterial, IconCategory, IconLibraryItem, MaterialCategory } from "@/lib/types";
 
@@ -25,6 +25,7 @@ export default function StudyHierarchyManager() {
   const [editingLevel, setEditingLevel] = useState<Partial<StudyLevel> | null>(null);
   const [editingChapter, setEditingChapter] = useState<Partial<StudyChapter> | null>(null);
   const [editingMaterial, setEditingMaterial] = useState<Partial<StudyMaterial> | null>(null);
+  const [editingCategory, setEditingCategory] = useState<Partial<MaterialCategory> | null>(null);
   const [editingAppCategory, setEditingAppCategory] = useState<MaterialCategory | null>(null);
   
   // Dynamic Editor Content state
@@ -132,6 +133,24 @@ export default function StudyHierarchyManager() {
     } catch (e) { alert("Error deleting material"); }
   };
 
+  const handleSaveCategory = async () => {
+    if (!editingCategory) return;
+    try {
+      await upsertMaterialCategory(editingCategory);
+      setEditingCategory(null);
+      loadLevels();
+    } catch (e) { alert("Error saving category"); }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!confirm("Delete this category? This will hide all levels inside it from the Materi tab.")) return;
+    try {
+      await deleteMaterialCategory(id);
+      setSelectedCategoryFilter(null);
+      loadLevels();
+    } catch (e) { alert("Error deleting category"); }
+  };
+
   const openMaterialModal = (mat: Partial<StudyMaterial>) => {
     setEditingMaterial(mat);
     const c = (mat.content || {}) as any;
@@ -171,13 +190,12 @@ export default function StudyHierarchyManager() {
     if (pickerTarget === 'category' && editingAppCategory) {
       try {
         const updatedCat = { ...editingAppCategory, icon_url: url };
-        // Use the existing upsert function - assuming it's imported or defined
-        const { upsertMaterialCategory } = await import("@/lib/db");
         await upsertMaterialCategory(updatedCat);
         setEditingAppCategory(null);
         loadLevels(); // Refresh all data
       } catch (err) { alert("Error saving category icon"); }
     }
+    else if (pickerTarget === 'category' && editingCategory) setEditingCategory({...editingCategory, icon_url: url});
     else if (pickerTarget === 'level' && editingLevel) setEditingLevel({...editingLevel, icon_url: url});
     else if (pickerTarget === 'chapter' && editingChapter) setEditingChapter({...editingChapter, icon_url: url});
     else if (pickerTarget === 'material' && editingMaterial) setEditingMaterial({...editingMaterial, icon_url: url});
@@ -301,10 +319,18 @@ export default function StudyHierarchyManager() {
     <div className="space-y-12">
       {/* 0. CATEGORIES */}
       <section className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl">
-         <div className="mb-6">
-            <h3 className="text-xl font-black italic">0. Select Category First</h3>
-            <p className="text-slate-400 text-sm font-medium">Pilih jalur sertifikasi untuk melihat level studinya.</p>
-         </div>
+          <div className="mb-6 flex justify-between items-center">
+             <div>
+                <h3 className="text-xl font-black italic">0. Select Category First</h3>
+                <p className="text-slate-400 text-sm font-medium">Pilih jalur sertifikasi untuk melihat level studinya.</p>
+             </div>
+             <button 
+                onClick={() => setEditingCategory({ name: "Kategori Baru", description: "", badge_color: "#14b8a6", sort_order: appCategories.length + 1 })}
+                className="px-6 py-2 bg-white text-slate-900 rounded-xl font-black text-[10px] tracking-widest uppercase shadow-lg hover:scale-105 transition active:scale-95"
+             >
+                + Add Category
+             </button>
+          </div>
          <div className="flex flex-wrap gap-4">
             {appCategories.map(cat => (
                <div key={cat.id} className="relative group">
@@ -321,13 +347,29 @@ export default function StudyHierarchyManager() {
                     )}
                     {cat.name}
                  </button>
-                 <button 
-                  onClick={(e) => { e.stopPropagation(); openIconPicker('category', cat); }}
-                  className="absolute -top-2 -right-2 h-8 w-8 rounded-full bg-white text-slate-900 border shadow-xl flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-all hover:scale-110 active:scale-95"
-                  title="Edit Icon"
-                 >
-                   ✎
-                 </button>
+                  <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all z-20">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); openIconPicker('category', cat); }}
+                      className="h-8 w-8 rounded-xl bg-white text-slate-900 border shadow-xl flex items-center justify-center text-xs hover:scale-110 active:scale-95"
+                      title="Edit Icon"
+                    >
+                      ✨
+                    </button>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setEditingCategory(cat); }}
+                      className="h-8 w-8 rounded-xl bg-slate-900 text-white shadow-xl flex items-center justify-center text-xs hover:scale-110 active:scale-95"
+                      title="Edit Details"
+                    >
+                      ✎
+                    </button>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleDeleteCategory(cat.id); }}
+                      className="h-8 w-8 rounded-xl bg-rose-500 text-white shadow-xl flex items-center justify-center text-xs hover:scale-110 active:scale-95"
+                      title="Delete Category"
+                    >
+                      ✕
+                    </button>
+                  </div>
                </div>
             ))}
          </div>
@@ -441,6 +483,44 @@ export default function StudyHierarchyManager() {
       )}
 
       {/* --- MODALS --- */}
+      
+      {/* Category Modal */}
+      {editingCategory && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] flex items-center justify-center p-6">
+           <div className="bg-white rounded-[2.5rem] w-full max-w-lg p-10 shadow-2xl overflow-y-auto max-h-[90vh]">
+              <h3 className="text-2xl font-black text-slate-800 mb-8 italic">{editingCategory.id ? 'Edit Category' : 'New Category'}</h3>
+              <div className="space-y-6">
+                 <div>
+                    <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Category Name</label>
+                    <input value={editingCategory.name || ""} onChange={e => setEditingCategory({...editingCategory, name: e.target.value})} className="w-full px-6 py-3 rounded-2xl bg-slate-50 font-bold" />
+                 </div>
+                 <div>
+                    <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Description</label>
+                    <textarea value={editingCategory.description || ""} onChange={e => setEditingCategory({...editingCategory, description: e.target.value})} className="w-full h-24 px-6 py-3 rounded-2xl bg-slate-50 font-bold" />
+                 </div>
+                 <div>
+                    <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Badge Color</label>
+                    <input type="color" value={editingCategory.badge_color || "#14b8a6"} onChange={e => setEditingCategory({...editingCategory, badge_color: e.target.value})} className="w-full h-12 p-0 rounded-2xl overflow-hidden cursor-pointer" />
+                 </div>
+                 <div className="pt-4 border-t">
+                    <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Category Icon</label>
+                     <div className="flex items-center gap-4">
+                       {editingCategory.icon_url && (
+                         <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center p-2 shadow-sm ring-1 ring-slate-100">
+                           <img src={editingCategory.icon_url || undefined} className="w-full h-full object-contain" alt="icon"/>
+                         </div>
+                       )}
+                       <button onClick={() => openIconPicker('category')} className="flex-1 py-4 bg-slate-100 font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-slate-200 transition-all">🖼️ Pilih dari Galeri</button>
+                     </div>
+                 </div>
+              </div>
+              <div className="flex justify-end gap-4 mt-8 pt-6 border-t font-black uppercase tracking-widest text-[10px]">
+                 <button onClick={() => setEditingCategory(null)} className="text-slate-400 hover:text-slate-600">Cancel</button>
+                 <button onClick={handleSaveCategory} className="px-10 py-3 bg-slate-900 text-white rounded-2xl shadow-xl active:scale-95 transition">SAVE</button>
+              </div>
+           </div>
+        </div>
+      )}
 
       {/* Level Modal */}
       {editingLevel && (
