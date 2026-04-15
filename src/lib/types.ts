@@ -134,6 +134,10 @@ export interface Profile {
   is_premium: boolean
   unlocked_materials: string[] | null
   unlocked_levels: string[] | null
+  exp: number
+  level: number
+  target_level: string | null
+  avatar_url: string | null
   created_at?: string
   updated_at?: string
 }
