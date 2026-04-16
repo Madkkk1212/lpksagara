@@ -163,7 +163,7 @@ export default function AdminClient() {
             <button
               key={tab.id}
               onClick={() => {
-                setActiveTab(tab.id);
+                setActiveTab(tab.id as AdminTab);
                 setIsSidebarOpen(false);
               }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all text-sm ${activeTab === tab.id ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'}`}

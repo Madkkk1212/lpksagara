@@ -148,11 +148,14 @@ export interface Profile {
   target_level: string | null
   avatar_url: string | null
   birth_date?: string | null
+  current_streak?: number
+  longest_streak?: number
+  last_activity_at?: string | null
+  created_at?: string
   address?: string | null
   institution?: string | null
   certificate_url?: string | null
   profile_completed?: boolean
-  created_at?: string
   updated_at?: string
 }
 

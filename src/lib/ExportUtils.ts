@@ -12,17 +12,17 @@ import autoTable from 'jspdf-autotable';
  * Export data to Excel (.xlsx)
  */
 export const exportToExcel = (data: any[], fileName: string, sheetName: string = 'Sheet1', metadata?: string) => {
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const workbook = XLSX.utils.book_new();
+  let worksheet: XLSX.WorkSheet;
   
   if (metadata) {
-    XLSX.utils.sheet_add_aoa(worksheet, [[`Laporan: ${metadata}`]], { origin: 'A1' });
-    // Shift data down if metadata is added
-    const dataWS = XLSX.utils.json_to_sheet(data, { origin: 'A2' });
-    XLSX.utils.book_append_sheet(workbook, dataWS, sheetName);
+    worksheet = XLSX.utils.aoa_to_sheet([[`Laporan: ${metadata}`]]);
+    XLSX.utils.sheet_add_json(worksheet, data, { origin: 'A2' });
   } else {
-    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    worksheet = XLSX.utils.json_to_sheet(data);
   }
+  
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
   
   XLSX.writeFile(workbook, `${fileName}.xlsx`);
 };
