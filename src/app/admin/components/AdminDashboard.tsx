@@ -34,29 +34,35 @@ export default function AdminDashboard() {
   }, []);
 
   const statCards = [
-    { label: "Total Banners", value: stats.banners, icon: "🖼️", bg: "bg-teal-50", text: "text-teal-600" },
-    { label: "Materi Belajar", value: stats.materials, icon: "📚", bg: "bg-amber-50", text: "text-amber-600" },
-    { label: "Level JLPT", value: stats.levels, icon: "🏆", bg: "bg-indigo-50", text: "text-indigo-600" },
-    { label: "Total Tes", value: stats.tests, icon: "🎯", bg: "bg-rose-50", text: "text-rose-600" },
-    { label: "Total Soal", value: stats.questions, icon: "❓", bg: "bg-slate-50", text: "text-slate-600" },
+    { label: "Total Banners", value: stats.banners, id: "BNR-X1" },
+    { label: "Materi Belajar", value: stats.materials, id: "MTR-C7" },
+    { label: "Level JLPT", value: stats.levels, id: "LVL-Z9" },
+    { label: "Total Tes", value: stats.tests, id: "TST-D4" },
+    { label: "Total Soal", value: stats.questions, id: "QST-V2" },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
       {statCards.map((item) => (
-        <div key={item.label} className={`p-8 rounded-[2rem] ${item.bg} ring-1 ring-inset ring-black/[0.03] transition-transform hover:-translate-y-1`}>
-          <div className="text-4xl mb-4">{item.icon}</div>
-          <p className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-1">{item.label}</p>
-          <p className={`text-4xl font-black ${item.text}`}>{item.value}</p>
+        <div key={item.label} className="p-5 bg-white border border-slate-200 shadow-sm rounded-2xl transition-all hover:shadow-md hover:border-indigo-200">
+          <div className="flex justify-between items-start mb-6">
+             <p className="text-xs font-semibold text-slate-500">{item.label}</p>
+             <span className="text-[10px] text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded-md">{item.id}</span>
+          </div>
+          <p className="text-3xl font-bold text-slate-900 tracking-tight">{item.value}</p>
         </div>
       ))}
-      <div className="col-span-full md:col-span-2 mt-8 p-10 bg-slate-900 rounded-[2.5rem] text-white shadow-xl">
-        <h3 className="text-2xl font-black mb-4">Selamat Datang, Admin!</h3>
-        <p className="opacity-70 leading-relaxed font-medium">Ini adalah panel manajemen konten Reiwa LMS. Anda bisa mengubah banner, materi, level, hingga soal ujian secara real-time yang akan langsung terupdate di sisi pengguna.</p>
-        <div className="mt-8 flex gap-4">
-           <div className="flex h-12 items-center gap-3 bg-white/10 px-6 rounded-full font-bold text-sm">
-             <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-             Supabase Connected
+      <div className="col-span-full mt-4 p-8 bg-indigo-50 border border-indigo-100 rounded-2xl text-indigo-900">
+        <h3 className="text-lg font-bold mb-2 flex items-center gap-3">
+           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" /></svg>
+           SYSTEM OVERVIEW
+        </h3>
+        <p className="text-sm opacity-80 font-medium">Primary Configuration & Metric Hub</p>
+        
+        <div className="mt-8 pt-6 border-t border-indigo-200 flex gap-4">
+           <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow-sm font-medium text-xs text-slate-600">
+             <div className="h-2 w-2 rounded-full bg-emerald-500" />
+             Core Database: Synced
            </div>
         </div>
       </div>

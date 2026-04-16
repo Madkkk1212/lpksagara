@@ -3,12 +3,18 @@
 import { useEffect, useState, useMemo } from "react";
 import { Profile, AppTheme } from "@/lib/types";
 import { getLeaderboard, getUserLastProgressDetails } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
+import AISenseiChat from "./AISenseiChat";
+import { Flame, Trophy, Calendar, Bell, ChevronRight, Zap } from "lucide-react";
 
-export default function DashboardView({ user, theme, onUpgrade }: { user: Profile, theme: AppTheme | null, onUpgrade?: (msg: string) => void }) {
+export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: { user: Profile, theme: AppTheme | null, onUpgrade?: (msg: string) => void, onSwitchTab?: (tab: any) => void }) {
   const [leaderboard, setLeaderboard] = useState<Profile[]>([]);
   const [lastProgress, setLastProgress] = useState<any[]>([]);
+  const [achievements, setAchievements] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
   const [isLeaderboardOpen, setLeaderboardOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showAnnouncement, setShowAnnouncement] = useState(false);
   
   const currentExp = user.exp || 0;
   // Progress formula: assuming levels are 1000 exp each
@@ -17,11 +23,32 @@ export default function DashboardView({ user, theme, onUpgrade }: { user: Profil
 
   useEffect(() => {
     async function loadDashboard() {
+      // 1. Fetch active announcements
+      const { data: ann } = await supabase
+        .from('announcements')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (ann && ann.length > 0) {
+        setAnnouncements(ann);
+        setShowAnnouncement(true);
+      }
+
+      // 2. Fetch earned achievements
+      const { data: ach } = await supabase
+        .from('user_achievements')
+        .select('achievement_id, achievements(*)')
+        .eq('user_email', user.email);
+      setAchievements(ach || []);
+
+      // 3. Fetch Leaderboard & Progress
       const [lb, lp] = await Promise.all([
         getLeaderboard(),
         getUserLastProgressDetails(user.email)
       ]);
-      setLeaderboard(lb);
+      setLeaderboard(lb.filter(p => !p.is_admin && !p.is_teacher));
       setLastProgress(lp);
     }
     loadDashboard();
@@ -30,10 +57,9 @@ export default function DashboardView({ user, theme, onUpgrade }: { user: Profil
   // Simulated Weekly Activity Data
   const weeklyActivity = useMemo(() => {
     const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
-    // Generate values based on current XP to make it look "live"
     return days.map((day, i) => ({
       day,
-      value: Math.floor(Math.random() * 60) + 20 + (i === 6 ? 20 : 0) // Peak on Saturday
+      value: Math.floor(Math.random() * 60) + 20 + (i === 6 ? 20 : 0)
     }));
   }, []);
 
@@ -45,15 +71,20 @@ export default function DashboardView({ user, theme, onUpgrade }: { user: Profil
           <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-teal-400/10 to-indigo-400/10 blur-[60px] rounded-full -mr-40 -mt-40 transition-transform duration-1000 group-hover:scale-110" />
           
           <div className="relative z-10 space-y-4">
-             <div className="flex items-center gap-2">
-                <span className="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center text-xs">🎉</span>
-                <span className="text-[10px] font-black text-teal-600 uppercase tracking-[0.3em]">Student Dashboard</span>
+             <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-rose-50 border border-rose-100 rounded-full">
+                   <Flame className="w-4 h-4 text-rose-500 fill-rose-500" />
+                   <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest">{user.current_streak || 0} DAY STREAK</span>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 border border-indigo-100 rounded-full">
+                   <Trophy className="w-4 h-4 text-indigo-500" />
+                   <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{achievements.length} BADGES</span>
+                </div>
              </div>
              <h2 className="text-4xl font-black text-slate-800 leading-tight">
                 Selamat Belajar,<br/>
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-indigo-600">{user.full_name}!</span>
              </h2>
-             <p className="text-slate-400 text-sm font-medium italic">"Teruslah berlatih, kesuksesan menantimu."</p>
           </div>
 
           <div className="w-full md:w-72 p-6 bg-white/50 backdrop-blur-md rounded-[2rem] border border-white/60 shadow-inner relative z-10">
@@ -145,7 +176,7 @@ export default function DashboardView({ user, theme, onUpgrade }: { user: Profil
                            className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-teal-500 to-teal-300 rounded-t-2xl shadow-[0_0_20px_rgba(20,184,166,0.2)] transition-all duration-1000 group-hover:from-indigo-500 group-hover:to-indigo-300" 
                            style={{ height: '0%' }}
                            ref={(el) => {
-                             if (el) setTimeout(() => el.style.height = '100%', 100 * idx);
+                             if (el) setTimeout(() => (el.style.height = "100%"), 100 * idx);
                            }}
                          />
                          <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
@@ -187,14 +218,12 @@ export default function DashboardView({ user, theme, onUpgrade }: { user: Profil
 
       {/* Lanjutkan Belajar Section */}
       <div className="space-y-6">
-         <div className="flex items-center justify-between px-2">
-            <h3 className="text-xl font-black text-slate-800 italic uppercase tracking-wider flex items-center gap-3">
-              <span className="p-2 bg-white rounded-xl shadow-sm border border-slate-100">📖</span>
-              Lanjutkan Belajar
-            </h3>
-         </div>
-         
-         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <h3 className="text-xl font-black text-slate-800 italic uppercase tracking-wider flex items-center gap-3 px-2">
+            <span className="p-2 bg-white rounded-xl shadow-sm border border-slate-100">📖</span>
+            Lanjutkan Belajar
+          </h3>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="p-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:translate-y-[-8px] transition-all duration-700 group cursor-pointer relative overflow-hidden">
                <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-10 transition-opacity duration-700">
                  <span className="text-6xl">🎓</span>
@@ -208,20 +237,51 @@ export default function DashboardView({ user, theme, onUpgrade }: { user: Profil
                </div>
             </div>
 
-            <div className="p-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:translate-y-[-8px] transition-all duration-700 group cursor-pointer relative overflow-hidden">
+            <div 
+              onClick={() => onSwitchTab?.('flashcards')}
+              className="p-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:translate-y-[-8px] transition-all duration-700 group cursor-pointer relative overflow-hidden"
+            >
                <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-10 transition-opacity duration-700">
-                 <span className="text-6xl">✍️</span>
+                 <Zap className="w-16 h-16 text-amber-400" />
                </div>
                <div className="relative z-10">
-                  <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-amber-100 mb-4 inline-block">Latihan Rekomendasi</span>
+                  <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-amber-100 mb-4 inline-block">Smart Review</span>
                   <h4 className="text-2xl font-black text-slate-800 leading-tight mb-2 group-hover:text-amber-600 transition-colors">
-                    Simulasi JLPT N5
+                    SRS Flashcards
                   </h4>
-                  <p className="text-xs text-slate-400 font-medium">Uji kemampuan Anda sebelum naik level.</p>
+                  <p className="text-xs text-slate-400 font-medium">Uji daya ingat Anda dengan Flashcards.</p>
+               </div>
+            </div>
+          </div>
+      </div>
+
+       {/* ANNOUNCEMENT MODAL */}
+       {showAnnouncement && announcements.length > 0 && (
+         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowAnnouncement(false)} />
+            <div className="relative w-full max-w-lg bg-white rounded-[3rem] p-10 shadow-3xl animate-in zoom-in-95 duration-500 border border-slate-100">
+               <div className="flex flex-col items-center text-center">
+                  <div className={`w-16 h-16 rounded-[2rem] flex items-center justify-center text-3xl mb-6 shadow-xl ${
+                    announcements[0].type === 'success' ? 'bg-emerald-100 shadow-emerald-100' : 
+                    announcements[0].type === 'warning' ? 'bg-amber-100 shadow-amber-100' : 'bg-indigo-100 shadow-indigo-100'
+                  }`}>
+                    {announcements[0].type === 'success' ? '🎉' : announcements[0].type === 'warning' ? '⚠️' : '📢'}
+                  </div>
+                  <h3 className="text-2xl font-black italic text-slate-800 leading-tight mb-4">{announcements[0].title}</h3>
+                  <p className="text-sm text-slate-500 font-medium leading-relaxed mb-8">{announcements[0].content}</p>
+                  <button 
+                    onClick={() => setShowAnnouncement(false)}
+                    className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-slate-800 transition-all shadow-xl"
+                  >
+                    MENGERTI
+                  </button>
                </div>
             </div>
          </div>
-      </div>
+       )}
+
+       {/* Floating AI Sensei */}
+       <AISenseiChat />
 
        {/* FULL LEADERBOARD MODAL */}
        {isLeaderboardOpen && (
@@ -279,9 +339,9 @@ export default function DashboardView({ user, theme, onUpgrade }: { user: Profil
                        >
                           <div className="flex items-center gap-4">
                              <div className={`w-10 h-10 rounded-[1rem] flex items-center justify-center font-black text-sm shadow-sm ${
-                               rank === 1 ? 'bg-amber-400 text-slate-900 ring-4 ring-amber-100' :
-                               rank === 2 ? 'bg-slate-200 text-slate-700' :
-                               rank === 3 ? 'bg-orange-200 text-orange-800' : 'bg-slate-50 text-slate-400 border border-slate-200'
+                                rank === 1 ? 'bg-amber-400 text-slate-900 ring-4 ring-amber-100' :
+                                rank === 2 ? 'bg-slate-200 text-slate-700' :
+                                rank === 3 ? 'bg-orange-200 text-orange-800' : 'bg-slate-50 text-slate-400 border border-slate-200'
                              }`}>
                                {rank}
                              </div>

@@ -26,7 +26,21 @@ export default function LoginClient() {
 
   useEffect(() => {
     getTheme().then(setTheme);
-  }, []);
+
+    const checkSession = () => {
+      const isAuthed = localStorage.getItem("luma-auth") === "true";
+      if (isAuthed) {
+        const profileRaw = localStorage.getItem("luma-user-profile");
+        if (profileRaw) {
+          const profile = JSON.parse(profileRaw);
+          if (profile.is_admin) router.push("/admin");
+          else if (profile.is_teacher) router.push("/teacher");
+          else router.push("/");
+        }
+      }
+    };
+    checkSession();
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +52,12 @@ export default function LoginClient() {
     try {
       const profile = await getProfileByEmail(emailInput);
       if (profile) {
+        if (profile.is_admin || profile.is_teacher) {
+           setErrorMsg("Akses ditolak: Staf harap menggunakan /manajemen-sagara.");
+           setLoading(false);
+           return;
+        }
+
         window.localStorage.setItem("luma-auth", "true");
         window.localStorage.setItem("luma-user-profile", JSON.stringify(profile));
         router.push(`/?tab=${redirect}`);

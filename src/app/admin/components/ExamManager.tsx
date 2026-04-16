@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ExamLevel, ExamTest, Question, IconCategory, IconLibraryItem } from "@/lib/types";
+import MediaUploader from "@/app/components/MediaUploader";
 import { 
   getExamLevels, getExamTests, getQuestions, 
   upsertExamLevel, deleteExamLevel, 
@@ -195,8 +196,11 @@ export default function ExamManager() {
                     </span>
                     <h4 className="text-xl font-black italic">{test.title}</h4>
                     <div className="mt-4 flex gap-4 text-[10px] font-bold uppercase tracking-widest opacity-60">
-                       <span>{test.duration_minutes} MIN</span>
-                       <span>{test.pass_point}% PASS</span>
+                       <span>⏱️ {test.duration_minutes} MIN</span>
+                       <span>✅ {test.pass_point}% PASS</span>
+                       {selectedTest?.id === test.id && questions.length > 0 && (
+                          <span className="text-teal-400">📝 {questions.length} Soal</span>
+                       )}
                     </div>
                   </button>
                   <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition">
@@ -214,9 +218,9 @@ export default function ExamManager() {
       {selectedTest && (
         <section className="animate-in fade-in slide-in-from-top-4 duration-500">
            <div className="flex justify-between items-center mb-6 pt-10 border-t">
-              <h3 className="text-xl font-black text-slate-800 italic">3. Questions in {selectedTest.title}</h3>
+              <h3 className="text-xl font-black text-slate-800 italic">3. Questions in {selectedTest.title} <span className="text-teal-500 font-black">({questions.length} soal)</span></h3>
               <button 
-                onClick={() => setEditingQuestion({ question_text: "", option_a: "", option_b: "", option_c: "", option_d: "", correct_option: 0, sort_order: questions.length + 1 })}
+                onClick={() => setEditingQuestion({ question_type: 'multiple_choice', question_text: "", audio_url: "", option_a: "", option_b: "", option_c: "", option_d: "", correct_option: 0, sort_order: questions.length + 1 })}
                 className="text-[10px] font-black uppercase bg-slate-900 text-white px-4 py-2 rounded-xl"
               >
                 Add Question
@@ -361,54 +365,121 @@ export default function ExamManager() {
       {/* Question Modal */}
       {editingQuestion && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] flex items-center justify-center p-6 font-sans">
-           <div className="bg-white rounded-[3rem] w-full max-w-2xl p-12 shadow-2xl overflow-y-auto max-h-[90vh]">
-              <h3 className="text-2xl font-black text-slate-800 mb-8 italic">{editingQuestion.id ? 'Edit Question' : 'New Question'}</h3>
+           <div className="bg-white rounded-[3rem] w-full max-w-2xl p-10 shadow-2xl overflow-y-auto max-h-[90vh]">
+              <h3 className="text-2xl font-black text-slate-800 mb-6 italic">{editingQuestion.id ? 'Edit Soal' : 'Tambah Soal Baru'}</h3>
               <div className="space-y-6">
+                 {/* Question Type Selector */}
                  <div>
-                    <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Question Text</label>
-                    <textarea value={editingQuestion.question_text || ""} onChange={e => setEditingQuestion({...editingQuestion, question_text: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-slate-50 font-bold h-24" />
+                    <label className="text-[10px] font-black uppercase text-slate-400 mb-3 block">Tipe Soal</label>
+                    <div className="grid grid-cols-5 gap-2">
+                      {[
+                        { value: 'multiple_choice', emoji: '📝', label: 'Teks' },
+                        { value: 'listening', emoji: '🔊', label: 'Audio' },
+                        { value: 'image_based', emoji: '🖼️', label: 'Gambar' },
+                        { value: 'video_based', emoji: '🎬', label: 'Video' },
+                        { value: 'reading', emoji: '📖', label: 'Bacaan' },
+                      ].map(type => (
+                        <button
+                          key={type.value}
+                          type="button"
+                          onClick={() => setEditingQuestion({...editingQuestion, question_type: type.value as any})}
+                          className={`p-3 rounded-2xl border-2 text-center transition-all ${
+                            (editingQuestion.question_type || 'multiple_choice') === type.value
+                              ? 'border-teal-500 bg-teal-50 text-teal-700'
+                              : 'border-slate-100 bg-slate-50 text-slate-400 hover:border-slate-200'
+                          }`}
+                        >
+                          <div className="text-2xl mb-1">{type.emoji}</div>
+                          <div className="text-[9px] font-black uppercase tracking-widest">{type.label}</div>
+                        </button>
+                      ))}
+                    </div>
+                 </div>
+
+                 {/* Media Uploaders based on type */}
+                 {editingQuestion.question_type === 'listening' && (
+                   <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                     <MediaUploader
+                       label="File Audio Soal (MP3/OGG/WAV)"
+                       mediaType="audio"
+                       value={editingQuestion.audio_url}
+                       onChange={(url) => setEditingQuestion({...editingQuestion, audio_url: url})}
+                     />
+                   </div>
+                 )}
+                 {editingQuestion.question_type === 'image_based' && (
+                   <div className="p-4 bg-sky-50 border border-sky-200 rounded-2xl">
+                     <MediaUploader
+                       label="Gambar Soal (JPG/PNG/WebP)"
+                       mediaType="image"
+                       value={editingQuestion.image_url}
+                       onChange={(url) => setEditingQuestion({...editingQuestion, image_url: url})}
+                     />
+                   </div>
+                 )}
+                 {editingQuestion.question_type === 'video_based' && (
+                   <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl">
+                     <MediaUploader
+                       label="Video Soal (MP4/WebM)"
+                       mediaType="video"
+                       value={editingQuestion.video_url}
+                       onChange={(url) => setEditingQuestion({...editingQuestion, video_url: url})}
+                     />
+                   </div>
+                 )}
+
+                 <div>
+                    <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">
+                      {editingQuestion.question_type === 'reading' ? 'Teks Bacaan (Passage)' : 'Teks Pertanyaan'}
+                    </label>
+                    <textarea
+                      value={editingQuestion.question_text || ""}
+                      onChange={e => setEditingQuestion({...editingQuestion, question_text: e.target.value})}
+                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 font-bold h-28 resize-none"
+                      placeholder={editingQuestion.question_type === 'reading' ? 'Tuliskan teks bacaan di sini...' : 'Tuliskan soal pertanyaan di sini...'}
+                    />
                  </div>
                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Option A</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Opsi A</label>
                       <input value={editingQuestion.option_a || ""} onChange={e => setEditingQuestion({...editingQuestion, option_a: e.target.value})} className="w-full px-6 py-3 rounded-2xl bg-slate-50 font-bold" />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Option B</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Opsi B</label>
                       <input value={editingQuestion.option_b || ""} onChange={e => setEditingQuestion({...editingQuestion, option_b: e.target.value})} className="w-full px-6 py-3 rounded-2xl bg-slate-50 font-bold" />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Option C</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Opsi C</label>
                       <input value={editingQuestion.option_c || ""} onChange={e => setEditingQuestion({...editingQuestion, option_c: e.target.value})} className="w-full px-6 py-3 rounded-2xl bg-slate-50 font-bold" />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Option D</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Opsi D</label>
                       <input value={editingQuestion.option_d || ""} onChange={e => setEditingQuestion({...editingQuestion, option_d: e.target.value})} className="w-full px-6 py-3 rounded-2xl bg-slate-50 font-bold" />
                     </div>
                  </div>
                  <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Correct Option</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Jawaban Benar</label>
                       <select value={editingQuestion.correct_option} onChange={e => setEditingQuestion({...editingQuestion, correct_option: parseInt(e.target.value)})} className="w-full px-6 py-3 rounded-2xl bg-slate-50 font-bold appearance-none">
-                         <option value={0}>Option A</option>
-                         <option value={1}>Option B</option>
-                         <option value={2}>Option C</option>
-                         <option value={3}>Option D</option>
+                         <option value={0}>Opsi A</option>
+                         <option value={1}>Opsi B</option>
+                         <option value={2}>Opsi C</option>
+                         <option value={3}>Opsi D</option>
                       </select>
                     </div>
                     <div>
-                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Sort</label>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Urutan</label>
                       <input type="number" value={editingQuestion.sort_order || 0} onChange={e => setEditingQuestion({...editingQuestion, sort_order: parseInt(e.target.value)})} className="w-full px-6 py-3 rounded-2xl bg-slate-50 font-bold" />
                     </div>
                  </div>
                  <div>
-                    <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Explanation (Optional)</label>
-                    <input value={editingQuestion.explanation || ""} onChange={e => setEditingQuestion({...editingQuestion, explanation: e.target.value})} className="w-full px-6 py-3 rounded-2xl bg-slate-50 font-bold" />
+                    <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Penjelasan Jawaban (Opsional)</label>
+                    <input value={editingQuestion.explanation || ""} onChange={e => setEditingQuestion({...editingQuestion, explanation: e.target.value})} className="w-full px-6 py-3 rounded-2xl bg-slate-50 font-bold" placeholder="Penjelasan mengapa jawaban ini benar..." />
                  </div>
               </div>
               <div className="flex justify-end gap-4 mt-10 pt-6 border-t font-black tracking-widest text-[10px] uppercase">
-                 <button onClick={() => setEditingQuestion(null)} className="text-slate-400">Cancel</button>
-                 <button onClick={handleSaveQuestion} className="px-12 py-4 bg-slate-900 text-white rounded-[2rem] shadow-xl active:scale-95 transition">Save Question</button>
+                 <button onClick={() => setEditingQuestion(null)} className="text-slate-400">Batal</button>
+                 <button onClick={handleSaveQuestion} className="px-12 py-4 bg-slate-900 text-white rounded-[2rem] shadow-xl active:scale-95 transition">Simpan Soal</button>
               </div>
            </div>
         </div>

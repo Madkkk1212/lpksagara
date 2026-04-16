@@ -6,16 +6,18 @@ import DashboardView from "./components/DashboardView";
 import MateriView from "./components/MateriView";
 import LatihanView from "./components/LatihanView";
 import ProfileView from "./components/ProfileView";
+import FlashcardSRS from "./components/FlashcardSRS";
 
 interface LearningSystemProps {
   user: Profile;
   onLogout: () => void;
   theme: any;
+  onRefreshUser?: () => void;
 }
 
-export type LearningTab = "dashboard" | "materi" | "latihan" | "profile";
+export type LearningTab = "dashboard" | "materi" | "latihan" | "profile" | "flashcards";
 
-export default function LearningSystem({ user, onLogout, theme }: LearningSystemProps) {
+export default function LearningSystem({ user, onLogout, theme, onRefreshUser }: LearningSystemProps) {
   const [activeTab, setActiveTab] = useState<LearningTab>("dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [upgradeMessage, setUpgradeMessage] = useState<string | null>(null);
@@ -194,10 +196,11 @@ export default function LearningSystem({ user, onLogout, theme }: LearningSystem
         {/* Dynamic View Rendering */}
         <div className="animate-in fade-in slide-in-from-bottom-6 duration-1000 flex-1">
            <div className="max-w-[1400px] mx-auto pb-10">
-             {activeTab === "dashboard" && <DashboardView user={user} theme={theme} onUpgrade={setUpgradeMessage} />}
-             {activeTab === "materi" && <MateriView user={user} theme={theme} onUpgrade={setUpgradeMessage} />}
+             {activeTab === "dashboard" && <DashboardView user={user} theme={theme} onUpgrade={setUpgradeMessage} onSwitchTab={setActiveTab} />}
+             {activeTab === "materi" && <MateriView user={user} theme={theme} onUpgrade={setUpgradeMessage} onRefreshUser={onRefreshUser} />}
              {activeTab === "latihan" && <LatihanView user={user} theme={theme} onUpgrade={setUpgradeMessage} />}
              {activeTab === "profile" && <ProfileView user={user} onLogout={onLogout} />}
+             {activeTab === "flashcards" && <FlashcardSRS userEmail={user.email} />}
            </div>
         </div>
       </main>

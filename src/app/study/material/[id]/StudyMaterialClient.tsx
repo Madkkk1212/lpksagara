@@ -9,11 +9,12 @@ import KioskBarrier from "@/app/components/KioskBarrier";
 export default function StudyMaterialClient({ materialData }: { materialData: StudyMaterial }) {
   const router = useRouter();
   const [showTranslation, setShowTranslation] = useState(false);
-  const [activeQuestion, setActiveQuestion] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
+  const [currentExIdx, setCurrentExIdx] = useState(0);
   const [isFinishing, setIsFinishing] = useState(false);
   
   const [userEmail, setUserEmail] = useState("");
+  const [alertData, setAlertData] = useState<{ title: string; message: string; type?: 'warning' | 'error' | 'success' } | null>(null);
 
   useEffect(() => {
     const sessionStr = localStorage.getItem('luma-user-profile');
@@ -26,13 +27,31 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
   }, []);
 
   const handleFinish = async () => {
-    if (!userEmail) { alert("Sesi kadaluarsa. Silakan login."); return; }
+    if (!userEmail) { 
+      setAlertData({ title: "Sesi Berakhir", message: "Silakan login kembali untuk melanjutkan.", type: 'warning' });
+      return; 
+    }
+
+    // Validation for Quizzes
+    if (materialData.material_type === 'quiz' && content.exercises) {
+      const unansweredIdx = content.exercises.findIndex((_: any, i: number) => selectedAnswers[i] === undefined);
+      if (unansweredIdx !== -1) {
+        setAlertData({ 
+          title: "Belum Lengkap", 
+          message: `Ada soal nomor ${unansweredIdx + 1} yang belum dijawab. Mohon selesaikan semua soal.`,
+          type: 'warning'
+        });
+        setCurrentExIdx(unansweredIdx);
+        return;
+      }
+    }
+
     setIsFinishing(true);
     try {
       await markMaterialCompleted(userEmail, materialData.id);
       router.back();
     } catch(e) {
-      alert("Error menandai selesai");
+      setAlertData({ title: "Error", message: "Gagal menyimpan progres belajar.", type: 'error' });
       setIsFinishing(false);
     }
   };
@@ -132,47 +151,62 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
 
   const renderExercises = () => {
     if (!content.exercises || content.exercises.length === 0) return null;
+    
+    const ex = content.exercises[currentExIdx];
+    if (!ex) return null;
+
+    const isAnswered = selectedAnswers[currentExIdx] !== undefined;
+    const isCorrect = selectedAnswers[currentExIdx] === ex.answer;
+    const totalEx = content.exercises.length;
+
     return (
-      <div className="bg-white rounded-[2rem] p-8 shadow-sm ring-1 ring-slate-100">
-        <h3 className="text-sm font-black text-rose-500 uppercase tracking-widest mb-6">Latihan Soal</h3>
-        <div className="space-y-12">
-          {content.exercises.map((ex: any, idx: number) => {
-            const isAnswered = selectedAnswers[idx] !== undefined;
-            const isCorrect = selectedAnswers[idx] === ex.answer;
-            return (
-              <div key={idx} className="space-y-4">
-                <p className="font-bold text-slate-800 text-lg">{idx + 1}. {ex.q}</p>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {ex.options.map((opt: string, optIdx: number) => {
-                    const isSelected = selectedAnswers[idx] === optIdx;
-                    let btnClass = "bg-slate-50 border-slate-100 text-slate-600 hover:bg-slate-100";
-                    if (isAnswered) {
-                      if (optIdx === ex.answer) btnClass = "bg-teal-50 border-teal-500 text-teal-700 font-bold shadow-md";
-                      else if (isSelected) btnClass = "bg-rose-50 border-rose-500 text-rose-700 font-bold disabled";
-                      else btnClass = "bg-slate-50/50 border-transparent text-slate-400 opacity-50";
-                    } else if (isSelected) {
-                      btnClass = "bg-slate-900 border-slate-900 text-white shadow-xl";
-                    }
-                    return (
-                      <button 
-                        key={optIdx}
-                        disabled={isAnswered}
-                        onClick={() => handleAnswer(idx, optIdx)}
-                        className={`p-4 border-2 rounded-2xl text-left transition-all ${btnClass}`}
-                      >
-                        {opt}
-                      </button>
-                    )
-                  })}
-                </div>
-                {isAnswered && (
-                  <p className={`text-sm font-bold mt-2 ${isCorrect ? 'text-teal-600' : 'text-rose-500'}`}>
-                    {isCorrect ? '✨ Benar!' : '❌ Salah.'}
-                  </p>
-                )}
+      <div className="bg-white rounded-[2rem] p-8 shadow-sm ring-1 ring-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-sm font-black text-rose-500 uppercase tracking-widest">Latihan Soal {currentExIdx + 1} / {totalEx}</h3>
+          <div className="flex gap-1">
+            {content.exercises.map((_: any, i: number) => (
+              <div key={i} className={`h-1.5 w-4 rounded-full transition-all ${i === currentExIdx ? 'bg-rose-500' : selectedAnswers[i] !== undefined ? 'bg-teal-400' : 'bg-slate-100'}`} />
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <p className="font-bold text-slate-800 text-xl leading-snug">{ex.q}</p>
+            <div className="grid sm:grid-cols-1 gap-3">
+              {ex.options.map((opt: string, optIdx: number) => {
+                const isSelected = selectedAnswers[currentExIdx] === optIdx;
+                let btnClass = "bg-slate-50 border-slate-100 text-slate-600 hover:bg-slate-100";
+                if (isAnswered) {
+                  if (optIdx === ex.answer) btnClass = "bg-teal-50 border-teal-500 text-teal-700 font-bold shadow-md";
+                  else if (isSelected) btnClass = "bg-rose-50 border-rose-500 text-rose-700 font-bold opacity-80";
+                  else btnClass = "bg-slate-50/50 border-transparent text-slate-400 opacity-50";
+                } else if (isSelected) {
+                  btnClass = "bg-slate-900 border-slate-900 text-white shadow-xl";
+                }
+                return (
+                  <button 
+                    key={optIdx}
+                    disabled={isAnswered}
+                    onClick={() => handleAnswer(currentExIdx, optIdx)}
+                    className={`p-5 border-2 rounded-2xl text-left transition-all text-base font-medium flex justify-between items-center ${btnClass}`}
+                  >
+                    <span>{opt}</span>
+                    {isAnswered && optIdx === ex.answer && <span>✨</span>}
+                    {isAnswered && isSelected && optIdx !== ex.answer && <span>❌</span>}
+                  </button>
+                )
+              })}
+            </div>
+            {isAnswered && (
+              <div className={`p-4 rounded-2xl border ${isCorrect ? 'bg-teal-50 border-teal-100 text-teal-700' : 'bg-rose-50 border-rose-100 text-rose-700'} animate-in zoom-in-95 duration-300`}>
+                <p className="text-sm font-black uppercase tracking-wider mb-1">
+                  {isCorrect ? '✨ Jawaban Benar!' : '❌ Jawaban Salah.'}
+                </p>
+                {ex.explanation && <p className="text-xs opacity-80">{ex.explanation}</p>}
               </div>
-            );
-          })}
+            )}
+          </div>
         </div>
       </div>
     );
@@ -190,8 +224,8 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
   );
 
   const nodeRoot = (
-    <main className="min-h-screen pb-40" style={{ backgroundColor: '#f8fafc' }}>
-      <header className="px-6 pt-12 pb-8 bg-white shadow-sm ring-1 ring-black/[0.03] sticky top-0 z-30 flex items-start justify-between">
+    <main className={`flex flex-col bg-slate-50 ${materialData.material_type === 'quiz' ? 'h-screen w-screen overflow-hidden' : 'min-h-screen pb-40'}`}>
+      <header className="shrink-0 px-6 pt-12 pb-8 bg-white shadow-sm ring-1 ring-black/[0.03] z-30 flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-4 mb-4">
             <button onClick={() => router.back()} className="h-10 w-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-500 hover:bg-slate-100 transition">
@@ -208,30 +242,127 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
         )}
       </header>
       
-      <div className="max-w-3xl mx-auto px-6 mt-8">
-         {materialData.material_type === 'moji_goi' && renderMojiGoi()}
-         {materialData.material_type === 'bunpou' && renderBunpou()}
-         {materialData.material_type === 'dokkai' && renderDokkai()}
-         {materialData.material_type === 'choukai' && renderChoukai()}
-         {materialData.material_type === 'quiz' && renderQuiz()}
+      <div className={`flex-1 min-h-0 ${materialData.material_type === 'quiz' ? 'overflow-y-auto overscroll-contain' : ''}`}>
+        <div className="max-w-3xl mx-auto px-6 mt-8 pb-48">
+           {/* Video banner if material has video */}
+           {materialData.video_url && (
+             <div className="mb-8 rounded-[2rem] overflow-hidden bg-black shadow-xl ring-1 ring-black/10">
+               <video
+                 controls
+                 className="w-full max-h-80"
+                 src={materialData.video_url}
+               >
+                 Browser tidak mendukung video.
+               </video>
+             </div>
+           )}
+           {/* Image banner if material has image */}
+           {!materialData.video_url && materialData.image_url && (
+             <div className="mb-8 rounded-[2rem] overflow-hidden shadow-md ring-1 ring-black/5">
+               <img
+                 src={materialData.image_url}
+                 alt={materialData.title}
+                 className="w-full max-h-64 object-cover"
+               />
+             </div>
+           )}
+
+           {materialData.material_type === 'moji_goi' && renderMojiGoi()}
+           {materialData.material_type === 'bunpou' && renderBunpou()}
+           {materialData.material_type === 'dokkai' && renderDokkai()}
+           {materialData.material_type === 'choukai' && renderChoukai()}
+           {materialData.material_type === 'quiz' && renderQuiz()}
+        </div>
       </div>
 
-      <div className="fixed bottom-0 inset-x-0 p-6 bg-white border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-40">
-        <div className="max-w-3xl mx-auto">
-          <button 
-             onClick={handleFinish} 
-             disabled={isFinishing}
-             className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black tracking-widest uppercase hover:bg-slate-800 active:scale-95 transition-all shadow-xl disabled:opacity-50"
-          >
-             {isFinishing ? 'Menyimpan...' : '✓ Tandai Selesai & Lanjut'}
-          </button>
+      <div className="fixed bottom-0 inset-x-0 p-6 bg-white/90 backdrop-blur-xl border-t border-slate-100 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-40">
+        <div className="max-w-3xl mx-auto flex gap-3">
+          {materialData.material_type === 'quiz' && (
+            <>
+              <button
+                onClick={() => setCurrentExIdx(p => Math.max(0, p - 1))}
+                disabled={currentExIdx === 0}
+                className="h-14 w-14 flex items-center justify-center rounded-2xl bg-white ring-1 ring-slate-200 text-slate-400 disabled:opacity-20 disabled:pointer-events-none active:scale-95 transition shrink-0"
+              >
+                ←
+              </button>
+              {currentExIdx < (content.exercises?.length || 0) - 1 ? (
+                <button
+                  onClick={() => setCurrentExIdx(p => p + 1)}
+                  className="flex-1 h-14 bg-rose-500 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-rose-500/20 active:scale-95 transition-all text-sm"
+                >
+                  Next Question →
+                </button>
+              ) : (
+                <button 
+                  onClick={handleFinish} 
+                  disabled={isFinishing}
+                  className="flex-1 h-14 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all text-sm disabled:opacity-50"
+                >
+                  {isFinishing ? 'Menyimpan...' : '🎯 Selesaikan Quiz'}
+                </button>
+              )}
+            </>
+          )}
+          
+          {materialData.material_type !== 'quiz' && (
+            <button 
+               onClick={handleFinish} 
+               disabled={isFinishing}
+               className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black tracking-widest uppercase hover:bg-slate-800 active:scale-95 transition-all shadow-xl disabled:opacity-50"
+            >
+               {isFinishing ? 'Menyimpan...' : '✓ Tandai Selesai & Lanjut'}
+            </button>
+          )}
         </div>
       </div>
     </main>
   );
 
   if (materialData.material_type === 'quiz') {
-    return <KioskBarrier title="Kuis Evaluasi Bab">{nodeRoot}</KioskBarrier>;
+    return (
+      <KioskBarrier title="Kuis Evaluasi Bab">
+        {nodeRoot}
+        {alertData && (
+          <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+            <div className="bg-white rounded-[2.5rem] p-10 max-w-sm w-full shadow-2xl scale-in-center animate-in zoom-in-95 duration-300">
+              <div className="text-5xl mb-6 text-center">
+                {alertData.type === 'error' ? '❌' : alertData.type === 'success' ? '✅' : '⚠️'}
+              </div>
+              <h3 className="text-2xl font-black text-slate-800 text-center mb-2 italic tracking-tight">{alertData.title}</h3>
+              <p className="text-slate-500 font-medium text-center mb-10 leading-relaxed text-sm">{alertData.message}</p>
+              <button 
+                onClick={() => setAlertData(null)}
+                className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-800 active:scale-95 transition-all shadow-xl"
+              >
+                Mengerti
+              </button>
+            </div>
+          </div>
+        )}
+      </KioskBarrier>
+    );
   }
-  return nodeRoot;
+  return (
+    <>
+      {nodeRoot}
+      {alertData && (
+          <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+            <div className="bg-white rounded-[2.5rem] p-10 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-300">
+              <div className="text-5xl mb-6 text-center">
+                {alertData.type === 'error' ? '❌' : alertData.type === 'success' ? '✅' : '⚠️'}
+              </div>
+              <h3 className="text-2xl font-black text-slate-800 text-center mb-2 italic tracking-tight">{alertData.title}</h3>
+              <p className="text-slate-500 font-medium text-center mb-10 leading-relaxed text-sm">{alertData.message}</p>
+              <button 
+                onClick={() => setAlertData(null)}
+                className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-800 active:scale-95 transition-all shadow-xl"
+              >
+                Mengerti
+              </button>
+            </div>
+          </div>
+      )}
+    </>
+  );
 }

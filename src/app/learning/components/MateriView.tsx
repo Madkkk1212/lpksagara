@@ -2,9 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { Profile, MaterialCategory, StudyLevel, StudyChapter, StudyMaterial, AppTheme } from "@/lib/types";
-import { getMaterialCategories, getStudyLevels, getStudyChapters, getStudyMaterials, upsertProfile } from "@/lib/db";
+import { getMaterialCategories, getStudyLevels, getStudyChapters, getStudyMaterials, upsertProfile, getCompletedMaterials, markMaterialCompleted } from "@/lib/db";
+import { Lock, CheckCircle2, Trophy, Star } from "lucide-react";
 
-export default function MateriView({ user, theme, onUpgrade }: { user: Profile, theme: AppTheme | null, onUpgrade?: (msg: string) => void }) {
+interface MateriViewProps {
+  user: Profile;
+  theme: AppTheme | null;
+  onUpgrade?: (msg: string) => void;
+  onRefreshUser?: () => void;
+}
+
+export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: MateriViewProps) {
   const [categories, setCategories] = useState<MaterialCategory[]>([]);
   const [levels, setLevels] = useState<StudyLevel[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -14,6 +22,11 @@ export default function MateriView({ user, theme, onUpgrade }: { user: Profile, 
   const [chapterMaterials, setChapterMaterials] = useState<Record<string, StudyMaterial[]>>({});
   const [selectedMaterial, setSelectedMaterial] = useState<StudyMaterial | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // New states for progression
+  const [completedMaterials, setCompletedMaterials] = useState<string[]>([]);
+  const [allLevelMaterials, setAllLevelMaterials] = useState<StudyMaterial[]>([]);
+  const [completing, setCompleting] = useState(false);
 
   const isLevelUnlocked = (lvlId: string) => {
     if (user.is_admin || user.is_premium) return true;
@@ -29,19 +42,44 @@ export default function MateriView({ user, theme, onUpgrade }: { user: Profile, 
     return unlocked.includes(lvlId);
   };
 
+  // Progression Logic
+  const isChapterCompleted = (chapterId: string) => {
+    const chapterMats = allLevelMaterials.filter(m => m.chapter_id === chapterId);
+    if (chapterMats.length === 0) return true; 
+    return chapterMats.every(m => completedMaterials.includes(m.id));
+  };
+
+  const isChapterUnlocked = (chapterId: string) => {
+    if (user.is_admin || user.is_premium) return true;
+    
+    const sortedChapters = [...chapters].sort((a, b) => a.sort_order - b.sort_order);
+    const chapterIndex = sortedChapters.findIndex(c => c.id === chapterId);
+    
+    if (chapterIndex === 0) return true; 
+    
+    const prevChapter = sortedChapters[chapterIndex - 1];
+    return isChapterCompleted(prevChapter.id);
+  };
+
+  const isMaterialCompleted = (materialId: string) => {
+    return completedMaterials.includes(materialId);
+  };
+
   useEffect(() => {
     async function loadInitial() {
-      const [cats, lvls] = await Promise.all([
+      const [cats, lvls, completed] = await Promise.all([
         getMaterialCategories(),
-        getStudyLevels()
+        getStudyLevels(),
+        user.email ? getCompletedMaterials(user.email) : Promise.resolve([])
       ]);
       setCategories(cats);
       setLevels(lvls);
+      setCompletedMaterials(completed);
       if (cats.length > 0) setActiveCategory(cats[0].id);
       setLoading(false);
     }
     loadInitial();
-  }, []);
+  }, [user.email]);
 
   useEffect(() => {
     if (activeCategory) {
@@ -53,13 +91,29 @@ export default function MateriView({ user, theme, onUpgrade }: { user: Profile, 
 
   useEffect(() => {
     if (activeLevel) {
-      getStudyChapters(activeLevel.id).then(setChapters);
+      getStudyChapters(activeLevel.id).then(async (chaps) => {
+        const sortedChaps = [...chaps].sort((a, b) => a.sort_order - b.sort_order);
+        setChapters(sortedChaps);
+        
+        // Fetch all materials in the level for progression check
+        const allMats: StudyMaterial[] = [];
+        for (const chap of sortedChaps) {
+            const mats = await getStudyMaterials(chap.id);
+            allMats.push(...mats);
+        }
+        setAllLevelMaterials(allMats);
+      });
     } else {
       setChapters([]);
+      setAllLevelMaterials([]);
     }
   }, [activeLevel]);
 
   const toggleChapter = async ( chapterId: string) => {
+    if (!isChapterUnlocked(chapterId)) {
+        return; // Prevent opening locked chapters
+    }
+
     if (expandedChapter === chapterId) {
       setExpandedChapter(null);
     } else {
@@ -71,7 +125,42 @@ export default function MateriView({ user, theme, onUpgrade }: { user: Profile, 
     }
   };
 
-  if (loading) return <div className="p-10 text-center font-black text-teal-600/40 animate-pulse uppercase tracking-[0.5em]">Initializing Learning Mats...</div>;
+  const handleMarkCompleted = async () => {
+    if (!selectedMaterial || !user.email || completing) return;
+    
+    setCompleting(true);
+    try {
+        await markMaterialCompleted(user.email, selectedMaterial.id);
+        
+        // Reward 50 EXP
+        const newExp = (user.exp || 0) + 50;
+        const newLevel = Math.floor(newExp / 1000) + 1;
+        await upsertProfile({ 
+            email: user.email, 
+            exp: newExp, 
+            level: newLevel 
+        });
+
+        // Update local state
+        setCompletedMaterials(prev => [...prev, selectedMaterial.id]);
+        if (onRefreshUser) onRefreshUser();
+        
+        alert("Selamat! Materi selesai. Anda mendapatkan +50 EXP! 🏆");
+        setSelectedMaterial(null); // Go back to chapter view
+    } catch (err: any) {
+        console.error("Error saving progress:", err);
+        alert(`Gagal menyimpan progres: ${err.message || "Terjadi kesalahan database"}`);
+    } finally {
+        setCompleting(false);
+    }
+  };
+
+  if (loading) return (
+    <div className="min-h-[600px] flex flex-col items-center justify-center p-10 bg-white/40 backdrop-blur-xl rounded-[4rem] border-2 border-dashed border-white/80">
+        <div className="h-12 w-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mb-6" />
+        <div className="text-center font-black text-teal-600/40 uppercase tracking-[0.5em] text-sm">Initializing Learning Maps...</div>
+    </div>
+  );
 
   return (
     <div className="space-y-10">
@@ -124,16 +213,25 @@ export default function MateriView({ user, theme, onUpgrade }: { user: Profile, 
            {selectedMaterial ? (
               /* VIEW 4: MATERIAL CONTENT */
               <div className="animate-in fade-in slide-in-from-bottom-10 duration-700">
-                <div className="bg-white rounded-[3rem] p-10 shadow-xl border border-slate-50">
-                  <div className="flex items-center gap-4 mb-8">
+                <div className="bg-white rounded-[3rem] p-10 shadow-xl border border-slate-50 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-10 opacity-5 pointer-events-none">
+                     <Star size={200} className="text-teal-500 rotate-12" />
+                  </div>
+                  
+                  <div className="flex items-center gap-4 mb-8 relative z-10">
                      <span className="px-4 py-1.5 bg-teal-50 text-teal-600 rounded-full text-[10px] font-black uppercase tracking-widest">
                        {selectedMaterial.material_type.replace('_', ' ')}
                      </span>
+                     {isMaterialCompleted(selectedMaterial.id) && (
+                        <span className="flex items-center gap-2 px-4 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+                           <CheckCircle2 size={12} /> SUDAH SELESAI
+                        </span>
+                     )}
                   </div>
-                  <h2 className="text-4xl font-black text-slate-900 italic mb-8">{selectedMaterial.title}</h2>
+                  <h2 className="text-4xl font-black text-slate-900 italic mb-8 relative z-10">{selectedMaterial.title}</h2>
                   
                   {/* Dynamic Content Renderer */}
-                  <div className="w-full">
+                  <div className="w-full relative z-10">
                     {(() => {
                       const content = typeof selectedMaterial.content === 'string' 
                           ? JSON.parse(selectedMaterial.content) 
@@ -151,15 +249,6 @@ export default function MateriView({ user, theme, onUpgrade }: { user: Profile, 
                                       <p className="text-sm font-bold text-teal-600 uppercase tracking-widest">{item.id}</p>
                                       {item.example && <p className="text-xs text-slate-500 font-medium mt-2">Contoh: {item.example}</p>}
                                     </div>
-                                    {item.audioUrl ? (
-                                       <button className="h-12 w-12 bg-white rounded-full shadow-sm flex items-center justify-center text-teal-500 border border-slate-100 group-hover:bg-teal-500 group-hover:text-white transition-colors text-xl">
-                                         🔊
-                                       </button>
-                                    ) : (
-                                       <div className="h-12 w-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-300 border border-slate-200 text-xl">
-                                         🔈
-                                       </div>
-                                    )}
                                  </div>
                               ))}
                            </div>
@@ -172,9 +261,6 @@ export default function MateriView({ user, theme, onUpgrade }: { user: Profile, 
                            <div className="space-y-6">
                               {content?.items?.map((item: any, idx: number) => (
                                  <div key={idx} className="bg-indigo-50 border border-indigo-100/50 rounded-[2.5rem] p-8 shadow-sm relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 p-8 opacity-5">
-                                      <span className="text-8xl font-black">文法</span>
-                                    </div>
                                     <div className="relative z-10">
                                       <div className="inline-block bg-indigo-600 shadow-[0_10px_30px_rgba(79,70,229,0.3)] text-white px-5 py-3 rounded-2xl text-xl font-black tracking-widest mb-6">
                                         {item.pattern}
@@ -182,7 +268,6 @@ export default function MateriView({ user, theme, onUpgrade }: { user: Profile, 
                                       <p className="text-slate-600 font-medium mb-8 leading-relaxed text-lg max-w-2xl">{item.explanation}</p>
                                       
                                       <div className="space-y-4 bg-white/80 p-8 rounded-[2rem] shadow-sm border border-white">
-                                         <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] block mb-2">Contoh Kalimat:</span>
                                          {item.examples?.map((ex: any, i: number) => (
                                             <div key={i} className="flex flex-col border-b border-indigo-50 pb-4 last:border-0 last:pb-0">
                                                <span className="text-slate-800 font-black text-xl mb-1">{ex.jp}</span>
@@ -206,28 +291,6 @@ export default function MateriView({ user, theme, onUpgrade }: { user: Profile, 
                                  <div className="h-px w-16 bg-slate-200 mb-8" />
                                  <p className="text-base font-medium text-slate-500 italic border-l-4 border-slate-200 pl-6 leading-relaxed">{content.text_id}</p>
                               </div>
-                              
-                              {content.exercises && content.exercises.length > 0 && (
-                                 <div className="space-y-6 pt-4">
-                                    <h3 className="text-xl font-black italic text-slate-800 flex items-center gap-3">
-                                      <span className="p-3 bg-teal-50 text-teal-500 rounded-2xl">✏️</span> 
-                                      Latihan Pemahaman
-                                    </h3>
-                                    {content.exercises.map((ex: any, idx: number) => (
-                                       <div key={idx} className="bg-white border-2 border-slate-100 rounded-[2rem] p-8 shadow-sm">
-                                          <p className="text-xl font-black text-slate-800 mb-8">{ex.q}</p>
-                                          <div className="grid gap-3">
-                                             {ex.options?.map((opt: string, i: number) => (
-                                                <button key={i} className="text-left w-full px-6 py-4 rounded-2xl border-2 border-slate-100 hover:border-teal-500 hover:bg-teal-50 hover:shadow-md transition-all font-bold text-slate-700 text-lg group">
-                                                  <span className="inline-block w-10 text-slate-300 group-hover:text-teal-500 transition-colors font-black mr-4 tabular-nums">{i+1}.</span> 
-                                                  {opt}
-                                                </button>
-                                             ))}
-                                          </div>
-                                       </div>
-                                    ))}
-                                 </div>
-                              )}
                            </div>
                          );
                       }
@@ -237,55 +300,44 @@ export default function MateriView({ user, theme, onUpgrade }: { user: Profile, 
                          return (
                            <div className="space-y-10">
                               <div className="bg-gradient-to-br from-teal-500 via-emerald-500 to-teal-400 p-12 rounded-[3.5rem] shadow-[0_20px_50px_rgba(20,184,166,0.3)] text-center relative overflow-hidden">
-                                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
                                  <div className="relative z-10">
                                    <div className="h-24 w-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-5xl mx-auto mb-8 shadow-inner ring-4 ring-white/10">🎧</div>
                                    <h3 className="text-white font-black text-3xl italic tracking-tight mb-8">Dengarkan Audio Berikut</h3>
                                    {content.audioUrl ? (
-                                      <div className="bg-white/10 backdrop-blur-xl p-4 rounded-3xl shadow-inner max-w-md mx-auto">
-                                        <audio controls className="w-full outline-none" src={content.audioUrl}></audio>
-                                      </div>
+                                      <audio controls className="w-full" src={content.audioUrl}></audio>
                                    ) : (
-                                      <div className="bg-black/20 text-white rounded-2xl px-6 py-3 inline-block font-bold text-sm tracking-widest uppercase">Audio tidak tersedia (Data Dummy)</div>
+                                      <div className="bg-black/20 text-white rounded-2xl px-6 py-3 inline-block font-bold text-sm tracking-widest uppercase">Audio tidak tersedia</div>
                                    )}
                                  </div>
                               </div>
-                              
-                              {content.exercises && content.exercises.length > 0 && (
-                                 <div className="space-y-6 pt-4">
-                                    <h3 className="text-xl font-black italic text-slate-800 flex items-center gap-3">
-                                      <span className="p-3 bg-emerald-50 text-emerald-500 rounded-2xl">📝</span> 
-                                      Sesi Tanya Jawab
-                                    </h3>
-                                    {content.exercises.map((ex: any, idx: number) => (
-                                       <div key={idx} className="bg-white border-2 border-slate-100 rounded-[2rem] p-8 shadow-sm">
-                                          <p className="text-xl font-black text-slate-800 mb-8">{ex.q}</p>
-                                          <div className="grid gap-3">
-                                             {ex.options?.map((opt: string, i: number) => (
-                                                <button key={i} className="text-left w-full px-6 py-4 rounded-2xl border-2 border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 hover:shadow-md transition-all font-bold text-slate-700 text-lg group">
-                                                  <span className="inline-block w-10 text-slate-300 group-hover:text-emerald-500 transition-colors font-black mr-4 tabular-nums">{String.fromCharCode(65 + i)}.</span> 
-                                                  {opt}
-                                                </button>
-                                             ))}
-                                          </div>
-                                       </div>
-                                    ))}
-                                 </div>
-                              )}
                            </div>
                          );
                       }
                       
-                      // Fallback for raw/unknown JSON
-                      return (
-                         <div className="bg-slate-900 border border-slate-800 p-8 rounded-[2rem] shadow-xl overflow-auto relative group">
-                            <span className="absolute top-4 right-6 text-xs font-black text-rose-500 tracking-widest">RAW JSON DATA</span>
-                            <pre className="font-mono text-sm text-teal-300 leading-relaxed opacity-90 group-hover:opacity-100 transition-opacity">
-                              {JSON.stringify(content, null, 2)}
-                            </pre>
-                         </div>
-                      );
+                      return <div className="p-10 bg-slate-50 rounded-3xl border border-slate-100 text-slate-400 italic">Materi ini tidak memiliki viewer khusus.</div>;
                     })()}
+
+                    {/* Completion Action */}
+                    <div className="mt-16 pt-10 border-t border-slate-100 flex flex-col items-center">
+                        {!isMaterialCompleted(selectedMaterial.id) ? (
+                            <button 
+                                onClick={handleMarkCompleted}
+                                disabled={completing}
+                                className="group relative px-12 py-5 bg-slate-900 text-white rounded-[2rem] font-black italic text-sm uppercase tracking-widest shadow-2xl hover:bg-teal-600 transition-all active:scale-95 disabled:opacity-50"
+                            >
+                                <span className="flex items-center gap-3">
+                                   {completing ? 'MENYIMPAN...' : 'SELESAIKAN MATERI & AMBIL +50 EXP'}
+                                   {!completing && <Trophy size={18} className="group-hover:rotate-12 transition-transform" />}
+                                </span>
+                            </button>
+                        ) : (
+                            <div className="flex flex-col items-center gap-4 text-emerald-600 font-black italic uppercase tracking-widest text-xs">
+                                <div className="h-16 w-16 bg-emerald-100 rounded-full flex items-center justify-center text-3xl">🎉</div>
+                                Materi Berhasil Diselesaikan!
+                            </div>
+                        )}
+                        <p className="mt-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Selesaikan materi untuk membuka Chapter selanjutnya</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -298,57 +350,75 @@ export default function MateriView({ user, theme, onUpgrade }: { user: Profile, 
                    </div>
                    <div className="relative z-10">
                       <div className="flex items-center gap-3 mb-6">
-                        <span className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-black uppercase tracking-[0.2em]">Study Path</span>
+                        <span className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-black uppercase tracking-[0.2em]">Study Path: Linear Mode</span>
                         <div className="h-2 w-2 rounded-full bg-teal-400 animate-ping" />
                       </div>
                       <h4 className="text-5xl font-black italic mb-4 leading-tight">{activeLevel.title}</h4>
-                      <p className="text-white/60 font-medium max-w-xl text-sm leading-relaxed">{activeLevel.description || 'Kuasai materi bahasa Jepang ini dengan kurikulum terukur dan latihan intensif.'}</p>
+                      <p className="text-white/60 font-medium max-w-xl text-sm leading-relaxed">Penyelesaian materi bersifat berurutan. Selesaikan semua materi di satu chapter untuk membuka akses ke chapter berikutnya.</p>
                    </div>
                 </div>
 
                 <div className="space-y-4">
-                   {chapters.map((chapter) => (
-                     <div key={chapter.id} className="bg-white/60 backdrop-blur-md rounded-[2.5rem] border border-white/80 shadow-sm overflow-hidden transition-all duration-500">
-                        <button 
-                          onClick={() => toggleChapter(chapter.id)}
-                          className={`w-full p-8 flex items-center justify-between hover:bg-white/80 transition-all ${expandedChapter === chapter.id ? 'bg-white/40' : ''}`}
-                        >
-                           <div className="flex items-center gap-6 text-left">
-                              <div className="h-16 w-16 rounded-[1.2rem] bg-indigo-50 flex items-center justify-center p-3.5 shadow-sm ring-1 ring-slate-100">
-                                 {chapter.icon_url ? <img src={chapter.icon_url} className="w-full h-full object-contain" alt="icon"/> : '📖'}
-                              </div>
-                              <div>
-                                <h5 className="text-xl font-black text-slate-800 italic uppercase tracking-tight">{chapter.title}</h5>
-                                {chapter.description && <p className="text-xs text-slate-400 font-medium mt-1">{chapter.description}</p>}
-                              </div>
-                           </div>
-                           <div className={`h-10 w-10 rounded-full border border-slate-100 flex items-center justify-center transition-all duration-500 ${expandedChapter === chapter.id ? 'rotate-180 bg-slate-900 text-white' : 'bg-white text-slate-300'}`}>▼</div>
-                        </button>
+                   {chapters.map((chapter) => {
+                     const unlocked = isChapterUnlocked(chapter.id);
+                     const completed = isChapterCompleted(chapter.id);
+                     
+                     return (
+                      <div key={chapter.id} className={`bg-white/60 backdrop-blur-md rounded-[2.5rem] border border-white/80 shadow-sm overflow-hidden transition-all duration-500 ${!unlocked ? 'opacity-60 saturate-50' : ''}`}>
+                         <button 
+                           onClick={() => unlocked && toggleChapter(chapter.id)}
+                           className={`w-full p-8 flex items-center justify-between hover:bg-white/80 transition-all ${expandedChapter === chapter.id ? 'bg-white/40' : ''} ${!unlocked ? 'cursor-not-allowed' : ''}`}
+                         >
+                            <div className="flex items-center gap-6 text-left">
+                               <div className={`h-16 w-16 rounded-[1.2rem] flex items-center justify-center p-3.5 shadow-sm ring-1 ring-slate-100 ${!unlocked ? 'bg-slate-200' : completed ? 'bg-emerald-50 text-emerald-600 ring-emerald-100' : 'bg-indigo-50'}`}>
+                                  {!unlocked ? <Lock size={24} className="text-slate-400" /> : completed ? <CheckCircle2 size={24} /> : chapter.icon_url ? <img src={chapter.icon_url} className="w-full h-full object-contain" alt="icon"/> : '📖'}
+                               </div>
+                               <div>
+                                 <h5 className={`text-xl font-black italic uppercase tracking-tight ${unlocked ? 'text-slate-800' : 'text-slate-400'}`}>
+                                    {chapter.title}
+                                 </h5>
+                                 <div className="flex items-center gap-2 mt-1">
+                                    <span className={`text-[10px] font-bold uppercase tracking-widest ${completed ? 'text-emerald-500' : unlocked ? 'text-indigo-400' : 'text-slate-400'}`}>
+                                       {completed ? 'Chapter Selesai' : unlocked ? 'Sedang Dipelajari' : 'Masih Terkunci'}
+                                    </span>
+                                 </div>
+                               </div>
+                            </div>
+                            {unlocked ? (
+                                <div className={`h-10 w-10 rounded-full border border-slate-100 flex items-center justify-center transition-all duration-500 ${expandedChapter === chapter.id ? 'rotate-180 bg-slate-900 text-white' : 'bg-white text-slate-300'}`}>▼</div>
+                            ) : (
+                                <div className="h-10 w-10 flex items-center justify-center text-slate-300">🔒</div>
+                            )}
+                         </button>
 
-                        {expandedChapter === chapter.id && (
-                          <div className="px-8 pb-8 space-y-3 animate-in fade-in slide-in-from-top-4 duration-500">
-                             {chapterMaterials[chapter.id]?.map((mat) => (
-                               <button 
-                                 key={mat.id}
-                                 onClick={() => setSelectedMaterial(mat)}
-                                 className="w-full p-6 bg-white/40 hover:bg-white hover:shadow-xl rounded-3xl flex items-center justify-between group transition-all border border-transparent hover:border-white/80"
-                               >
-                                 <div className="flex items-center gap-5">
-                                    <div className="w-10 h-10 rounded-2xl bg-white border border-slate-50 flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform">
-                                       {mat.material_type === 'quiz' ? '🎯' : mat.material_type === 'choukai' ? '🎧' : '📄'}
+                         {expandedChapter === chapter.id && unlocked && (
+                           <div className="px-8 pb-8 space-y-3 animate-in fade-in slide-in-from-top-4 duration-500">
+                              {chapterMaterials[chapter.id]?.map((mat) => {
+                                const matDone = isMaterialCompleted(mat.id);
+                                return (
+                                  <button 
+                                    key={mat.id}
+                                    onClick={() => setSelectedMaterial(mat)}
+                                    className={`w-full p-6 bg-white/40 hover:bg-white hover:shadow-xl rounded-3xl flex items-center justify-between group transition-all border ${matDone ? 'border-emerald-100' : 'border-transparent hover:border-white/80'}`}
+                                  >
+                                    <div className="flex items-center gap-5">
+                                       <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform ${matDone ? 'bg-emerald-50 text-emerald-600' : 'bg-white border border-slate-50'}`}>
+                                          {matDone ? <CheckCircle2 size={18} /> : mat.material_type === 'quiz' ? '🎯' : mat.material_type === 'choukai' ? '🎧' : '📄'}
+                                       </div>
+                                       <span className={`text-sm font-black transition-colors uppercase tracking-tight ${matDone ? 'text-emerald-600' : 'text-slate-600 group-hover:text-slate-900'}`}>{mat.title}</span>
                                     </div>
-                                    <span className="text-sm font-black text-slate-600 group-hover:text-slate-900 transition-colors uppercase tracking-tight">{mat.title}</span>
-                                 </div>
-                                 <div className="h-8 w-8 rounded-full flex items-center justify-center bg-slate-50 group-hover:bg-teal-500 group-hover:text-white transition-all">
-                                    <span className="text-xs">→</span>
-                                 </div>
-                               </button>
-                             ))}
-                             {!chapterMaterials[chapter.id] && <div className="p-10 text-center text-xs text-slate-300 italic font-black uppercase tracking-[0.3em]">Loading Materials...</div>}
-                          </div>
-                        )}
-                     </div>
-                   ))}
+                                    <div className={`h-8 w-8 rounded-full flex items-center justify-center transition-all ${matDone ? 'bg-emerald-500 text-white' : 'bg-slate-50 group-hover:bg-indigo-500 group-hover:text-white'}`}>
+                                       <span className="text-xs">{matDone ? '✓' : '→'}</span>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                              {!chapterMaterials[chapter.id] && <div className="p-10 text-center text-xs text-slate-300 italic font-black uppercase tracking-[0.3em]">Loading Materials...</div>}
+                           </div>
+                         )}
+                      </div>
+                     );
+                   })}
                 </div>
              </div>
            ) : activeCategory ? (

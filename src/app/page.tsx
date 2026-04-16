@@ -79,6 +79,19 @@ export default function Home() {
   // Carousel State
   const [currentSlide, setCurrentSlide] = useState(0);
 
+  // Time State
+  const [currentTime, setCurrentTime] = useState("");
+
+  useEffect(() => {
+    const updateTime = () => {
+       const now = new Date();
+       setCurrentTime(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const fetchData = useCallback(async () => {
     const [t, b, c, m, l] = await Promise.all([
       getTheme(),
@@ -129,11 +142,23 @@ export default function Home() {
             if (freshProfile) {
               setUserProfile(freshProfile);
               localStorage.setItem("luma-user-profile", JSON.stringify(freshProfile));
+              if (!freshProfile.profile_completed) {
+                 window.location.href = '/learning';
+                 return;
+              }
             } else {
               setUserProfile(localProfile);
+              if (!localProfile.profile_completed) {
+                 window.location.href = '/learning';
+                 return;
+              }
             }
           } catch (err) {
             setUserProfile(localProfile);
+            if (!localProfile.profile_completed) {
+               window.location.href = '/learning';
+               return;
+            }
           }
         }
       }
@@ -327,8 +352,26 @@ export default function Home() {
                  ))}
               </div>
               <div className="flex items-center gap-4">
-                 <p className="text-xs font-black uppercase text-teal-500">09:44 AM</p>
-                 <div className="h-10 w-10 rounded-full bg-slate-900"></div>
+                 <p className="text-xs font-black uppercase text-teal-500">{currentTime || "..."}</p>
+                 {loggedIn ? (
+                    <div 
+                      className="h-10 w-10 rounded-full bg-slate-900 border-2 border-slate-200 overflow-hidden shadow-sm flex items-center justify-center text-white font-bold cursor-pointer hover:ring-2 hover:ring-teal-500 transition-all"
+                      onClick={() => changeTab("profile")}
+                    >
+                      {userProfile?.avatar_url ? (
+                         <img src={userProfile.avatar_url} alt="profile" className="w-full h-full object-cover" />
+                      ) : (
+                         userProfile?.full_name.charAt(0) || "U"
+                      )}
+                    </div>
+                 ) : (
+                    <button 
+                      onClick={() => router.push("/login")}
+                      className="px-4 py-2 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-slate-800 active:scale-95 transition-all"
+                    >
+                       Login
+                    </button>
+                 )}
               </div>
            </div>
         </header>
@@ -645,11 +688,21 @@ export default function Home() {
                        </div>
                        
                        <div className="grid gap-4 font-black tracking-widest text-[10px] uppercase">
-                          <button onClick={() => router.push('/learning')} className="w-full py-5 bg-teal-500 text-white rounded-2xl shadow-xl shadow-teal-500/20 active:scale-95 transition flex items-center justify-center gap-3">
-                             <span className="text-lg">📊</span> LEARNING SYSTEM (RIWAYAT)
-                          </button>
+                          {userProfile?.is_admin ? (
+                             <button onClick={() => router.push('/admin')} className="w-full py-5 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-600/20 active:scale-95 transition flex items-center justify-center gap-3">
+                                <span className="text-lg">⚙️</span> ADMIN DASHBOARD
+                             </button>
+                          ) : userProfile?.is_teacher ? (
+                             <button onClick={() => router.push('/teacher')} className="w-full py-5 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-600/20 active:scale-95 transition flex items-center justify-center gap-3">
+                                <span className="text-lg">👩‍🏫</span> TEACHER DASHBOARD
+                             </button>
+                          ) : (
+                             <button onClick={() => router.push('/learning')} className="w-full py-5 bg-teal-500 text-white rounded-2xl shadow-xl shadow-teal-500/20 active:scale-95 transition flex items-center justify-center gap-3">
+                                <span className="text-lg">📊</span> LEARNING SYSTEM (RIWAYAT)
+                             </button>
+                          )}
                           <button onClick={() => setActiveTab("soal")} className="w-full py-5 bg-slate-900 text-white rounded-2xl shadow-xl active:scale-95 transition">Lanjut Belajar</button>
-                          <button onClick={() => { localStorage.removeItem("luma-auth"); window.location.reload(); }} className="w-full py-5 bg-rose-50 text-rose-500 rounded-2xl border border-rose-100 active:scale-95 transition">Keluar Akun</button>
+                          <button onClick={() => { localStorage.removeItem("luma-auth"); localStorage.removeItem("luma-admin-auth"); window.location.reload(); }} className="w-full py-5 bg-rose-50 text-rose-500 rounded-2xl border border-rose-100 active:scale-95 transition">Keluar Akun</button>
                        </div>
                     </div>
                  </div>

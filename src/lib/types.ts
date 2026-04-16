@@ -30,6 +30,8 @@ export interface AppTheme {
   social_instagram: string | null
   social_twitter: string | null
   social_website: string | null
+  cloudinary_cloud_name: string | null
+  cloudinary_upload_preset: string | null
   updated_at: string
 }
 
@@ -112,7 +114,11 @@ export interface ExamTest {
 export interface Question {
   id: string
   test_id: string
+  question_type: 'multiple_choice' | 'listening' | 'reading' | 'image_based' | 'video_based'
   question_text: string
+  audio_url?: string | null
+  image_url?: string | null
+  video_url?: string | null
   option_a: string
   option_b: string
   option_c: string
@@ -131,13 +137,21 @@ export interface Profile {
   gender: 'Laki-laki' | 'Perempuan'
   phone: string
   is_admin: boolean
+  is_super_admin?: boolean
+  is_teacher: boolean
   is_premium: boolean
+  staff_password?: string | null
   unlocked_materials: string[] | null
   unlocked_levels: string[] | null
   exp: number
   level: number
   target_level: string | null
   avatar_url: string | null
+  birth_date?: string | null
+  address?: string | null
+  institution?: string | null
+  certificate_url?: string | null
+  profile_completed?: boolean
   created_at?: string
   updated_at?: string
 }
@@ -175,6 +189,8 @@ export interface StudyMaterial {
   content: Json
   sort_order: number
   icon_url: string | null
+  video_url: string | null
+  image_url: string | null
   is_locked: boolean
   created_at: string
   updated_at: string
@@ -187,8 +203,20 @@ export interface IconCategory {
 }
 
 export interface IconLibraryItem {
-  id: string
-  category_id: string
-  url: string
-  created_at: string
+  id: string;
+  category_id: string;
+  url: string;
+  created_at: string;
+}
+
+export interface AdminMenuConfig {
+  id: string;
+  tab_id: string;
+  label: string;
+  icon: string;
+  is_active: boolean;
+  scope?: 'admin' | 'teacher';
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
 }

@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { AppTheme, BannerSlide, MaterialCategory, Material, ExamLevel, ExamTest, Question, Profile, StudyLevel, StudyChapter, StudyMaterial } from './types'
+import { AppTheme, BannerSlide, MaterialCategory, Material, ExamLevel, ExamTest, Question, Profile, StudyLevel, StudyChapter, StudyMaterial, AdminMenuConfig } from './types'
 
 // Theme
 export async function getTheme(): Promise<AppTheme | null> {
@@ -157,7 +157,7 @@ export async function getProfileByEmail(email: string): Promise<Profile | null> 
 }
 
 export async function upsertProfile(profile: Partial<Profile>) {
-  const { data, error } = await supabase.from('profiles').upsert(profile).select()
+  const { data, error } = await supabase.from('profiles').upsert(profile, { onConflict: 'email' }).select()
   if (error) throw error
   return data
 }
@@ -308,12 +308,40 @@ export async function getUserLastProgressDetails(userEmail: string): Promise<any
   return data as any[];
 }
 
-export async function getLeaderboard(limit = 10): Promise<Profile[]> {
+export async function getLeaderboard(limit = 50): Promise<Profile[]> {
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
+    .eq('is_admin', false)
+    .eq('is_teacher', false)
     .order('exp', { ascending: false })
     .limit(limit);
   if (error) return [];
+  return data;
+}
+
+// ==========================================
+// ADMIN MENU CONFIGURATION
+// ==========================================
+
+export async function getAdminMenuConfig(scope?: 'admin' | 'teacher'): Promise<AdminMenuConfig[]> {
+  let query = supabase.from('admin_menu_config').select('*');
+  
+  if (scope) {
+    query = query.eq('scope', scope);
+  }
+  
+  const { data, error } = await query.order('sort_order', { ascending: true });
+  if (error) return [];
+  return data;
+}
+
+export async function updateAdminMenuConfig(config: Partial<AdminMenuConfig>) {
+  const { data, error } = await supabase
+    .from('admin_menu_config')
+    .update(config)
+    .eq('tab_id', config.tab_id)
+    .select();
+  if (error) throw error;
   return data;
 }

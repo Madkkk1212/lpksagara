@@ -30,6 +30,8 @@ export async function generateMetadata() {
   return {
     title: theme?.app_name || "Reiwa LMS",
     description: theme?.tagline || "Premium Japanese Study Experience",
+    manifest: "/manifest.json",
+    themeColor: theme?.primary_color || "#4f46e5",
     icons: favicon ? {
       icon: favicon,
       apple: favicon,
@@ -61,6 +63,13 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <SmoothScroll />
         {children}
+        <script dangerouslySetInnerHTML={{ __html: `
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+              navigator.serviceWorker.register('/sw.js');
+            });
+          }
+        `}} />
       </body>
     </html>
   );

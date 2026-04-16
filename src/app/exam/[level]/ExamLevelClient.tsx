@@ -62,6 +62,7 @@ export default function ExamLevelClient({ level }: { level: string }) {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const [levelConfig, setLevelConfig] = useState<ExamLevel | null>(null);
+  const [alertData, setAlertData] = useState<{ title: string; message: string; type?: 'warning' | 'error' | 'success' } | null>(null);
   const [testList, setTestList] = useState<ExamTest[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -281,80 +282,165 @@ export default function ExamLevelClient({ level }: { level: string }) {
 
     return (
       <KioskBarrier title={`Mode Ujian: ${selectedTest.title}`}>
-        <div className="flex flex-col min-h-screen bg-slate-50 font-sans">
-        {/* Modern Header / Progress */}
-        <div className="sticky top-0 z-50 bg-white shadow-sm">
-           <div className="max-w-2xl mx-auto px-6 py-6">
-              <div className="flex items-center justify-between mb-4">
-                 <div className="flex items-center gap-3">
-                    <div className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-                    <span className="text-xl font-black italic text-slate-800 tracking-tighter tabular-nums">{formatTime(timer)}</span>
-                 </div>
-                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Question {currentIdx + 1} of {selectedTest.questions.length}</span>
+        <div className="h-screen flex flex-col bg-slate-50 font-sans overflow-hidden">
+
+          {/* Header / Progress Bar - Fixed */}
+          <div className="shrink-0 bg-white shadow-sm">
+            <div className="max-w-2xl mx-auto px-6 py-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+                  <span className="text-xl font-black italic text-slate-800 tracking-tighter tabular-nums">{formatTime(timer)}</span>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Soal {currentIdx + 1} / {selectedTest.questions.length}</span>
               </div>
               <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                 <div 
-                   className="h-full bg-teal-500 transition-all duration-700 ease-out shadow-[0_0_8px_rgba(20,184,166,0.3)]"
-                   style={{ width: `${progress}%` }}
-                 />
+                <div 
+                  className="h-full bg-teal-500 transition-all duration-700 ease-out shadow-[0_0_8px_rgba(20,184,166,0.3)]"
+                  style={{ width: `${progress}%` }}
+                />
               </div>
-           </div>
-        </div>
-
-        <div className="flex-1 max-w-2xl mx-auto w-full px-6 py-10 space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
-          <section className="bg-white rounded-[3rem] p-10 md:p-14 shadow-[0_8px_40px_rgba(0,0,0,0.03)] ring-1 ring-slate-100">
-             <div className="mb-8">
-                <span className="px-4 py-1.5 rounded-full bg-teal-50 text-teal-600 text-[10px] font-black uppercase tracking-widest">Question {currentIdx + 1}</span>
-             </div>
-             <h2 className="text-2xl md:text-3xl font-black text-slate-900 italic leading-snug">{q.question_text}</h2>
-          </section>
-
-          <div className="grid gap-4 pb-24">
-            {[q.option_a, q.option_b, q.option_c, q.option_d].map((opt, i) => (
-              <button
-                key={i}
-                onClick={() => handleAnswer(q.id, i)}
-                className={`flex items-center gap-6 p-6 rounded-[2.5rem] text-left transition-all duration-300 group ${userAnswers[q.id] === i ? 'bg-teal-500 text-white shadow-2xl shadow-teal-500/20 ring-0' : 'bg-white ring-1 ring-slate-100 hover:ring-teal-500/30'}`}
-              >
-                <div className={`h-12 w-12 rounded-[1.2rem] flex items-center justify-center font-black transition-colors ${userAnswers[q.id] === i ? 'bg-white/20 text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-teal-50 group-hover:text-teal-600'}`}>
-                  {String.fromCharCode(65 + i)}
-                </div>
-                <span className={`text-lg font-bold ${userAnswers[q.id] === i ? 'text-white' : 'text-slate-700'}`}>{opt}</span>
-              </button>
-            ))}
+            </div>
           </div>
-        </div>
 
-        {/* Footer Navigation */}
-        <div className="sticky bottom-0 bg-white/80 backdrop-blur-xl border-t border-slate-100 p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.02)]">
-           <div className="max-w-2xl mx-auto flex gap-4">
+          {/* Question + Options - Scrollable only inside, no outer scroll */}
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            <div className="max-w-2xl mx-auto w-full px-6 py-8 flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              
+              {/* Question Card */}
+              <section className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm ring-1 ring-slate-100">
+                <div className="mb-4 flex items-center gap-2 flex-wrap">
+                  <span className="px-3 py-1 rounded-full bg-teal-50 text-teal-600 text-[10px] font-black uppercase tracking-widest">Soal {currentIdx + 1}</span>
+                  {q.question_type === 'listening' && <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-600 text-[10px] font-black uppercase tracking-widest">🔊 Listening</span>}
+                  {q.question_type === 'reading' && <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest">📖 Reading</span>}
+                  {q.question_type === 'image_based' && <span className="px-3 py-1 rounded-full bg-sky-50 text-sky-600 text-[10px] font-black uppercase tracking-widest">🖼️ Gambar</span>}
+                  {q.question_type === 'video_based' && <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-600 text-[10px] font-black uppercase tracking-widest">🎬 Video</span>}
+                </div>
+
+                {/* AUDIO player */}
+                {q.question_type === 'listening' && q.audio_url && (
+                  <div className="mb-5 p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                    <p className="text-[10px] font-black uppercase text-amber-500 mb-2 tracking-widest">🔊 Putar audio terlebih dahulu</p>
+                    <audio controls className="w-full" src={q.audio_url}>
+                      Browser tidak mendukung audio.
+                    </audio>
+                  </div>
+                )}
+
+                {/* IMAGE */}
+                {q.question_type === 'image_based' && q.image_url && (
+                  <div className="mb-5 rounded-2xl overflow-hidden border border-sky-100 bg-sky-50">
+                    <img
+                      src={q.image_url}
+                      alt="Gambar soal"
+                      className="w-full max-h-72 object-contain"
+                    />
+                  </div>
+                )}
+
+                {/* VIDEO */}
+                {q.question_type === 'video_based' && q.video_url && (
+                  <div className="mb-5 rounded-2xl overflow-hidden border border-purple-100 bg-black">
+                    <video
+                      controls
+                      className="w-full max-h-72"
+                      src={q.video_url}
+                    >
+                      Browser tidak mendukung video.
+                    </video>
+                  </div>
+                )}
+
+                <h2 className="text-xl md:text-2xl font-black text-slate-900 italic leading-snug">{q.question_text}</h2>
+              </section>
+
+              {/* Answer Options */}
+              <div className="grid gap-3">
+                {[q.option_a, q.option_b, q.option_c, q.option_d].map((opt, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      handleAnswer(q.id, i);
+                      // Auto-advance after 400ms
+                      if (currentIdx < selectedTest.questions.length - 1) {
+                        setTimeout(() => setCurrentIdx(p => p + 1), 400);
+                      }
+                    }}
+                    className={`flex items-center gap-5 p-5 rounded-[2rem] text-left transition-all duration-300 group ${userAnswers[q.id] === i ? 'bg-teal-500 text-white shadow-xl shadow-teal-500/20 scale-[1.02]' : 'bg-white ring-1 ring-slate-100 hover:ring-teal-500/30 active:scale-95'}`}
+                  >
+                    <div className={`h-10 w-10 shrink-0 rounded-[1rem] flex items-center justify-center font-black transition-colors ${userAnswers[q.id] === i ? 'bg-white/20 text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-teal-50 group-hover:text-teal-600'}`}>
+                      {String.fromCharCode(65 + i)}
+                    </div>
+                    <span className={`text-base font-bold leading-tight ${userAnswers[q.id] === i ? 'text-white' : 'text-slate-700'}`}>{opt}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer Navigation - Fixed */}
+          <div className="shrink-0 bg-white/90 backdrop-blur-xl border-t border-slate-100 px-6 py-4 shadow-[0_-4px_20px_rgba(0,0,0,0.04)]">
+            <div className="max-w-2xl mx-auto flex gap-3">
               <button 
                 onClick={() => setCurrentIdx(p => p - 1)} 
                 disabled={currentIdx === 0}
-                className="h-16 w-16 flex items-center justify-center rounded-2xl bg-white ring-1 ring-slate-200 text-slate-400 disabled:opacity-20 disabled:pointer-events-none active:scale-95 transition"
+                className="h-14 w-14 flex items-center justify-center rounded-2xl bg-white ring-1 ring-slate-200 text-slate-400 disabled:opacity-20 disabled:pointer-events-none active:scale-95 transition shrink-0"
               >
-                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
               </button>
               
               {currentIdx === selectedTest.questions.length - 1 ? (
                 <button 
-                  onClick={() => setActiveView("result")}
-                  className="flex-1 h-16 bg-teal-500 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-teal-500/20 active:scale-95 transition"
+                  onClick={() => {
+                    const questions = selectedTest.questions;
+                    const unansweredIdx = questions.findIndex(q => userAnswers[q.id] === undefined);
+                    if (unansweredIdx !== -1) {
+                      const count = questions.length - Object.keys(userAnswers).length;
+                      setAlertData({
+                        title: "Soal Belum Lengkap",
+                        message: `Ada ${count} soal belum dijawab. Mohon lengkapi jawaban Anda (dimulai dari Soal ${unansweredIdx + 1}).`,
+                        type: 'warning'
+                      });
+                      setCurrentIdx(unansweredIdx);
+                      return;
+                    }
+                    setActiveView("result");
+                  }}
+                  className="flex-1 h-14 bg-teal-500 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-teal-500/20 active:scale-95 transition text-sm"
                 >
-                  Selesaikan Ujian
+                  🎯 Selesaikan Ujian
                 </button>
               ) : (
                 <button 
                   onClick={() => setCurrentIdx(p => p + 1)}
-                  className="flex-1 h-16 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition flex items-center justify-center gap-2"
+                  className="flex-1 h-14 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition flex items-center justify-center gap-2 text-sm"
                 >
                   Lanjutkan
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </button>
               )}
-           </div>
+            </div>
+          </div>
+ 
+          {/* Custom Alert Modal for Exams */}
+          {alertData && (
+            <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+              <div className="bg-white rounded-[2.5rem] p-10 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-300">
+                <div className="text-5xl mb-6 text-center">
+                  {alertData.type === 'error' ? '❌' : alertData.type === 'success' ? '✅' : '⚠️'}
+                </div>
+                <h3 className="text-2xl font-black text-slate-800 text-center mb-2 italic tracking-tight">{alertData.title}</h3>
+                <p className="text-slate-500 font-medium text-center mb-10 leading-relaxed text-sm">{alertData.message}</p>
+                <button 
+                  onClick={() => setAlertData(null)}
+                  className="w-full py-5 bg-teal-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-teal-700 active:scale-95 transition-all shadow-xl"
+                >
+                  Fokus Lagi
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
       </KioskBarrier>
     );
   }

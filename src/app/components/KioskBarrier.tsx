@@ -96,7 +96,7 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)" }:
 
   return (
     <>
-      <div className="select-none h-screen w-screen overflow-y-auto bg-slate-50">
+      <div className="h-screen w-screen overflow-hidden bg-slate-50 flex flex-col">
         {children}
       </div>
       {violation && (

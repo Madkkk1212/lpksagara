@@ -147,6 +147,7 @@ export default function ThemeManager() {
         </div>
       </div>
 
+
       <div className="flex justify-end pt-8 border-t">
         <button onClick={handleSave} disabled={saving} className="px-10 py-4 bg-slate-900 text-white rounded-[1.5rem] font-black shadow-xl active:scale-95 transition disabled:opacity-50">
           {saving ? "SAVING..." : "SAVE CHANGES"}

@@ -17,42 +17,42 @@ export default function SettingsPanel() {
   };
 
   return (
-    <div className="space-y-12">
-      <section>
-        <h3 className="text-xl font-black text-slate-800 mb-6 italic border-b pb-4">Supabase Connection</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-           <div className="p-6 bg-slate-50 rounded-2xl ring-1 ring-slate-100">
-              <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Project URL</p>
-              <p className="font-mono text-xs text-slate-600 break-all">{config.url}</p>
+    <div className="space-y-6 font-sans">
+      <section className="bg-white border border-slate-200 rounded-2xl p-6 lg:p-8 shadow-sm">
+        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-6 border-b border-slate-100 pb-4">Supabase Connection Parameters</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+           <div className="p-5 bg-slate-50 border border-slate-200 rounded-xl">
+              <p className="text-[10px] font-bold uppercase text-slate-500 mb-2 tracking-widest">Project URL Endpoint</p>
+              <p className="text-xs text-indigo-600 break-all font-mono bg-white p-2 border border-slate-100 rounded inline-block shadow-sm">{config.url}</p>
            </div>
-           <div className="p-6 bg-slate-50 rounded-2xl ring-1 ring-slate-100">
-              <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Anon Key (Masked)</p>
-              <p className="font-mono text-xs text-slate-600 break-all">{config.key}</p>
+           <div className="p-5 bg-slate-50 border border-slate-200 rounded-xl">
+              <p className="text-[10px] font-bold uppercase text-slate-500 mb-2 tracking-widest">Anon Key (Masked)</p>
+              <p className="text-xs text-indigo-600 break-all font-mono bg-white p-2 border border-slate-100 rounded inline-block shadow-sm">{config.key}</p>
            </div>
         </div>
       </section>
 
-      <section>
-        <h3 className="text-xl font-black text-slate-800 mb-6 italic border-b pb-4">Maintenance</h3>
-        <div className="space-y-4">
-           <div className="p-8 border-2 border-dashed border-slate-200 rounded-[2rem] flex flex-col items-center justify-center text-center">
-              <p className="text-slate-500 font-medium mb-6">Resetting data will clear all entries in the database. Use with caution.</p>
-              <button disabled className="px-8 py-3 bg-slate-200 text-slate-400 rounded-xl font-black text-xs uppercase tracking-widest cursor-not-allowed">Reset Database (Disabled)</button>
+      <section className="bg-white border border-slate-200 rounded-2xl p-6 lg:p-8 shadow-sm">
+        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-6 border-b border-slate-100 pb-4">System Maintenance</h3>
+        <div className="space-y-6">
+           <div className="p-8 border-2 border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center text-center rounded-xl">
+              <p className="text-slate-500 text-sm font-medium mb-4">Resetting will clear all database entries. This process is currently restricted.</p>
+              <button disabled className="px-6 py-2.5 bg-slate-200 text-slate-400 font-bold text-xs uppercase tracking-widest cursor-not-allowed rounded-lg">Factory Reset (Disabled)</button>
            </div>
            
-           <div className="p-8 bg-rose-50 rounded-[2rem] border border-rose-100 flex items-center justify-between">
+           <div className="p-6 bg-rose-50 border border-rose-100 flex flex-col md:flex-row items-center justify-between gap-4 rounded-xl">
               <div>
-                <h4 className="text-rose-600 font-black italic">Admin Session</h4>
-                <p className="text-rose-400 text-xs font-bold uppercase tracking-widest mt-1">Clear your browser session</p>
+                <h4 className="text-rose-700 font-bold uppercase tracking-widest text-xs">Terminate Session</h4>
+                <p className="text-rose-500 text-xs font-medium mt-1">Clear local authentication storage</p>
               </div>
-              <button onClick={handleResetLocalStorage} className="px-6 py-3 bg-rose-500 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-rose-500/20 active:scale-95 transition">Logout Local</button>
+              <button onClick={handleResetLocalStorage} className="px-6 py-3 bg-white border border-rose-200 text-rose-600 font-bold text-xs uppercase tracking-widest hover:bg-rose-50 rounded-xl shadow-sm transition">Purge Auth Token</button>
            </div>
         </div>
       </section>
 
-      <section className="bg-slate-900 p-10 rounded-[2.5rem] text-white">
-         <h3 className="text-2xl font-black mb-4 italic underline decoration-teal-500 decoration-4">Luma Admin v1.0</h3>
-         <p className="opacity-60 leading-relaxed font-medium">Built with Next.js 15, Tailwind CSS, and Supabase. Powered by high-end design principles for the ultimate study experience.</p>
+      <section className="bg-slate-900 border border-slate-800 p-8 text-slate-300 rounded-2xl shadow-lg mt-8">
+         <h3 className="text-sm font-bold mb-2 uppercase tracking-widest text-indigo-400">Core System v1.0</h3>
+         <p className="text-sm text-slate-400 font-medium leading-relaxed">Built with Next.js 15, Tailwind CSS, and Supabase. Admin interface deployed in Premium Light Mode.</p>
       </section>
     </div>
   );
