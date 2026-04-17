@@ -18,10 +18,11 @@ export default function ProfileView({ user }: { user: Profile }) {
 
   const fetchData = async () => {
     try {
+      if (!user.id) return;
       const role = user.is_student ? 'student' : user.is_alumni ? 'alumni' : 'all';
       const [f, v] = await Promise.all([
         getProfileFields(role),
-        getProfileValuesByUserId(user.id)
+        getProfileValuesByUserId(user.id!)
       ]);
       setFields(f);
       setValues(v);
@@ -92,7 +93,7 @@ export default function ProfileView({ user }: { user: Profile }) {
       try {
         const base64 = reader.result as string;
         await upsertProfileValue({
-          user_id: user.id,
+          user_id: user.id!,
           field_id: field.id,
           value: base64
         });

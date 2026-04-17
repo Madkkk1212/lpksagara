@@ -93,6 +93,34 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
     return `${nipPrefix}-${dateStr}-${sequence}`;
   };
 
+  const handleDynamicFileChange = (e: React.ChangeEvent<HTMLInputElement>, fieldId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("File terlalu besar. Maksimal 2MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setDynamicValues(prev => ({ ...prev, [fieldId]: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAdminAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (editingProfile) {
+        setEditingProfile({ ...editingProfile, avatar_url: reader.result as string });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const updateGlobalPrefix = async () => {
     if (!theme) return;
     setIsUpdatingPrefix(true);
@@ -134,7 +162,7 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
         for (const [fieldId, value] of Object.entries(dynamicValues)) {
           if (value) {
             await upsertProfileValue({
-              user_id: editingProfile.id,
+              user_id: editingProfile.id!,
               field_id: fieldId,
               value: value
             });
@@ -240,6 +268,7 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
             </button>
             <button 
               onClick={() => {
+                setDynamicValues({});
                 setEditingProfile({
                   email: "",
                   full_name: "",
@@ -395,6 +424,24 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
             </div>
             <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar max-w-2xl mx-auto w-full">
                <div className="space-y-8">
+                  {/* Foto Profil Section */}
+                  <div className="flex flex-col items-center gap-6 p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem]">
+                     <div className="relative">
+                        <div className="h-32 w-32 rounded-[2.5rem] bg-white border-4 border-white shadow-xl flex items-center justify-center overflow-hidden ring-4 ring-slate-100">
+                           {editingProfile.avatar_url ? (
+                              <img src={editingProfile.avatar_url} className="w-full h-full object-cover" alt="avatar" />
+                           ) : (
+                              <span className="text-4xl grayscale opacity-20">👤</span>
+                           )}
+                        </div>
+                        <input type="file" id="admin-pfp" className="hidden" accept="image/*" onChange={handleAdminAvatarChange} />
+                        <label htmlFor="admin-pfp" className="absolute -bottom-2 -right-2 h-10 w-10 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg border-2 border-white cursor-pointer hover:scale-110 active:scale-95 transition">📷</label>
+                     </div>
+                     <div className="text-center">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Update Profile Photo</p>
+                     </div>
+                  </div>
+
                   <div className="space-y-4">
                      <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4">Identity Verification</label>
                      <div className="grid grid-cols-2 gap-6">
@@ -439,14 +486,104 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
                            type="email"
                         />
                      </div>
+                     <div className="grid grid-cols-2 gap-6">
+                        <input 
+                           className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
+                           placeholder="Nomor Telepon / WhatsApp"
+                           value={editingProfile.phone}
+                           onChange={e => setEditingProfile({...editingProfile, phone: e.target.value})}
+                           required
+                        />
+                        <input 
+                           type="date"
+                           className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
+                           value={editingProfile.birth_date || ""}
+                           onChange={e => setEditingProfile({...editingProfile, birth_date: e.target.value})}
+                        />
+                     </div>
                      <input 
                         className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
-                        placeholder="Nomor Telepon / WhatsApp"
-                        value={editingProfile.phone}
-                        onChange={e => setEditingProfile({...editingProfile, phone: e.target.value})}
-                        required
+                        placeholder="Institusi Asal"
+                        value={editingProfile.institution || ""}
+                        onChange={e => setEditingProfile({...editingProfile, institution: e.target.value})}
+                     />
+                     <textarea 
+                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold min-h-[100px]"
+                        placeholder="Alamat Lengkap"
+                        value={editingProfile.address || ""}
+                        onChange={e => setEditingProfile({...editingProfile, address: e.target.value})}
                      />
                   </div>
+
+                  {/* DATA PENUNJANG DYNAMIC */}
+                  {(() => {
+                     const role = editingProfile.is_admin ? 'admin' : 
+                                  editingProfile.is_teacher ? 'teacher' : 
+                                  editingProfile.is_alumni ? 'alumni' : 
+                                  editingProfile.is_student ? 'student' : 
+                                  editingProfile.is_premium ? 'premium' : 'all';
+
+                     const roleFields = dynamicFields.filter(f => f.target_role === 'all' || f.target_role === role);
+                     if (roleFields.length === 0) return null;
+
+                     return (
+                        <div className="space-y-6 pt-10 border-t border-slate-100">
+                           <label className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-500 ml-4">Data Penunjang & Dokumen</label>
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                              {roleFields.map(field => {
+                                 const value = dynamicValues[field.id];
+                                 return (
+                                    <div key={field.id} className="space-y-3">
+                                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">
+                                          {field.name} {field.is_required && <span className="text-rose-500">*</span>}
+                                       </label>
+                                       
+                                       {field.type === 'file' ? (
+                                          <div className="space-y-4">
+                                             {value ? (
+                                                <div className="relative group rounded-3xl overflow-hidden border border-slate-100 bg-white aspect-video shadow-sm">
+                                                   {value.startsWith('data:image') ? (
+                                                      <img src={value} alt={field.name} className="w-full h-full object-contain" />
+                                                   ) : (
+                                                      <div className="w-full h-full flex flex-col items-center justify-center bg-indigo-50 text-indigo-400">
+                                                         <span className="text-4xl mb-2">📄</span>
+                                                         <span className="text-[9px] font-black uppercase">Document Uploaded</span>
+                                                      </div>
+                                                   )}
+                                                   <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center flex-col gap-2 p-4">
+                                                      <label htmlFor={`admin-file-${field.id}`} className="px-5 py-2.5 bg-white text-slate-900 rounded-xl font-black text-[9px] uppercase shadow-xl cursor-pointer hover:bg-slate-50">Ganti Dokumen</label>
+                                                      <a href={value} download={`${field.name}.jpg`} className="text-white text-[9px] font-bold uppercase underline">Pratinjau Full</a>
+                                                   </div>
+                                                </div>
+                                             ) : (
+                                                <label htmlFor={`admin-file-${field.id}`} className="h-32 border-2 border-dashed border-slate-200 rounded-[2rem] bg-slate-50 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-white transition-all group">
+                                                   <span className="text-2xl group-hover:scale-125 transition">➕</span>
+                                                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Unggah {field.name}</p>
+                                                </label>
+                                             )}
+                                             <input 
+                                                type="file"
+                                                id={`admin-file-${field.id}`}
+                                                className="hidden"
+                                                onChange={e => handleDynamicFileChange(e, field.id)}
+                                                accept={field.allowed_file_types?.map(t => `.${t}`).join(',')}
+                                             />
+                                          </div>
+                                       ) : (
+                                          <input 
+                                             className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-600 outline-none transition font-bold"
+                                             value={value || ""}
+                                             onChange={e => setDynamicValues({...dynamicValues, [field.id]: e.target.value})}
+                                             placeholder={`Masukkan ${field.name}`}
+                                          />
+                                       )}
+                                    </div>
+                                 );
+                              })}
+                           </div>
+                        </div>
+                     );
+                  })()}
 
                   <div className="p-8 bg-indigo-50 border border-indigo-100 rounded-3xl group">
                      <label className="text-[11px] font-black uppercase tracking-[0.2em] text-indigo-700 block mb-3 italic">Set Access Password</label>
