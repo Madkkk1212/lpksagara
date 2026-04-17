@@ -283,12 +283,52 @@ export default function ProfileView({ user }: { user: Profile }) {
                       ].map((item, idx) => (
                         <div key={idx} className="space-y-2">
                            <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 ml-2">{item.label}</label>
-                           <div className="bg-slate-50 border border-slate-100 rounded-[1.5rem] p-5 flex items-center gap-4">
-                              <span className="text-2xl">{item.icon}</span>
+                           <div className="bg-slate-50 border border-slate-100 rounded-[1.5rem] p-5 flex items-center gap-4 group">
+                              <span className="text-2xl group-hover:scale-110 transition-transform">{item.icon}</span>
                               <span className="text-sm font-bold text-slate-700 truncate">{item.value || 'Belum diisi'}</span>
                            </div>
                         </div>
                       ))}
+
+                      {/* Dynamic Text/Number Fields moved here */}
+                      {fields.filter(f => f.type !== 'file').sort((a,b) => (a.sort_order||0)-(b.sort_order||0)).map((field) => {
+                         const val = values.find(v => v.field_id === field.id)?.value;
+                         const isUploading = uploadingFieldId === field.id;
+                         const localVal = localValues[field.id] || "";
+
+                         return (
+                           <div key={field.id} className="space-y-2">
+                              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 ml-2">
+                                {field.name} {field.is_required && <span className="text-rose-500">*</span>}
+                              </label>
+                              <div className="relative group">
+                                <div className="flex bg-slate-50 rounded-[1.5rem] border border-slate-100 p-2 focus-within:bg-white focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-50 transition-all">
+                                  <input 
+                                    type={field.type === 'number' ? 'number' : 'text'}
+                                    className="flex-1 bg-transparent px-4 py-3 outline-none font-bold text-slate-800 text-sm placeholder:text-slate-300"
+                                    placeholder={`Masukkan ${field.name.toLowerCase()}...`}
+                                    value={localVal}
+                                    onChange={(e) => setLocalValues({ ...localValues, [field.id]: e.target.value })}
+                                  />
+                                  <button 
+                                    onClick={() => handleFieldUpdate(field.id, localVal)}
+                                    disabled={isUploading || localVal === val}
+                                    className={`px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${
+                                      localVal === val 
+                                        ? 'hidden' 
+                                        : 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 hover:bg-slate-900 active:scale-95 animate-in slide-in-from-right-2'
+                                    }`}
+                                  >
+                                    {isUploading ? '...' : 'SIMPAN'}
+                                  </button>
+                                </div>
+                                {val && localVal === val && (
+                                  <div className="absolute -right-2 -top-2 h-6 w-6 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[10px] shadow-lg border-2 border-white animate-in zoom-in-50">✓</div>
+                                )}
+                              </div>
+                           </div>
+                         );
+                      })}
                    </div>
                 </div>
               </section>
@@ -307,27 +347,26 @@ export default function ProfileView({ user }: { user: Profile }) {
                       <div className="flex items-center justify-center p-20">
                          <div className="h-10 w-10 border-4 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin" />
                       </div>
-                   ) : fields.length > 0 ? (
+                   ) : fields.filter(f => f.type === 'file').length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-12">
-                         {fields.map((field) => {
+                         {fields.filter(f => f.type === 'file').sort((a,b) => (a.sort_order||0)-(b.sort_order||0)).map((field) => {
                             const val = values.find(v => v.field_id === field.id)?.value;
-                            const isFilled = !!val;
-                            const isUploading = uploadingFieldId === field.id;
-                            const localVal = localValues[field.id] || "";
+                             const isFilled = !!val;
+                             const isUploading = uploadingFieldId === field.id;
+                             const localVal = localValues[field.id] || "";
 
-                            return (
-                               <div key={field.id} className="space-y-4">
-                                  <div className="flex items-center justify-between ml-2">
-                                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{field.name}</span>
-                                     <div className="flex gap-2">
-                                        <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase ${field.is_required ? 'bg-rose-50 border-rose-100 text-rose-500' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
-                                           {field.is_required ? 'Wajib' : 'Opsional'}
-                                        </span>
-                                     </div>
-                                  </div>
+                             return (
+                                <div key={field.id} className="space-y-4">
+                                   <div className="flex items-center justify-between ml-2">
+                                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{field.name}</span>
+                                      <div className="flex gap-2">
+                                         <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase ${field.is_required ? 'bg-rose-50 border-rose-100 text-rose-500' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                                            {field.is_required ? 'Wajib' : 'Opsional'}
+                                         </span>
+                                      </div>
+                                   </div>
 
-                                  {field.type === 'file' ? (
-                                    <div className={`relative border-2 rounded-[2rem] p-6 transition-all ${isFilled ? 'bg-emerald-50/20 border-emerald-100' : 'bg-slate-50 border-slate-100 border-dashed hover:border-indigo-200'}`}>
+                                   <div className={`relative border-2 rounded-[2rem] p-6 transition-all ${isFilled ? 'bg-emerald-50/20 border-emerald-100' : 'bg-slate-50 border-slate-100 border-dashed hover:border-indigo-200 shadow-inner'}`}>
                                       <div className="flex items-center justify-between">
                                          <div className="flex items-center gap-5 overflow-hidden">
                                             <div className={`h-14 w-14 rounded-2xl flex items-center justify-center text-3xl ${isFilled ? 'bg-white shadow-md' : 'bg-slate-100 opacity-40'}`}>
@@ -359,48 +398,21 @@ export default function ProfileView({ user }: { user: Profile }) {
                                             <div className="h-10 w-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
                                          )}
                                       </div>
-                                    </div>
-                                  ) : (
-                                    <div className="relative group">
-                                      <div className="flex bg-slate-50 rounded-[1.5rem] border border-slate-100 p-2 focus-within:bg-white focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-50 transition-all">
-                                        <input 
-                                          type={field.type === 'number' ? 'number' : 'text'}
-                                          className="flex-1 bg-transparent px-4 py-3 outline-none font-bold text-slate-800 text-sm placeholder:text-slate-300 italic"
-                                          placeholder={`Masukkan ${field.name.toLowerCase()}...`}
-                                          value={localVal}
-                                          onChange={(e) => setLocalValues({ ...localValues, [field.id]: e.target.value })}
-                                        />
-                                        <button 
-                                          onClick={() => handleFieldUpdate(field.id, localVal)}
-                                          disabled={isUploading || localVal === val}
-                                          className={`px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${
-                                            localVal === val 
-                                              ? 'text-slate-300 cursor-default' 
-                                              : 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 hover:bg-slate-900 active:scale-95'
-                                          }`}
-                                        >
-                                          {isUploading ? '...' : 'SIMPAN'}
-                                        </button>
-                                      </div>
-                                      {isFilled && localVal === val && (
-                                        <div className="absolute -right-2 -top-2 h-6 w-6 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[10px] shadow-lg border-2 border-white animate-in zoom-in-50">✓</div>
-                                      )}
-                                    </div>
-                                  )}
-                               </div>
-                            );
-                         })}
+                                   </div>
+                                </div>
+                             );
+                          })}
                       </div>
                    ) : (
                       <p className="text-center text-xs font-bold text-slate-400 uppercase italic py-10">Tidak ada berkas tambahan yang diperlukan.</p>
-                   )}
-                </div>
-                <div className="p-8 bg-indigo-50/30 rounded-[2rem] border border-indigo-50/50 text-center">
-                   <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest leading-relaxed">
-                     Pilih file (JPG/PDF) maksimal 2MB. Pastikan berkas terlihat jelas dan asli.
-                   </p>
-                </div>
-              </section>
+                    )}
+                 </div>
+                 <div className="p-8 bg-indigo-50/30 rounded-[2rem] border border-indigo-50/50 text-center">
+                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest leading-relaxed">
+                      Pilih file (JPG/PDF) maksimal 2MB. Pastikan berkas terlihat jelas dan asli.
+                    </p>
+                 </div>
+               </section>
             )}
           </motion.div>
         )}

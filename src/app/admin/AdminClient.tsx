@@ -252,7 +252,7 @@ export default function AdminClient() {
                { activeTab === "banners" && <BannerManager /> }
                { activeTab === "materials" && <StudyHierarchyManager /> }
                { activeTab === "exams" && <ExamManager /> }
-               { activeTab === "users" && <UserManager userProfile={userProfile} /> }
+               { activeTab === "users" && <UserManager user={userProfile!} /> }
                {activeTab === "settings" && <SettingsPanel />}
                {activeTab === "proposals" && <ProposalManager />}
                {activeTab === "profile-config" && <ProfileFieldManager />}

@@ -143,7 +143,7 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                  </motion.div>
                  <h1 className="text-4xl font-black italic text-slate-900 mb-4 tracking-tight uppercase">Identity Onboarding</h1>
                  <p className="text-slate-500 font-medium text-sm leading-relaxed max-w-xl mx-auto italic">
-                    Halo, <span className="text-indigo-600 font-black">{user.full_name || 'User'}</span>. Untuk menjaga validitas data di Sagara, mohon lengkapi seluruh kolom identitas dan dokumen penunjang di bawah ini.
+                    Selamat datang, <span className="text-indigo-600 font-black">{user.full_name || 'User'}</span>! Untuk menjaga validitas data di Sagara, mohon lengkapi detil identitas dan berkas penunjang di bawah ini.
                  </p>
               </div>
 
@@ -182,11 +182,11 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Wajib diisi sebagai syarat identitas resmi Sagara</p>
                     </div>
                  </div>
-                 {/* Section 1: Data Identitas Dasar */}
+                 {/* Section 1: Data Identitas Dasar & Data Utama */}
                  <div className="space-y-6">
                     <div className="flex items-center gap-4 ml-2">
                        <span className="h-2 w-2 bg-indigo-500 rounded-full" />
-                       <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-400">01. Informasi Profil Dasar</h3>
+                       <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-400">01. Informasi Identitas & Data Utama</h3>
                     </div>
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-50/50 p-8 rounded-[2.5rem] border border-slate-100">
                        <div className="space-y-2 group">
@@ -210,7 +210,7 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                             className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-slate-800 focus:border-indigo-500 outline-none transition-all font-bold text-sm shadow-sm" 
                           />
                        </div>
-                       <div className="space-y-2 group md:col-span-2 lg:col-span-1">
+                       <div className="space-y-2 group">
                           <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4 group-focus-within:text-indigo-600 transition-colors">Alamat Lengkap (KTP) <span className="text-rose-500">(Wajib)</span></label>
                           <input 
                             placeholder="Alamat domisili..." 
@@ -220,23 +220,41 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                             className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-slate-800 focus:border-indigo-500 outline-none transition-all font-bold text-sm shadow-sm" 
                           />
                        </div>
+
+                       {/* Inject Dynamic Text/Number fields into Identity section */}
+                       {fields.filter(f => f.type !== 'file').sort((a,b) => (a.sort_order||0)-(b.sort_order||0)).map((field) => (
+                          <div key={field.id} className="space-y-2 group">
+                            <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4 group-focus-within:text-indigo-600 transition-colors">
+                              {field.name} {field.is_required && <span className="text-rose-500">(Wajib)</span>}
+                            </label>
+                            <input 
+                              type={field.type === 'number' ? 'number' : 'text'}
+                              required={field.is_required}
+                              placeholder={`Isi ${field.name}...`}
+                              value={dynamicValues[field.id] || ""}
+                              onChange={e => setDynamicValues({...dynamicValues, [field.id]: e.target.value})}
+                              className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-slate-800 focus:border-indigo-500 outline-none transition-all font-bold text-sm shadow-sm" 
+                            />
+                          </div>
+                        ))}
                     </div>
                  </div>
 
-                 {/* Section 2: Dokumen Penunjang */}
+                 {/* Section 2: Berkas Lampiran */}
                  <div className="space-y-8">
                     <div className="flex items-center gap-4 ml-2">
                        <span className="h-2 w-2 bg-emerald-500 rounded-full" />
-                       <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-400">02. Dokumen Penunjang (KTP/Foto/Lainnya)</h3>
+                       <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-400">02. Berkas Lampiran (Upload Dokumen)</h3>
                     </div>
 
-                    {fields.length === 0 ? (
+                    {fields.filter(f => f.type === 'file').length === 0 ? (
                        <div className="p-12 text-center bg-slate-50 border border-dashed border-slate-200 rounded-[2.5rem]">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Tidak ada dokumen penunjang tambahan.</p>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Tidak ada lampiran dokumen tambahan.</p>
                        </div>
                     ) : (
                        <div className="grid md:grid-cols-2 gap-8">
                           {fields
+                             .filter(f => f.type === 'file')
                              .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
                              .map((field, idx) => (
                                 <motion.div 
@@ -247,8 +265,8 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                                    className={`relative p-8 rounded-[2.5rem] border-2 transition-all flex flex-col gap-6 ${
                                       dynamicValues[field.id] 
                                          ? 'bg-emerald-50/50 border-emerald-200 ring-4 ring-emerald-500/5' 
-                                         : 'bg-white border-slate-100 hover:border-slate-300'
-                                   } shadow-sm group`}
+                                         : 'bg-white border-slate-100 hover:border-slate-300 shadow-sm'
+                                   } group`}
                                 >
                                    <div className="flex justify-between items-start">
                                       <div className="space-y-1">
@@ -270,7 +288,7 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                                    <div className="relative">
                                       {dynamicValues[field.id] ? (
                                          <div className="w-full bg-white rounded-2xl p-4 border border-emerald-100 flex items-center gap-4">
-                                            {field.type === 'file' && dynamicValues[field.id]?.startsWith('data:image') ? (
+                                            {dynamicValues[field.id]?.startsWith('data:image') ? (
                                                <div className="h-14 w-14 rounded-xl overflow-hidden border border-emerald-50 bg-slate-50">
                                                   <img src={dynamicValues[field.id]} className="w-full h-full object-cover" alt="preview" />
                                                </div>

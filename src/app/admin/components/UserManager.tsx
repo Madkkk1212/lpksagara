@@ -1,432 +1,284 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getProfiles, upsertProfile, deleteProfile, getMaterials, getExamLevels, getTheme, updateTheme, getProfileById, getProfileFields, getProfileValuesByUserId, upsertProfileValue } from "@/lib/db";
-import { Profile, Material, ExamLevel, AppTheme, ProfileField } from "@/lib/types";
+import { Profile, ProfileField, StudyLevel } from "@/lib/types";
+import { 
+  getProfiles, 
+  deleteProfile, 
+  upsertProfile, 
+  getProfileFields, 
+  getProfileValuesByUserId, 
+  upsertProfileValue,
+  getStudyLevels
+} from "@/lib/db";
+import { motion, AnimatePresence } from "framer-motion";
 
-export default function UserManager({ userProfile }: { userProfile: Profile | null }) {
+export default function UserManager({ user: userProfile }: { user: Profile }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [levels, setLevels] = useState<ExamLevel[]>([]);
-  const [theme, setTheme] = useState<AppTheme | null>(null);
-  
   const [loading, setLoading] = useState(true);
-  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filterRole, setFilterRole] = useState<"all" | "admin" | "teacher" | "student" | "alumni">("all");
   
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
-  const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [dynamicFields, setDynamicFields] = useState<ProfileField[]>([]);
   const [dynamicValues, setDynamicValues] = useState<Record<string, string>>({});
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [nipPrefix, setNipPrefix] = useState<string>("R");
-  const [isUpdatingPrefix, setIsUpdatingPrefix] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [levels, setLevels] = useState<StudyLevel[]>([]);
+
+  const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
 
   useEffect(() => {
-    fetchData();
+    fetchProfiles();
+    getProfileFields('all').then(setDynamicFields);
+    getStudyLevels().then(setLevels);
   }, []);
 
-  const fetchData = async () => {
+  const fetchProfiles = async () => {
     setLoading(true);
-    const [pData, mData, lData, tData] = await Promise.all([
-      getProfiles(), 
-      getMaterials(),
-      getExamLevels(),
-      getTheme()
-    ]);
-    setProfiles(pData);
-    setMaterials(mData);
-    setLevels(lData);
-    setTheme(tData);
-    if (tData?.nip_prefix) {
-      setNipPrefix(tData.nip_prefix);
-    }
-    setLoading(false);
-  };
-
-  const loadFullProfile = async (id: string, mode: 'edit' | 'view') => {
-    setIsDetailLoading(true);
     try {
-      const [full, fields, values] = await Promise.all([
-        getProfileById(id),
-        getProfileFields(),
-        getProfileValuesByUserId(id)
-      ]);
-
-      if (full) {
-        // Map values to a record
-        const valMap: Record<string, string> = {};
-        values.forEach(v => { valMap[v.field_id] = v.value; });
-        
-        setDynamicFields(fields);
-        setDynamicValues(valMap);
-
-        if (mode === 'edit') {
-          setEditingProfile(full);
-          setIsModalOpen(true);
-        } else {
-          setViewingProfile(full);
-        }
-      }
+      const data = await getProfiles();
+      setProfiles(data);
     } catch (err) {
-      alert("Gagal memuat detail profil.");
+      console.error(err);
     } finally {
-      setIsDetailLoading(false);
+      setLoading(false);
     }
   };
 
-  const generateNIP = () => {
-    const now = new Date();
-    const dateStr = now.getFullYear().toString() + 
-                    (now.getMonth() + 1).toString().padStart(2, '0') + 
-                    now.getDate().toString().padStart(2, '0');
-    
-    const countToday = profiles.filter(p => {
-       if (!p.created_at) return false;
-       const d = new Date(p.created_at);
-       return d.toDateString() === now.toDateString();
-    }).length;
+  const handleDelete = async (id: string, email: string) => {
+    if (email === userProfile.email) {
+      alert("Anda tidak bisa menghapus akun Anda sendiri.");
+      return;
+    }
+    if (!confirm("Hapus pengguna ini secara permanen?")) return;
+    try {
+      await deleteProfile(id);
+      fetchProfiles();
+    } catch (err) {
+      alert("Gagal menghapus.");
+    }
+  };
 
-    const sequence = (countToday + 1).toString().padStart(3, '0');
-    return `${nipPrefix}-${dateStr}-${sequence}`;
+  const handleEdit = async (p: Profile) => {
+    setEditingProfile(p);
+    setIsModalOpen(true);
+    if (p.id) {
+       const vals = await getProfileValuesByUserId(p.id);
+       const valMap: Record<string, string> = {};
+       vals.forEach(v => { valMap[v.field_id] = v.value; });
+       setDynamicValues(valMap);
+    }
+  };
+
+  const handleAdminAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingProfile) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+       setEditingProfile({ ...editingProfile, avatar_url: reader.result as string });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDynamicFileChange = (e: React.ChangeEvent<HTMLInputElement>, fieldId: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (file.size > 2 * 1024 * 1024) {
-      alert("File terlalu besar. Maksimal 2MB.");
-      return;
-    }
-
     const reader = new FileReader();
     reader.onloadend = () => {
-      setDynamicValues(prev => ({ ...prev, [fieldId]: reader.result as string }));
+       setDynamicValues(prev => ({ ...prev, [fieldId]: reader.result as string }));
     };
     reader.readAsDataURL(file);
   };
 
-  const handleAdminAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (editingProfile) {
-        setEditingProfile({ ...editingProfile, avatar_url: reader.result as string });
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const updateGlobalPrefix = async () => {
-    if (!theme) return;
-    setIsUpdatingPrefix(true);
-    try {
-      await updateTheme({ id: theme.id, nip_prefix: nipPrefix });
-      alert("NIP Prefix Updated Successfully!");
-    } catch (err) {
-      alert("Failed to update prefix");
-    } finally {
-      setIsUpdatingPrefix(false);
-    }
-  };
-
-  const filteredProfiles = profiles.filter(p => {
-    if (!userProfile?.is_super_admin && p.is_admin) return false;
-    if (roleFilter === "all") return true;
-    if (roleFilter === "admin") return p.is_admin;
-    if (roleFilter === "teacher") return p.is_teacher && !p.is_admin;
-    if (roleFilter === "student") return p.is_student && !p.is_teacher && !p.is_admin;
-    if (roleFilter === "alumni") return p.is_alumni && !p.is_teacher && !p.is_admin;
-    if (roleFilter === "premium") return p.is_premium && !p.is_admin && !p.is_teacher;
-    if (roleFilter === "standard") return !p.is_admin && !p.is_teacher && !p.is_premium && !p.is_student && !p.is_alumni;
-    return true;
-  });
-
-  const handleSave = async (e: React.FormEvent) => {
+  const handleAdminUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProfile) return;
-    
     try {
-      const sanitized = { 
-        ...editingProfile,
-        birth_date: editingProfile.birth_date === "" ? null : editingProfile.birth_date,
-      };
-      
-      await upsertProfile(sanitized);
-
-      if (editingProfile.id) {
-        for (const [fieldId, value] of Object.entries(dynamicValues)) {
-          if (value) {
+      await upsertProfile(editingProfile);
+      for (const [fieldId, value] of Object.entries(dynamicValues)) {
+        if (value) {
             await upsertProfileValue({
-              user_id: editingProfile.id!,
-              field_id: fieldId,
-              value: value
+                user_id: editingProfile.id!,
+                field_id: fieldId,
+                value: value
             });
-          }
         }
       }
-
       setIsModalOpen(false);
-      fetchData();
-    } catch (err: any) {
-      alert("Gagal menyimpan profile: " + (err.message || "Terjadi kesalahan tidak dikenal"));
+      fetchProfiles();
+      alert("Profil berhasil diperbarui.");
+    } catch (err) {
+      alert("Gagal memperbarui profil.");
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Hapus user ini?")) {
-      await deleteProfile(id);
-      fetchData();
-    }
+  const handleViewDetails = async (p: Profile) => {
+     setViewingProfile(p);
+     setIsDetailLoading(true);
+     try {
+        if (p.id) {
+           const vals = await getProfileValuesByUserId(p.id);
+           const valMap: Record<string, string> = {};
+           vals.forEach(v => { valMap[v.field_id] = v.value; });
+           setDynamicValues(valMap);
+        }
+     } catch (err) {
+        console.error(err);
+     } finally {
+        setIsDetailLoading(false);
+     }
   };
 
-  const toggleMaterial = (id: string) => {
-    if (!editingProfile) return;
-    const current = editingProfile.unlocked_materials || [];
-    const updated = current.includes(id) 
-      ? current.filter(mId => mId !== id) 
-      : [...current, id];
-    setEditingProfile({ ...editingProfile, unlocked_materials: updated });
-  };
-
-  const toggleLevel = (id: string) => {
-    if (!editingProfile) return;
-    const current = editingProfile.unlocked_levels || [];
-    const updated = current.includes(id) 
-      ? current.filter(lId => lId !== id) 
-      : [...current, id];
-    setEditingProfile({ ...editingProfile, unlocked_levels: updated });
-  };
-
-  const getCount = (role: string) => {
-    return profiles.filter(p => {
-      if (!userProfile?.is_super_admin && p.is_admin) return false;
-      if (role === "admin") return p.is_admin;
-      if (role === "teacher") return p.is_teacher && !p.is_admin;
-      if (role === "student") return p.is_student && !p.is_teacher && !p.is_admin;
-      if (role === "alumni") return p.is_alumni && !p.is_teacher && !p.is_admin;
-      if (role === "premium") return p.is_premium && !p.is_admin && !p.is_teacher;
-      if (role === "standard") return !p.is_admin && !p.is_teacher && !p.is_premium && !p.is_student && !p.is_alumni;
-      return true;
-    }).length;
-  };
-
-  const tabs = [
-    { id: "all", label: "Semua", count: userProfile?.is_super_admin ? profiles.length : profiles.filter(p => !p.is_admin).length },
-    ...(userProfile?.is_super_admin ? [{ id: "admin", label: "Admin", count: getCount("admin") }] : []),
-    { id: "teacher", label: "Guru", count: getCount("teacher") },
-    { id: "student", label: "Murid", count: getCount("student") },
-    { id: "alumni", label: "Alumni", count: getCount("alumni") },
-    { id: "premium", label: "Premium", count: getCount("premium") },
-    { id: "standard", label: "Umum", count: getCount("standard") },
-  ];
-
-  if (loading) return (
-     <div className="p-20 text-center flex flex-col items-center gap-6">
-        <div className="h-12 w-12 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin" />
-        <p className="font-black text-slate-400 text-sm tracking-widest uppercase italic animate-pulse">Menghubungkan Sagara Database...</p>
-     </div>
-  );
+  const filtered = profiles.filter(p => {
+    const matchesSearch = 
+      p.full_name.toLowerCase().includes(search.toLowerCase()) || 
+      p.email.toLowerCase().includes(search.toLowerCase()) || 
+      p.nip?.toLowerCase().includes(search.toLowerCase());
+    
+    if (filterRole === "all") return matchesSearch;
+    if (filterRole === "admin") return matchesSearch && p.is_admin;
+    if (filterRole === "teacher") return matchesSearch && p.is_teacher;
+    if (filterRole === "alumni") return matchesSearch && p.is_alumni;
+    if (filterRole === "student") return matchesSearch && p.is_student;
+    return matchesSearch;
+  });
 
   return (
-    <div className="space-y-6 font-sans">
-      <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden divide-y divide-slate-100">
-        <div className="p-6 md:p-8 flex flex-col md:flex-row justify-between md:items-center gap-6">
-          <div className="flex-1">
-            <h3 className="text-xl font-black text-slate-900 tracking-tight">Registry Pengguna</h3>
-            <p className="text-slate-500 text-xs font-bold mt-1 uppercase tracking-wider opacity-60">Pusat Manajemen Akses Sagara</p>
-            
-            {userProfile?.is_super_admin && (
-              <div className="mt-4 flex items-center gap-3 bg-slate-50 p-2 rounded-2xl border border-slate-100 max-w-fit">
-                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 md:ml-2">NIP Prefix:</span>
-                 <input 
-                   disabled={isUpdatingPrefix}
-                   value={nipPrefix}
-                   onChange={e => setNipPrefix(e.target.value.toUpperCase())}
-                   className="w-12 md:w-16 px-2 py-1.5 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none text-xs font-bold text-center bg-white"
-                 />
-                 <button 
-                   onClick={updateGlobalPrefix}
-                   disabled={isUpdatingPrefix}
-                   className="px-3 py-1.5 bg-indigo-600 text-white text-[10px] font-black rounded-xl hover:bg-slate-900 transition disabled:opacity-50"
-                 >
-                   {isUpdatingPrefix ? '...' : 'SAVE'}
-                 </button>
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={fetchData}
-              className="p-3 bg-slate-50 text-slate-400 hover:text-indigo-600 rounded-2xl transition active:scale-95 border border-slate-100 font-bold"
-            >
-              🔄
-            </button>
-            <button 
-              onClick={() => {
-                setDynamicValues({});
-                setEditingProfile({
-                  email: "",
-                  full_name: "",
-                  gender: "Laki-laki",
-                  phone: "",
-                  nip: generateNIP(),
-                  batch: "",
-                  is_admin: false,
-                  is_teacher: false,
-                  is_premium: false,
-                  is_student: true,
-                  is_alumni: false,
-                  password: "",
-                  unlocked_materials: [],
-                  unlocked_levels: [],
-                  birth_date: null,
-                  address: "",
-                  institution: "",
-                  certificate_url: "",
-                  avatar_url: "",
-                  profile_completed: false,
-                } as any);
-                setIsModalOpen(true);
-              }}
-              className="px-6 py-4 bg-slate-900 text-white font-black text-xs hover:bg-slate-800 rounded-2xl shadow-xl shadow-slate-200 transition-all whitespace-nowrap active:scale-95 uppercase italic tracking-widest"
-            >
-              + Provision Account
-            </button>
-          </div>
+    <div className="space-y-10">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-2">
+          <h2 className="text-3xl font-black italic text-slate-900 tracking-tighter uppercase">User Database</h2>
+          <p className="text-slate-500 font-bold text-xs uppercase tracking-widest">Total Active Users: {profiles.length}</p>
         </div>
+        
+        <div className="flex flex-wrap items-center gap-4">
+           <div className="bg-white p-1 rounded-2xl border border-slate-100 flex gap-1 shadow-sm overflow-hidden">
+              {(["all", "admin", "teacher", "student", "alumni"] as const).map((r) => (
+                 <button 
+                  key={r}
+                  onClick={() => setFilterRole(r)}
+                  className={`px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all ${filterRole === r ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
+                 >
+                    {r}
+                 </button>
+              ))}
+           </div>
 
-        <div className="px-6 md:px-8 py-2 overflow-x-auto bg-slate-50/50 flex items-center no-scrollbar">
-          <div className="flex gap-2">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setRoleFilter(tab.id)}
-                className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-black transition-all whitespace-nowrap ${
-                  roleFilter === tab.id 
-                    ? 'bg-white text-slate-900 shadow-md shadow-slate-200/50 border border-slate-200' 
-                    : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'
-                }`}
-              >
-                {tab.label}
-                <span className={`px-2 py-0.5 rounded-lg text-[10px] ${
-                  roleFilter === tab.id ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-200/50 text-slate-400'
-                }`}>
-                  {tab.count}
-                </span>
-              </button>
-            ))}
-          </div>
+           <div className="relative group">
+              <input 
+                type="text" 
+                placeholder="Cari Nama, Email, NIP..." 
+                className="pl-12 pr-6 py-4 bg-white border border-slate-100 rounded-2xl text-sm font-bold w-full md:w-80 shadow-sm focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors">🔍</span>
+           </div>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden relative">
-        {isDetailLoading && (
-           <div className="absolute inset-x-0 top-0 h-1 bg-indigo-500 overflow-hidden z-20">
-              <div className="w-full h-full bg-indigo-200 animate-[shimmer_1.5s_infinite]" />
-           </div>
-        )}
+      <div className="bg-white rounded-[3rem] shadow-sm border border-black/[0.03] overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs whitespace-nowrap">
-            <thead className="bg-slate-50 border-b border-slate-200 font-black text-slate-500 uppercase tracking-widest">
-              <tr>
-                <th className="px-6 py-5">Identity / NIP</th>
-                <th className="px-6 py-5">Kategori & Batch</th>
-                <th className="px-6 py-5">Contact</th>
-                <th className="px-6 py-5 text-right">Operations</th>
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-slate-50">
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Identity</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Roles / Stats</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Status</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 text-right">Settings</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredProfiles.map(profile => (
-                <tr key={profile.id} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div>
-                        <h4 className="font-black text-slate-900 text-sm">{profile.full_name}</h4>
-                        <p className="text-[10px] text-slate-400 font-black tracking-widest mt-0.5 uppercase">
-                          {profile.nip || 'NO_NIP_ASSIGNED'}
-                        </p>
+            <tbody className="divide-y divide-slate-50">
+              {filtered.map(p => (
+                <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-5">
+                      <div className="h-14 w-14 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center font-black text-slate-300 relative group-hover:scale-105 transition-transform duration-500 shadow-sm">
+                        {p.avatar_url ? (
+                          <img src={p.avatar_url} className="w-full h-full object-cover" alt="avatar" />
+                        ) : (
+                          p.full_name.charAt(0)
+                        )}
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="font-black text-slate-900 italic uppercase text-sm tracking-tight">{p.full_name}</p>
+                        <p className="text-[10px] font-bold text-slate-400 tracking-tighter font-mono">{p.email}</p>
+                        {p.nip && <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-1">ID: {p.nip}</p>}
+                      </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex gap-2 flex-wrap items-center">
-                       {profile.is_admin ? (
-                         <span className="bg-rose-50 text-rose-700 border border-rose-100 text-[10px] px-2.5 py-1 rounded-md font-black uppercase tracking-tighter shadow-sm">Admin</span>
-                       ) : profile.is_teacher ? (
-                         <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] px-2.5 py-1 rounded-md font-black uppercase tracking-tighter shadow-sm">Staff</span>
-                       ) : profile.is_alumni ? (
-                         <span className="bg-slate-900 text-white text-[10px] px-2.5 py-1 rounded-md font-black uppercase tracking-tighter shadow-sm">Alumni</span>
-                       ) : profile.is_student ? (
-                         <span className="bg-teal-50 text-teal-700 border border-teal-100 text-[10px] px-2.5 py-1 rounded-md font-black uppercase tracking-tighter shadow-sm">Murid</span>
-                       ) : profile.is_premium ? (
-                         <span className="bg-amber-50 text-amber-700 border border-amber-100 text-[10px] px-2.5 py-1 rounded-md font-black uppercase tracking-tighter shadow-sm">Premium</span>
-                       ) : (
-                         <span className="bg-slate-50 text-slate-500 border border-slate-200 text-[10px] px-2.5 py-1 rounded-md font-black uppercase tracking-tighter shadow-sm">Umum</span>
-                       )}
-                       {profile.batch && (
-                         <span className="bg-slate-100 text-slate-500 border border-slate-200 text-[10px] px-2 py-1 rounded-md font-bold uppercase tracking-widest">
-                            {profile.batch}
-                         </span>
-                       )}
+                  <td className="px-8 py-6">
+                    <div className="flex flex-wrap gap-2">
+                       {p.is_admin && <span className="px-3 py-1 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-rose-100">Admin</span>}
+                       {p.is_teacher && <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-indigo-100">Guru</span>}
+                       {p.is_student && <span className="px-3 py-1 bg-teal-50 text-teal-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-teal-100">Murid</span>}
+                       {p.is_alumni && <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-slate-200">Alumni</span>}
+                       {p.is_premium && <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-amber-100 italic">Premium</span>}
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                     <p className="text-slate-700 font-bold">{profile.email}</p>
-                     <p className="text-[10px] text-slate-400 font-mono italic mt-0.5">{profile.phone || '—'}</p>
+                  <td className="px-8 py-6">
+                     <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-2 w-fit ${p.profile_completed ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${p.profile_completed ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+                        {p.profile_completed ? 'Lengkap' : 'Menunggu'}
+                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right space-x-2">
-                     <button 
-                       disabled={isDetailLoading}
-                       onClick={() => profile.id && loadFullProfile(profile.id, 'view')}
-                       className="px-4 py-2 bg-indigo-50 border border-indigo-100 text-indigo-700 hover:bg-indigo-100 rounded-xl shadow-sm transition-all text-[10px] font-black uppercase disabled:opacity-50"
-                     >
-                       Info
-                     </button>
-                     <button 
-                       disabled={isDetailLoading}
-                       onClick={() => profile.id && loadFullProfile(profile.id, 'edit')}
-                       className="px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl shadow-sm transition-all text-[10px] font-black uppercase disabled:opacity-50"
-                     >
-                       Edit
-                     </button>
-                     <button 
-                       disabled={isDetailLoading}
-                       onClick={() => profile.id && handleDelete(profile.id)}
-                       className="px-4 py-2 bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 rounded-xl shadow-sm transition-all text-[10px] font-black uppercase disabled:opacity-50"
-                     >
-                       Delete
-                     </button>
+                  <td className="px-8 py-6">
+                    <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => handleViewDetails(p)}
+                        className="h-10 px-5 bg-white border border-slate-200 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm"
+                      >
+                         View Info
+                      </button>
+                      <button 
+                        onClick={() => handleEdit(p)}
+                        className="h-10 w-10 bg-white border border-slate-200 text-slate-400 rounded-xl flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                        title="Edit User"
+                      >
+                         ✍️
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(p.id!, p.email)}
+                        className="h-10 w-10 bg-white border border-slate-200 text-rose-300 rounded-xl flex items-center justify-center hover:bg-rose-600 hover:text-white transition-all shadow-sm"
+                        title="Delete User"
+                      >
+                         🗑️
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {filtered.length === 0 && (
+             <div className="py-20 text-center">
+                <p className="text-sm font-black text-slate-300 uppercase italic tracking-widest">Tidak ada murid yang ditemukan.</p>
+             </div>
+          )}
         </div>
       </div>
 
       {/* EDIT MODAL */}
-      {isModalOpen && editingProfile && !isDetailLoading && (
+      {isModalOpen && editingProfile && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setIsModalOpen(false)} />
-          <div className="relative w-full max-w-5xl bg-white rounded-[3rem] shadow-2xl overflow-hidden max-h-[92vh] flex flex-col border border-white/20">
-            <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-               <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white text-xl">👤</div>
-                  <div>
-                    <h3 className="text-xl font-black text-slate-800 tracking-tight leading-none uppercase italic">Manajemen Profil & Akses</h3>
-                    <p className="text-[10px] text-slate-400 font-black tracking-widest uppercase mt-1">ID: {editingProfile.id || 'NEW_RECORD'}</p>
-                  </div>
-               </div>
-               <button onClick={() => setIsModalOpen(false)} className="h-12 w-12 flex items-center justify-center rounded-2xl hover:bg-white transition text-xl shadow-sm border border-slate-100">✕</button>
-            </div>
-            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar max-w-2xl mx-auto w-full">
-               <div className="space-y-8">
-                  {/* Foto Profil Section */}
-                  <div className="flex flex-col items-center gap-6 p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem]">
-                     <div className="relative">
+           <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
+           <div className="relative w-full max-w-2xl bg-white rounded-[3.5rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col scale-in-center">
+              <div className="p-10 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                 <div className="flex items-center gap-5">
+                    <div className="h-16 w-16 bg-white rounded-2xl border border-slate-200 flex items-center justify-center text-3xl shadow-sm">🛡️</div>
+                    <div className="space-y-0.5">
+                       <h3 className="text-xl font-black text-slate-900 italic uppercase leading-none">Edit User Profile</h3>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Update data identitas & hak akses</p>
+                    </div>
+                 </div>
+                 <button onClick={() => setIsModalOpen(false)} className="h-10 w-10 border border-slate-200 rounded-xl flex items-center justify-center hover:bg-white transition shadow-sm">✕</button>
+              </div>
+
+              <form onSubmit={handleAdminUpdate} className="p-10 space-y-10 overflow-y-auto custom-scrollbar flex-1">
+                  <div className="flex items-center gap-10 bg-slate-50 p-8 rounded-[3rem]">
+                     <div className="relative group">
                         <div className="h-32 w-32 rounded-[2.5rem] bg-white border-4 border-white shadow-xl flex items-center justify-center overflow-hidden ring-4 ring-slate-100">
                            {editingProfile.avatar_url ? (
                               <img src={editingProfile.avatar_url} className="w-full h-full object-cover" alt="avatar" />
@@ -467,55 +319,91 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
                      </div>
                   </div>
 
-                  <div className="space-y-4">
-                     <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4">Personal Details</label>
-                     <div className="grid grid-cols-2 gap-6">
-                        <input 
-                           className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
-                           placeholder="Nama Lengkap"
-                           value={editingProfile.full_name}
-                           onChange={e => setEditingProfile({...editingProfile, full_name: e.target.value})}
-                           required
-                        />
-                        <input 
-                           className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
-                           placeholder="Email Address"
-                           value={editingProfile.email}
-                           onChange={e => setEditingProfile({...editingProfile, email: e.target.value})}
-                           required
-                           type="email"
-                        />
-                     </div>
-                     <div className="grid grid-cols-2 gap-6">
-                        <input 
-                           className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
-                           placeholder="Nomor Telepon / WhatsApp"
-                           value={editingProfile.phone}
-                           onChange={e => setEditingProfile({...editingProfile, phone: e.target.value})}
-                           required
-                        />
-                        <input 
-                           type="date"
-                           className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
-                           value={editingProfile.birth_date || ""}
-                           onChange={e => setEditingProfile({...editingProfile, birth_date: e.target.value})}
-                        />
-                     </div>
-                     <input 
-                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
-                        placeholder="Institusi Asal"
-                        value={editingProfile.institution || ""}
-                        onChange={e => setEditingProfile({...editingProfile, institution: e.target.value})}
-                     />
-                     <textarea 
-                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold min-h-[100px]"
-                        placeholder="Alamat Lengkap"
-                        value={editingProfile.address || ""}
-                        onChange={e => setEditingProfile({...editingProfile, address: e.target.value})}
-                     />
-                  </div>
+                  <div className="space-y-8">
+                     <div className="space-y-4">
+                        <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4">Personal Details</label>
+                        <div className="grid grid-cols-2 gap-6">
+                           <input 
+                              className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
+                              placeholder="Nama Lengkap"
+                              value={editingProfile.full_name}
+                              onChange={e => setEditingProfile({...editingProfile, full_name: e.target.value})}
+                              required
+                           />
+                           <input 
+                              className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
+                              placeholder="Email Address"
+                              value={editingProfile.email}
+                              onChange={e => setEditingProfile({...editingProfile, email: e.target.value})}
+                              required
+                              type="email"
+                           />
+                        </div>
+                        <div className="grid grid-cols-2 gap-6">
+                           <input 
+                              className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
+                              placeholder="Nomor Telepon / WhatsApp"
+                              value={editingProfile.phone}
+                              onChange={e => setEditingProfile({...editingProfile, phone: e.target.value})}
+                              required
+                           />
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="relative group">
+                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-2 block">Tanggal Lahir</label>
+                             <input 
+                                type="date"
+                                className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
+                                value={editingProfile.birth_date || ""}
+                                onChange={e => setEditingProfile({...editingProfile, birth_date: e.target.value})}
+                             />
+                          </div>
+                          <div className="relative group">
+                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-2 block">Institusi Asal</label>
+                             <input 
+                                className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
+                                placeholder="Institusi Asal"
+                                value={editingProfile.institution || ""}
+                                onChange={e => setEditingProfile({...editingProfile, institution: e.target.value})}
+                             />
+                          </div>
+                          <div className="relative group md:col-span-2">
+                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-2 block">Alamat Lengkap</label>
+                             <textarea 
+                                className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold min-h-[100px]"
+                                placeholder="Alamat Lengkap"
+                                value={editingProfile.address || ""}
+                                onChange={e => setEditingProfile({...editingProfile, address: e.target.value})}
+                             />
+                          </div>
 
-                  {/* DATA PENUNJANG DYNAMIC */}
+                          {/* DATA TAMBAHAN (TEXT/NUMBER) */}
+                          {(() => {
+                             const role = editingProfile.is_admin ? 'admin' : 
+                                          editingProfile.is_teacher ? 'teacher' : 
+                                          editingProfile.is_alumni ? 'alumni' : 
+                                          editingProfile.is_student ? 'student' : 
+                                          editingProfile.is_premium ? 'premium' : 'all';
+
+                             const textFields = dynamicFields.filter(f => (f.target_role === 'all' || f.target_role === role) && f.type !== 'file');
+                             return textFields.map(field => (
+                                <div key={field.id} className="relative group">
+                                   <label className="text-[10px] font-black uppercase tracking-widest text-indigo-500 ml-4 mb-2 block">{field.name}</label>
+                                   <input 
+                                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-600 outline-none transition font-bold shadow-sm"
+                                      value={dynamicValues[field.id] || ""}
+                                      onChange={e => setDynamicValues({...dynamicValues, [field.id]: e.target.value})}
+                                      placeholder={`Masukkan ${field.name}`}
+                                   />
+                                </div>
+                             ));
+                          })()}
+                        </div>
+                     </div>
+                  </div>
+                  
+                  {/* BERKAS PENDUKUNG (UPLOAD) */}
                   {(() => {
                      const role = editingProfile.is_admin ? 'admin' : 
                                   editingProfile.is_teacher ? 'teacher' : 
@@ -523,14 +411,14 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
                                   editingProfile.is_student ? 'student' : 
                                   editingProfile.is_premium ? 'premium' : 'all';
 
-                     const roleFields = dynamicFields.filter(f => f.target_role === 'all' || f.target_role === role);
-                     if (roleFields.length === 0) return null;
+                     const fileFields = dynamicFields.filter(f => (f.target_role === 'all' || f.target_role === role) && f.type === 'file');
+                     if (fileFields.length === 0) return null;
 
                      return (
                         <div className="space-y-6 pt-10 border-t border-slate-100">
-                           <label className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-500 ml-4">Data Penunjang & Dokumen</label>
+                           <label className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500 ml-4">Dokumen Pendukung (Lampiran)</label>
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                              {roleFields.map(field => {
+                              {fileFields.map(field => {
                                  const value = dynamicValues[field.id];
                                  return (
                                     <div key={field.id} className="space-y-3">
@@ -538,45 +426,36 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
                                           {field.name} {field.is_required && <span className="text-rose-500">*</span>}
                                        </label>
                                        
-                                       {field.type === 'file' ? (
-                                          <div className="space-y-4">
-                                             {value ? (
-                                                <div className="relative group rounded-3xl overflow-hidden border border-slate-100 bg-white aspect-video shadow-sm">
-                                                   {value.startsWith('data:image') ? (
-                                                      <img src={value} alt={field.name} className="w-full h-full object-contain" />
-                                                   ) : (
-                                                      <div className="w-full h-full flex flex-col items-center justify-center bg-indigo-50 text-indigo-400">
-                                                         <span className="text-4xl mb-2">📄</span>
-                                                         <span className="text-[9px] font-black uppercase">Document Uploaded</span>
-                                                      </div>
-                                                   )}
-                                                   <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center flex-col gap-2 p-4">
-                                                      <label htmlFor={`admin-file-${field.id}`} className="px-5 py-2.5 bg-white text-slate-900 rounded-xl font-black text-[9px] uppercase shadow-xl cursor-pointer hover:bg-slate-50">Ganti Dokumen</label>
-                                                      <a href={value} download={`${field.name}.jpg`} className="text-white text-[9px] font-bold uppercase underline">Pratinjau Full</a>
+                                       <div className="space-y-4">
+                                          {value ? (
+                                             <div className="relative group rounded-3xl overflow-hidden border border-slate-100 bg-white aspect-video shadow-sm">
+                                                {value.startsWith('data:image') ? (
+                                                   <img src={value} alt={field.name} className="w-full h-full object-contain" />
+                                                ) : (
+                                                   <div className="w-full h-full flex flex-col items-center justify-center bg-indigo-50 text-indigo-400">
+                                                      <span className="text-4xl mb-2">📄</span>
+                                                      <span className="text-[9px] font-black uppercase">Document Uploaded</span>
                                                    </div>
+                                                )}
+                                                <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center flex-col gap-2 p-4">
+                                                   <label htmlFor={`admin-file-${field.id}`} className="px-5 py-2.5 bg-white text-slate-900 rounded-xl font-black text-[9px] uppercase shadow-xl cursor-pointer hover:bg-slate-50">Ganti Dokumen</label>
+                                                   <a href={value} download={`${field.name}.jpg`} className="text-white text-[9px] font-bold uppercase underline">Pratinjau Full</a>
                                                 </div>
-                                             ) : (
-                                                <label htmlFor={`admin-file-${field.id}`} className="h-32 border-2 border-dashed border-slate-200 rounded-[2rem] bg-slate-50 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-white transition-all group">
-                                                   <span className="text-2xl group-hover:scale-125 transition">➕</span>
-                                                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Unggah {field.name}</p>
-                                                </label>
-                                             )}
-                                             <input 
-                                                type="file"
-                                                id={`admin-file-${field.id}`}
-                                                className="hidden"
-                                                onChange={e => handleDynamicFileChange(e, field.id)}
-                                                accept={field.allowed_file_types?.map(t => `.${t}`).join(',')}
-                                             />
-                                          </div>
-                                       ) : (
+                                             </div>
+                                          ) : (
+                                             <label htmlFor={`admin-file-${field.id}`} className="h-32 border-2 border-dashed border-slate-200 rounded-[2rem] bg-slate-50 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-white transition-all group">
+                                                <span className="text-2xl group-hover:scale-125 transition">➕</span>
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Unggah {field.name}</p>
+                                             </label>
+                                          )}
                                           <input 
-                                             className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-600 outline-none transition font-bold"
-                                             value={value || ""}
-                                             onChange={e => setDynamicValues({...dynamicValues, [field.id]: e.target.value})}
-                                             placeholder={`Masukkan ${field.name}`}
+                                             type="file"
+                                             id={`admin-file-${field.id}`}
+                                             className="hidden"
+                                             onChange={e => handleDynamicFileChange(e, field.id)}
+                                             accept={field.allowed_file_types?.map(t => `.${t}`).join(',')}
                                           />
-                                       )}
+                                       </div>
                                     </div>
                                  );
                               })}
@@ -647,13 +526,10 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
                             let updatedLevels = editingProfile.unlocked_levels || [];
                             
                             if (newState) {
-                              // Auto-unlock N5 and N4
                               const n5n4 = levels.filter(l => 
                                 l.level_code.toUpperCase() === "N5" || 
                                 l.level_code.toUpperCase() === "N4"
                               ).map(l => l.id);
-                              
-                              // Add unique IDs
                               updatedLevels = Array.from(new Set([...updatedLevels, ...n5n4]));
                             }
 
@@ -683,14 +559,13 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
                         </button>
                      </div>
                   </div>
-               </div>
 
-               <div className="pt-10 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-8 py-5 bg-slate-100 text-slate-500 font-black rounded-2xl hover:bg-slate-200 transition text-[11px] uppercase tracking-widest">CANCEL</button>
-                  <button type="submit" className="flex-1 py-5 bg-slate-900 text-white rounded-2xl font-black shadow-2xl active:scale-95 transition text-[11px] tracking-[0.3em] uppercase italic">Update Identity Access</button>
-               </div>
-            </form>
-          </div>
+                  <div className="pt-10 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4">
+                     <button type="button" onClick={() => setIsModalOpen(false)} className="px-8 py-5 bg-slate-100 text-slate-500 font-black rounded-2xl hover:bg-slate-200 transition text-[11px] uppercase tracking-widest">CANCEL</button>
+                     <button type="submit" className="flex-1 py-5 bg-slate-900 text-white rounded-2xl font-black shadow-2xl active:scale-95 transition text-[11px] tracking-[0.3em] uppercase italic">Update Identity Access</button>
+                  </div>
+              </form>
+           </div>
         </div>
       )}
 
@@ -733,7 +608,7 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
                {viewingProfile.address && (
                   <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
                      <p className="text-[9px] font-black uppercase text-slate-400 mb-1 tracking-widest">Full Address</p>
-                     <p className="text-sm font-bold text-slate-800 leading-relaxed italic">"{viewingProfile.address}"</p>
+                     <p className="text-sm font-bold text-slate-800 leading-relaxed italic">\"{viewingProfile.address}\"</p>
                   </div>
                )}
 
@@ -749,7 +624,6 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
                   </div>
                )}
 
-               {/* Dynamic Supporting Data Sections */}
                {(() => {
                   const role = viewingProfile.is_admin ? 'admin' : 
                                viewingProfile.is_teacher ? 'teacher' : 
@@ -786,7 +660,7 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
                                                 </div>
                                              )}
                                              <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center p-4">
-                                                <a href={value} download={`${field.name}-${viewingProfile.full_name}.jpg`} className="px-5 py-2.5 bg-white text-slate-900 rounded-xl font-black text-[9px] uppercase shadow-xl whitespace-nowrap">Download / View</a>
+                                                <a href={value} download={`\${field.name}-\${viewingProfile.full_name}.jpg`} className="px-5 py-2.5 bg-white text-slate-900 rounded-xl font-black text-[9px] uppercase shadow-xl whitespace-nowrap">Download / View</a>
                                              </div>
                                           </div>
                                        ) : (
