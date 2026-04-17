@@ -68,7 +68,7 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
       {/* 1. Stat Cards & Welcome */}
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 bg-white/60 backdrop-blur-xl rounded-[3rem] p-10 shadow-[0_20px_60px_rgba(0,0,0,0.03)] border border-white/80 flex flex-col md:flex-row items-center justify-between gap-10 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-teal-400/10 to-indigo-400/10 blur-[60px] rounded-full -mr-40 -mt-40 transition-transform duration-1000 group-hover:scale-110" />
+          <div className="absolute top-0 right-0 w-80 h-80 bg-[radial-gradient(circle,rgba(45,212,191,0.1)_0%,transparent_70%)] rounded-full -mr-40 -mt-40 transition-transform duration-1000 group-hover:scale-110" />
           
           <div className="relative z-10 space-y-4">
              <div className="flex items-center gap-3">
@@ -148,7 +148,7 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
                  </div>
               </div>
               <button 
-                onClick={() => onUpgrade?.(`Halo Admin, saya ${user.full_name} ingin upgrade ke Premium di ${theme?.app_name || 'Reiwa LMS'}`)}
+                onClick={() => onUpgrade?.(`Halo Admin, saya ${user.full_name} ingin upgrade ke Premium di ${theme?.app_name || 'Sagara'}`)}
                 className="px-12 py-5 bg-slate-900 text-white rounded-2xl font-black text-sm tracking-widest shadow-[0_20px_50px_rgba(15,23,42,0.3)] hover:shadow-none hover:translate-y-1 transition-all duration-500 block text-center min-w-[200px]"
               >
                 HUBUNGI ADMIN
@@ -281,7 +281,7 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
        )}
 
        {/* Floating AI Sensei */}
-       <AISenseiChat />
+       {theme?.ai_sensei_active !== false && <AISenseiChat />}
 
        {/* FULL LEADERBOARD MODAL */}
        {isLeaderboardOpen && (

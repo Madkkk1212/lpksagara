@@ -94,7 +94,7 @@ export default function NotFoundContent({ theme }: NotFoundContentProps) {
               )}
             </div>
             <h1 className="mt-4 text-xl md:text-2xl font-black italic tracking-tighter text-slate-900 group-hover:text-primary transition-colors">
-              {theme?.app_name || 'reiwa lms'}
+              {theme?.app_name || 'sagara'}
             </h1>
           </Link>
         </motion.div>

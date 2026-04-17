@@ -25,7 +25,8 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
 
     const fetchHierarchy = async () => {
       const chaps = await getStudyChapters(levelData.id);
-      setChapters(chaps);
+      const sortedChaps = [...chaps].sort((a, b) => a.sort_order - b.sort_order);
+      setChapters(sortedChaps);
       
       let completed: string[] = [];
       if (saved?.email) {
@@ -33,12 +34,8 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
         setCompletedMaterials(completed);
       }
 
-      if (chaps.length > 0) {
-        const isPremium = saved?.is_premium;
-        const firstAllowedId = chaps.find(c => !c.is_locked || isPremium)?.id || chaps[0].id;
-        setExpandedChapter(firstAllowedId);
-        
-        const chapterIds = chaps.map(c => c.id);
+      const chapterIds = sortedChaps.map(c => c.id);
+      if (chapterIds.length > 0) {
         const { data: mats } = await supabase
           .from('study_materials')
           .select('*')
@@ -53,6 +50,20 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
           });
           setMaterialsByChapter(grouped);
         }
+
+        const isPremium = saved?.is_premium;
+        const isStaff = saved?.is_admin || saved?.is_super_admin;
+        
+        // Find the first chapter that should be expanded by default
+        const firstExpanded = sortedChaps.find(c => {
+          if (isStaff || isPremium) return true;
+          // Logic for unlocking will be defined below, but for default expand:
+          const idx = sortedChaps.findIndex(inner => inner.id === c.id);
+          if (idx === 0) return true;
+          return false; 
+        });
+        
+        setExpandedChapter(firstExpanded?.id || sortedChaps[0].id);
       }
       setLoading(false);
     };
@@ -60,11 +71,33 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
     fetchHierarchy();
   }, [levelData.id]);
 
+  const isChapterCompleted = (chapterId: string) => {
+    const mats = materialsByChapter[chapterId] || [];
+    if (mats.length === 0) return false;
+    return mats.every(m => completedMaterials.includes(m.id));
+  };
+
+  const isChapterUnlocked = (chapId: string) => {
+    if (userProfile?.is_admin || userProfile?.is_super_admin || userProfile?.is_premium) return true;
+    
+    const chapterIndex = chapters.findIndex(c => c.id === chapId);
+    if (chapterIndex === 0) return true;
+
+    const prevChapter = chapters[chapterIndex - 1];
+    return isChapterCompleted(prevChapter.id);
+  };
+
   const toggleChapter = (chap: StudyChapter) => {
-    if (chap.is_locked && !userProfile?.is_premium) {
+    if (chap.is_locked && !userProfile?.is_premium && !userProfile?.is_admin && !userProfile?.is_super_admin) {
       alert("Bab ini terkunci! Silakan hubungi admin untuk akses Premium.");
       return;
     }
+
+    if (!isChapterUnlocked(chap.id)) {
+      alert("Bab sebelumnya belum selesai! Selesaikan semua materi di bab sebelumnya terlebih dahulu.");
+      return;
+    }
+
     setExpandedChapter(prev => prev === chap.id ? null : chap.id);
   };
 
@@ -107,26 +140,35 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
         {chapters.map((chap, idx) => {
           const isExpanded = expandedChapter === chap.id;
           const mats = materialsByChapter[chap.id] || [];
-          const isLockedForUser = chap.is_locked && !userProfile?.is_premium;
+          const isPremiumLocked = chap.is_locked && !userProfile?.is_premium && !userProfile?.is_admin && !userProfile?.is_super_admin;
+          const isSequenceLocked = !isChapterUnlocked(chap.id);
+          const isLockedForUser = isPremiumLocked || isSequenceLocked;
+          const isCompleted = isChapterCompleted(chap.id);
           
           return (
-            <div key={chap.id} className="bg-white rounded-[2rem] shadow-sm ring-1 ring-slate-100 overflow-hidden transition-all duration-300">
+            <div key={chap.id} className={`bg-white rounded-[2rem] shadow-sm ring-1 ring-slate-100 overflow-hidden transition-all duration-300 ${isLockedForUser ? 'opacity-60 grayscale' : ''}`}>
               <button 
                 onClick={() => toggleChapter(chap)}
                 className={`w-full flex items-center justify-between p-6 text-left transition ${isLockedForUser ? 'hover:bg-rose-50/50' : 'hover:bg-slate-50/50'}`}
               >
                 <div className="flex items-center gap-4">
-                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-black text-sm overflow-hidden ${isLockedForUser ? 'bg-rose-50 text-rose-500' : 'bg-slate-100 text-slate-500'}`}>
-                    {isLockedForUser ? '🔒' : (chap.icon_url ? <img src={chap.icon_url || undefined} alt="chap" className="w-full h-full object-cover" /> : (idx + 1))}
+                  <div className={`h-12 w-12 rounded-2xl flex items-center justify-center font-black text-sm overflow-hidden shadow-sm ring-1 ring-black/5 ${isLockedForUser ? 'bg-rose-50 text-rose-500' : isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                    {isLockedForUser ? '🔒' : isCompleted ? '✓' : (chap.icon_url ? <img src={chap.icon_url || undefined} alt="chap" className="w-full h-full object-cover" /> : (idx + 1))}
                   </div>
                   <div>
-                    <h3 className={`text-lg font-black ${isLockedForUser ? 'text-slate-400' : 'text-slate-800'}`}>{chap.title}</h3>
-                    <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">{mats.length} Materi {isLockedForUser && ' (Premium)'}</p>
+                    <h3 className={`text-lg font-black italic tracking-tight ${isLockedForUser ? 'text-slate-400' : 'text-slate-800'}`}>{chap.title}</h3>
+                    <div className="flex items-center gap-2">
+                       <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">{mats.length} Materi</p>
+                       {isPremiumLocked && <span className="px-2 py-0.5 bg-rose-50 text-rose-500 rounded-full text-[8px] font-black uppercase tracking-widest">Premium</span>}
+                       {isSequenceLocked && !isPremiumLocked && <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full text-[8px] font-black uppercase tracking-widest">Terkunci Bab 1</span>}
+                    </div>
                   </div>
                 </div>
-                <div className={`text-slate-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
-                  ▼
-                </div>
+                {!isLockedForUser && (
+                  <div className={`text-slate-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                    ▼
+                  </div>
+                )}
               </button>
 
               {isExpanded && (

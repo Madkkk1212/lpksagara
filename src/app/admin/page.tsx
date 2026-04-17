@@ -7,7 +7,7 @@ import { getTheme } from "@/lib/db";
 export async function generateMetadata() {
   const theme = await getTheme();
   return {
-    title: `Admin Panel | ${theme?.app_name || "Reiwa LMS"}`,
+    title: `Admin Panel | ${theme?.app_name || "Sagara"}`,
     description: theme?.tagline || "Management Dashboard",
   };
 }

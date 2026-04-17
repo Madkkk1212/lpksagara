@@ -82,8 +82,37 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    const missing: { name: string; id: string }[] = [];
+
     if (!avatarPreview) {
-      alert("Foto profil wajib diunggah.");
+      missing.push({ name: "Foto Profil", id: "pfp-container" });
+    }
+    if (!formData.birth_date) {
+      missing.push({ name: "Tanggal Lahir", id: "input-birth-date" });
+    }
+    if (!formData.institution) {
+      missing.push({ name: "Institusi Asal", id: "input-institution" });
+    }
+    if (!formData.address) {
+      missing.push({ name: "Alamat Lengkap", id: "input-address" });
+    }
+
+    fields.filter(f => f.type !== 'file' && f.is_required && !dynamicValues[f.id]).forEach(f => {
+      missing.push({ name: f.name, id: `input-dynamic-${f.id}` });
+    });
+
+    fields.filter(f => f.type === 'file' && f.is_required && !dynamicValues[f.id]).forEach(f => {
+      missing.push({ name: `Berkas ${f.name}`, id: `file-container-${f.id}` });
+    });
+
+    if (missing.length > 0) {
+      const message = "Terdapat " + missing.length + " data/berkas wajib yang belum diisi:\n\n" + missing.map(m => "• " + m.name).join("\n") + "\n\nMohon lengkapi terlebih dahulu!";
+      alert(message);
+      
+      const firstMissingId = missing[0].id;
+      document.getElementById(firstMissingId)?.focus();
+      document.getElementById(firstMissingId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setLoading(false);
       return;
     }
@@ -119,8 +148,8 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
     <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden">
        {/* Background Animated Blobs */}
        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-          <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-teal-200/20 blur-[120px] rounded-full animate-pulse" />
-          <div className="absolute top-[60%] -right-[10%] w-[50%] h-[50%] bg-indigo-200/20 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
+          <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-[radial-gradient(circle,rgba(153,246,228,0.2)_0%,transparent_70%)] rounded-full animate-pulse" />
+          <div className="absolute top-[60%] -right-[10%] w-[50%] h-[50%] bg-[radial-gradient(circle,rgba(199,210,254,0.2)_0%,transparent_70%)] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
        </div>
 
         <motion.div 
@@ -147,7 +176,7 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                  </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-12">
+              <form onSubmit={handleSubmit} className="space-y-12" noValidate>
                  {/* Section 0: Foto Profil (Mandatory) */}
                  <div className="space-y-8 flex flex-col items-center border-b border-slate-100 pb-12">
                     <div className="flex items-center gap-4 w-full">
@@ -155,7 +184,7 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                        <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-400">00. Pas Foto Terbaru (Wajib)</h3>
                     </div>
                     
-                    <div className="relative group">
+                    <div id="pfp-container" className="relative group">
                        <div className="h-40 w-40 rounded-[3rem] bg-slate-50 border-4 border-white shadow-2xl flex items-center justify-center overflow-hidden ring-8 ring-slate-100 transition-all group-hover:ring-indigo-100">
                           {avatarPreview ? (
                              <img src={avatarPreview} className="w-full h-full object-cover" alt="pfp" />
@@ -179,7 +208,7 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                     </div>
                     <div className="text-center space-y-1">
                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-800">Klik ikon kamera untuk unggah foto</p>
-                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Wajib diisi sebagai syarat identitas resmi Sagara</p>
+                      
                     </div>
                  </div>
                  {/* Section 1: Data Identitas Dasar & Data Utama */}
@@ -191,9 +220,7 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-50/50 p-8 rounded-[2.5rem] border border-slate-100">
                        <div className="space-y-2 group">
                           <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4 group-focus-within:text-indigo-600 transition-colors">Tanggal Lahir <span className="text-rose-500">(Wajib)</span></label>
-                          <input 
-                            type="date" 
-                            required 
+                          <input id="input-birth-date" type="date" 
                             value={formData.birth_date} 
                             onChange={e => setFormData({...formData, birth_date: e.target.value})} 
                             className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-slate-800 focus:border-indigo-500 outline-none transition-all font-bold text-sm shadow-sm" 
@@ -201,10 +228,7 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                        </div>
                        <div className="space-y-2 group">
                           <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4 group-focus-within:text-indigo-600 transition-colors">Institusi Asal <span className="text-rose-500">(Wajib)</span></label>
-                          <input 
-                            type="text" 
-                            required 
-                            placeholder="Cth: LPK Sagara" 
+                          <input id="input-institution" type="text" placeholder="Cth: LPK Sagara" 
                             value={formData.institution} 
                             onChange={e => setFormData({...formData, institution: e.target.value})} 
                             className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-slate-800 focus:border-indigo-500 outline-none transition-all font-bold text-sm shadow-sm" 
@@ -212,9 +236,7 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                        </div>
                        <div className="space-y-2 group">
                           <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4 group-focus-within:text-indigo-600 transition-colors">Alamat Lengkap (KTP) <span className="text-rose-500">(Wajib)</span></label>
-                          <input 
-                            placeholder="Alamat domisili..." 
-                            required
+                          <input id="input-address" placeholder="Alamat domisili..."
                             value={formData.address} 
                             onChange={e => setFormData({...formData, address: e.target.value})} 
                             className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-slate-800 focus:border-indigo-500 outline-none transition-all font-bold text-sm shadow-sm" 
@@ -228,8 +250,7 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                               {field.name} {field.is_required && <span className="text-rose-500">(Wajib)</span>}
                             </label>
                             <input 
-                              type={field.type === 'number' ? 'number' : 'text'}
-                              required={field.is_required}
+                              id={`input-dynamic-${field.id}`} type={field.type === 'number' ? 'number' : 'text'}
                               placeholder={`Isi ${field.name}...`}
                               value={dynamicValues[field.id] || ""}
                               onChange={e => setDynamicValues({...dynamicValues, [field.id]: e.target.value})}
@@ -262,7 +283,7 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                                    animate={{ opacity: 1, scale: 1 }}
                                    transition={{ delay: 0.1 * idx }}
                                    key={field.id}
-                                   className={`relative p-8 rounded-[2.5rem] border-2 transition-all flex flex-col gap-6 ${
+                                   id={`file-container-${field.id}`} className={`relative p-8 rounded-[2.5rem] border-2 transition-all flex flex-col gap-6 ${
                                       dynamicValues[field.id] 
                                          ? 'bg-emerald-50/50 border-emerald-200 ring-4 ring-emerald-500/5' 
                                          : 'bg-white border-slate-100 hover:border-slate-300 shadow-sm'
@@ -314,7 +335,6 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                                         id={dynamicValues[field.id] ? `change-${field.id}` : `file-${field.id}`}
                                         className="hidden"
                                         onChange={e => handleDynamicFileChange(e, field)}
-                                        required={field.is_required && !dynamicValues[field.id]}
                                         accept={field.allowed_file_types?.map(t => `.${t}`).join(',')}
                                       />
                                    </div>

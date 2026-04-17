@@ -45,12 +45,12 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
   // Progression Logic
   const isChapterCompleted = (chapterId: string) => {
     const chapterMats = allLevelMaterials.filter(m => m.chapter_id === chapterId);
-    if (chapterMats.length === 0) return true; 
+    if (chapterMats.length === 0) return false; 
     return chapterMats.every(m => completedMaterials.includes(m.id));
   };
 
   const isChapterUnlocked = (chapterId: string) => {
-    if (user.is_admin || user.is_premium) return true;
+    if (user.is_admin || user.is_super_admin || user.is_premium) return true;
     
     const sortedChapters = [...chapters].sort((a, b) => a.sort_order - b.sort_order);
     const chapterIndex = sortedChapters.findIndex(c => c.id === chapterId);
@@ -58,6 +58,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
     if (chapterIndex === 0) return true; 
     
     const prevChapter = sortedChapters[chapterIndex - 1];
+    // ONLY unlock if the previous chapter is fully completed
     return isChapterCompleted(prevChapter.id);
   };
 
@@ -108,15 +109,15 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
     if (activeLevel) {
       getStudyChapters(activeLevel.id).then(async (chaps) => {
         const sortedChaps = [...chaps].sort((a, b) => a.sort_order - b.sort_order);
-        setChapters(sortedChaps);
         
-        // Fetch all materials in the level for progression check
+        // Fetch ALL materials for the entire level first to ensure progression logic works
         const allMats: StudyMaterial[] = [];
         for (const chap of sortedChaps) {
             const mats = await getStudyMaterials(chap.id);
             allMats.push(...mats);
         }
         setAllLevelMaterials(allMats);
+        setChapters(sortedChaps);
       });
     } else {
       setChapters([]);
@@ -479,7 +480,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                           
                             <div className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-slate-900/5 backdrop-blur-[2px] rounded-[3.5rem] opacity-0 hover:opacity-100 transition-opacity duration-500 pointer-events-none group-hover:pointer-events-auto">
                               <button 
-                                onClick={() => onUpgrade?.(`Halo Admin, saya ${user.full_name} ingin membuka akses ke ${level.title} di ${theme?.app_name || 'Reiwa LMS'}`)}
+                                onClick={() => onUpgrade?.(`Halo Admin, saya ${user.full_name} ingin membuka akses ke ${level.title} di ${theme?.app_name || 'Sagara'}`)}
                                 className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:bg-teal-600 transition-colors pointer-events-auto"
                               >
                                 Buka Level Sekarang →

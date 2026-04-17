@@ -132,6 +132,10 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
   };
 
   const filtered = profiles.filter(p => {
+    if (!userProfile.is_super_admin && (p.is_admin || p.is_super_admin)) {
+      if (p.email !== userProfile.email) return false;
+    }
+
     const matchesSearch = 
       p.full_name.toLowerCase().includes(search.toLowerCase()) || 
       p.email.toLowerCase().includes(search.toLowerCase()) || 
@@ -155,10 +159,10 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
         
         <div className="flex flex-wrap items-center gap-4">
            <div className="bg-white p-1 rounded-2xl border border-slate-100 flex gap-1 shadow-sm overflow-hidden">
-              {(["all", "admin", "teacher", "student", "alumni"] as const).map((r) => (
+              {(userProfile.is_super_admin ? ["all", "admin", "teacher", "student", "alumni"] : ["all", "teacher", "student", "alumni"]).map((r) => (
                  <button 
                   key={r}
-                  onClick={() => setFilterRole(r)}
+                  onClick={() => setFilterRole(r as "all" | "admin" | "teacher" | "student" | "alumni")}
                   className={`px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all ${filterRole === r ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
                  >
                     {r}
@@ -176,6 +180,41 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
               />
               <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors">🔍</span>
            </div>
+           
+           <button 
+             onClick={() => {
+               const d = new Date();
+               const dateStr = `${d.getDate().toString().padStart(2, '0')}${(d.getMonth() + 1).toString().padStart(2, '0')}${d.getFullYear().toString().slice(-2)}`;
+               const seq = (profiles.length + 1).toString().padStart(3, '0');
+               const generatedNip = `R-${dateStr}-${seq}`;
+
+               setEditingProfile({
+                 nip: generatedNip,
+                 email: "",
+                 full_name: "",
+                 password: "",
+                 gender: "Laki-laki",
+                 phone: "",
+                 is_admin: false,
+                 is_teacher: false,
+                 is_student: true,
+                 is_alumni: false,
+                 is_premium: false,
+                 unlocked_levels: [],
+                 unlocked_materials: [],
+                 exp: 0,
+                 level: 1,
+                 target_level: null,
+                 avatar_url: null,
+                 profile_completed: false, // NEW: must complete onboarding first
+               } as any);
+               setDynamicValues({});
+               setIsModalOpen(true);
+             }}
+             className="px-6 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl active:scale-95 transition-all hover:bg-indigo-600"
+           >
+              + Tambah User
+           </button>
         </div>
       </div>
 
@@ -269,30 +308,32 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
                  <div className="flex items-center gap-5">
                     <div className="h-16 w-16 bg-white rounded-2xl border border-slate-200 flex items-center justify-center text-3xl shadow-sm">🛡️</div>
                     <div className="space-y-0.5">
-                       <h3 className="text-xl font-black text-slate-900 italic uppercase leading-none">Edit User Profile</h3>
-                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Update data identitas & hak akses</p>
+                       <h3 className="text-xl font-black text-slate-900 italic uppercase leading-none">{editingProfile.id ? "Edit User Profile" : "Tambah User"}</h3>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{editingProfile.id ? "Update data identitas & hak akses" : "Buat akun pengguna baru"}</p>
                     </div>
                  </div>
                  <button onClick={() => setIsModalOpen(false)} className="h-10 w-10 border border-slate-200 rounded-xl flex items-center justify-center hover:bg-white transition shadow-sm">✕</button>
               </div>
 
               <form onSubmit={handleAdminUpdate} className="p-10 space-y-10 overflow-y-auto custom-scrollbar flex-1">
-                  <div className="flex items-center gap-10 bg-slate-50 p-8 rounded-[3rem]">
-                     <div className="relative group">
-                        <div className="h-32 w-32 rounded-[2.5rem] bg-white border-4 border-white shadow-xl flex items-center justify-center overflow-hidden ring-4 ring-slate-100">
-                           {editingProfile.avatar_url ? (
-                              <img src={editingProfile.avatar_url} className="w-full h-full object-cover" alt="avatar" />
-                           ) : (
-                              <span className="text-4xl grayscale opacity-20">👤</span>
-                           )}
-                        </div>
-                        <input type="file" id="admin-pfp" className="hidden" accept="image/*" onChange={handleAdminAvatarChange} />
-                        <label htmlFor="admin-pfp" className="absolute -bottom-2 -right-2 h-10 w-10 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg border-2 border-white cursor-pointer hover:scale-110 active:scale-95 transition">📷</label>
-                     </div>
-                     <div className="text-center">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Update Profile Photo</p>
-                     </div>
-                  </div>
+                  {editingProfile.id && (
+                    <div className="flex items-center gap-10 bg-slate-50 p-8 rounded-[3rem]">
+                       <div className="relative group">
+                          <div className="h-32 w-32 rounded-[2.5rem] bg-white border-4 border-white shadow-xl flex items-center justify-center overflow-hidden ring-4 ring-slate-100">
+                             {editingProfile.avatar_url ? (
+                                <img src={editingProfile.avatar_url} className="w-full h-full object-cover" alt="avatar" />
+                             ) : (
+                                <span className="text-4xl grayscale opacity-20">👤</span>
+                             )}
+                          </div>
+                          <input type="file" id="admin-pfp" className="hidden" accept="image/*" onChange={handleAdminAvatarChange} />
+                          <label htmlFor="admin-pfp" className="absolute -bottom-2 -right-2 h-10 w-10 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg border-2 border-white cursor-pointer hover:scale-110 active:scale-95 transition">📷</label>
+                       </div>
+                       <div className="text-center">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Update Profile Photo</p>
+                       </div>
+                    </div>
+                  )}
 
                   <div className="space-y-4">
                      <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4">Identity Verification</label>
@@ -300,8 +341,7 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
                         <div className="space-y-2">
                            <p className="text-[9px] font-black uppercase text-indigo-600 ml-4 tracking-tighter">NIP (Dynamic Generation)</p>
                            <input 
-                              readOnly={!userProfile?.is_super_admin}
-                              className={`w-full px-6 py-4 rounded-2xl border-2 border-transparent outline-none transition font-black shadow-sm ${!userProfile?.is_super_admin ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-slate-50 focus:border-indigo-600 text-slate-900'}`}
+                              className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-600 outline-none transition font-black shadow-sm text-slate-900"
                               placeholder="NIP"
                               value={editingProfile.nip || ""}
                               onChange={e => setEditingProfile({...editingProfile, nip: e.target.value.toUpperCase()})}
@@ -349,62 +389,64 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
                            />
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="relative group">
-                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-2 block">Tanggal Lahir</label>
-                             <input 
-                                type="date"
-                                className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
-                                value={editingProfile.birth_date || ""}
-                                onChange={e => setEditingProfile({...editingProfile, birth_date: e.target.value})}
-                             />
-                          </div>
-                          <div className="relative group">
-                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-2 block">Institusi Asal</label>
-                             <input 
-                                className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
-                                placeholder="Institusi Asal"
-                                value={editingProfile.institution || ""}
-                                onChange={e => setEditingProfile({...editingProfile, institution: e.target.value})}
-                             />
-                          </div>
-                          <div className="relative group md:col-span-2">
-                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-2 block">Alamat Lengkap</label>
-                             <textarea 
-                                className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold min-h-[100px]"
-                                placeholder="Alamat Lengkap"
-                                value={editingProfile.address || ""}
-                                onChange={e => setEditingProfile({...editingProfile, address: e.target.value})}
-                             />
-                          </div>
+                        {editingProfile.id && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="relative group">
+                               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-2 block">Tanggal Lahir</label>
+                               <input 
+                                  type="date"
+                                  className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
+                                  value={editingProfile.birth_date || ""}
+                                  onChange={e => setEditingProfile({...editingProfile, birth_date: e.target.value})}
+                               />
+                            </div>
+                            <div className="relative group">
+                               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-2 block">Institusi Asal</label>
+                               <input 
+                                  className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
+                                  placeholder="Institusi Asal"
+                                  value={editingProfile.institution || ""}
+                                  onChange={e => setEditingProfile({...editingProfile, institution: e.target.value})}
+                               />
+                            </div>
+                            <div className="relative group md:col-span-2">
+                               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-2 block">Alamat Lengkap</label>
+                               <textarea 
+                                  className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold min-h-[100px]"
+                                  placeholder="Alamat Lengkap"
+                                  value={editingProfile.address || ""}
+                                  onChange={e => setEditingProfile({...editingProfile, address: e.target.value})}
+                               />
+                            </div>
 
-                          {/* DATA TAMBAHAN (TEXT/NUMBER) */}
-                          {(() => {
-                             const role = editingProfile.is_admin ? 'admin' : 
-                                          editingProfile.is_teacher ? 'teacher' : 
-                                          editingProfile.is_alumni ? 'alumni' : 
-                                          editingProfile.is_student ? 'student' : 
-                                          editingProfile.is_premium ? 'premium' : 'all';
+                            {/* DATA TAMBAHAN (TEXT/NUMBER) */}
+                            {(() => {
+                               const role = editingProfile.is_admin ? 'admin' : 
+                                            editingProfile.is_teacher ? 'teacher' : 
+                                            editingProfile.is_alumni ? 'alumni' : 
+                                            editingProfile.is_student ? 'student' : 
+                                            editingProfile.is_premium ? 'premium' : 'all';
 
-                             const textFields = dynamicFields.filter(f => (f.target_role === 'all' || f.target_role === role) && f.type !== 'file');
-                             return textFields.map(field => (
-                                <div key={field.id} className="relative group">
-                                   <label className="text-[10px] font-black uppercase tracking-widest text-indigo-500 ml-4 mb-2 block">{field.name}</label>
-                                   <input 
-                                      className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-600 outline-none transition font-bold shadow-sm"
-                                      value={dynamicValues[field.id] || ""}
-                                      onChange={e => setDynamicValues({...dynamicValues, [field.id]: e.target.value})}
-                                      placeholder={`Masukkan ${field.name}`}
-                                   />
-                                </div>
-                             ));
-                          })()}
-                        </div>
+                               const textFields = dynamicFields.filter(f => (f.target_role === 'all' || f.target_role === role) && f.type !== 'file');
+                               return textFields.map(field => (
+                                  <div key={field.id} className="relative group">
+                                     <label className="text-[10px] font-black uppercase tracking-widest text-indigo-500 ml-4 mb-2 block">{field.name}</label>
+                                     <input 
+                                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-600 outline-none transition font-bold shadow-sm"
+                                        value={dynamicValues[field.id] || ""}
+                                        onChange={e => setDynamicValues({...dynamicValues, [field.id]: e.target.value})}
+                                        placeholder={`Masukkan ${field.name}`}
+                                     />
+                                  </div>
+                               ));
+                            })()}
+                          </div>
+                        )}
                      </div>
                   </div>
                   
                   {/* BERKAS PENDUKUNG (UPLOAD) */}
-                  {(() => {
+                  {editingProfile.id && (() => {
                      const role = editingProfile.is_admin ? 'admin' : 
                                   editingProfile.is_teacher ? 'teacher' : 
                                   editingProfile.is_alumni ? 'alumni' : 
@@ -557,12 +599,31 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
                         >
                            ALUMNI
                         </button>
+                        </div>
                      </div>
+
+                  {/* Profile Completion Toggle */}
+                  <div className="pt-6 border-t border-slate-100">
+                    <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4 mb-4 block italic">Status Onboarding Profil</label>
+                    <button
+                      type="button"
+                      onClick={() => setEditingProfile({...editingProfile, profile_completed: !(editingProfile as any).profile_completed})}
+                      className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border-2 flex items-center justify-center gap-3 ${(editingProfile as any).profile_completed ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}
+                    >
+                      {(editingProfile as any).profile_completed
+                        ? '✅  Profil Sudah Lengkap — Klik untuk Reset ke Onboarding'
+                        : '⏳  Profil Belum Lengkap — User akan diarahkan ke form Onboarding saat Login'}
+                    </button>
+                    <p className="text-[9px] text-slate-400 font-bold mt-2 ml-4 italic uppercase tracking-wider">
+                      {(editingProfile as any).profile_completed
+                        ? 'User bisa langsung masuk ke Learning System'
+                        : 'User WAJIB isi data diri lengkap sebelum bisa belajar'}
+                    </p>
                   </div>
 
-                  <div className="pt-10 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4">
+                  <div className="pt-4 flex gap-4 sticky bottom-0 bg-white/80 backdrop-blur-md pb-4">
                      <button type="button" onClick={() => setIsModalOpen(false)} className="px-8 py-5 bg-slate-100 text-slate-500 font-black rounded-2xl hover:bg-slate-200 transition text-[11px] uppercase tracking-widest">CANCEL</button>
-                     <button type="submit" className="flex-1 py-5 bg-slate-900 text-white rounded-2xl font-black shadow-2xl active:scale-95 transition text-[11px] tracking-[0.3em] uppercase italic">Update Identity Access</button>
+                     <button type="submit" className="flex-1 py-5 bg-slate-900 text-white rounded-2xl font-black shadow-2xl active:scale-95 transition text-[11px] tracking-[0.3em] uppercase italic">{editingProfile.id ? "Update Identity Access" : "Provision New User"}</button>
                   </div>
               </form>
            </div>
@@ -603,6 +664,14 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
                      <p className="text-[9px] font-black uppercase text-slate-400 mb-1 tracking-widest">Institution</p>
                      <p className="text-sm font-bold text-slate-800">{viewingProfile.institution || '—'}</p>
                   </div>
+               </div>
+
+               <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 shadow-inner group relative">
+                  <p className="text-[9px] font-black uppercase text-indigo-400 mb-1 tracking-[0.2em] italic">Access Password</p>
+                  <p className="text-xl font-mono tracking-[0.2em] font-black pointer-events-none filter blur-sm group-hover:filter-none transition-all duration-300 select-all">
+                     {viewingProfile.password || 'TIDAK_ADA_PASSWORD'}
+                  </p>
+                  <span className="absolute top-6 right-6 text-[8px] font-black uppercase tracking-widest text-indigo-300 opacity-100 group-hover:opacity-0 transition">Hover to reveal</span>
                </div>
                
                {viewingProfile.address && (

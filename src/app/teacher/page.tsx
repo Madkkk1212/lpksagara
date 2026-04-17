@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata() {
   const theme = await getTheme();
   return {
-    title: `Teacher Hub | ${theme?.app_name || "Reiwa LMS"}`,
+    title: `Teacher Hub | ${theme?.app_name || "Sagara"}`,
     description: "Cinematic Teacher Dashboard",
   };
 }

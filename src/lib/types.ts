@@ -33,6 +33,7 @@ export interface AppTheme {
   cloudinary_cloud_name: string | null
   cloudinary_upload_preset: string | null
   nip_prefix: string | null
+  ai_sensei_active: boolean | null
   updated_at: string
 }
 

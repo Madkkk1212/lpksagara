@@ -28,7 +28,7 @@ export async function generateMetadata() {
   }
   
   return {
-    title: theme?.app_name || "Reiwa LMS",
+    title: theme?.app_name || "Sagara",
     description: theme?.tagline || "Premium Japanese Study Experience",
     manifest: "/manifest.json",
     icons: favicon ? {

@@ -88,7 +88,7 @@ export default function AdminClient() {
     localStorage.removeItem("luma-admin-auth");
     localStorage.removeItem("luma-auth");
     localStorage.removeItem("luma-user-profile");
-    window.location.href = "/";
+    window.location.href = "/?logout=1";
   };
 
   if (isCheckingAuth) {

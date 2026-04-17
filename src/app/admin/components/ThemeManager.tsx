@@ -70,7 +70,7 @@ export default function ThemeManager() {
               <input name="logo_text" value={theme?.logo_text || ""} onChange={handleChange as any} className="w-full px-6 py-3 rounded-xl bg-slate-50 border-2 border-transparent focus:border-slate-900 focus:bg-white outline-none transition" />
             </div>
             
-            <div className="pt-4 border-t border-slate-100">
+            <div className="pt-4 border-t border-slate-100 space-y-4">
                <label className="flex items-center gap-3 cursor-pointer">
                   <input 
                     type="checkbox" 
@@ -79,6 +79,19 @@ export default function ThemeManager() {
                     className="w-5 h-5 accent-slate-900" 
                   />
                   <span className="text-sm font-bold text-slate-800">Use Logo Image (Header)</span>
+               </label>
+
+               <label className="flex items-center gap-3 cursor-pointer p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                  <input 
+                    type="checkbox" 
+                    checked={theme?.ai_sensei_active ?? true}
+                    onChange={(e) => setTheme(prev => prev ? { ...prev, ai_sensei_active: e.target.checked } : null)}
+                    className="w-5 h-5 accent-indigo-600" 
+                  />
+                  <div>
+                    <span className="text-sm font-black text-indigo-900 block tracking-tight">Aktifkan AI Sensei Chatbot</span>
+                    <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest block">Fitur tutor AI di Learning System</span>
+                  </div>
                </label>
             </div>
             {theme?.header_use_logo_image && (

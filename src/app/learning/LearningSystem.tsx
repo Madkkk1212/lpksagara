@@ -18,9 +18,15 @@ interface LearningSystemProps {
 export type LearningTab = "dashboard" | "materi" | "latihan" | "profile" | "flashcards";
 
 export default function LearningSystem({ user, onLogout, theme, onRefreshUser }: LearningSystemProps) {
-  const [activeTab, setActiveTab] = useState<LearningTab>("dashboard");
+  const [activeTab, setActiveTab] = useState<LearningTab>(user.profile_completed === false ? "profile" : "dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [upgradeMessage, setUpgradeMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user.profile_completed === false) {
+      setActiveTab("profile");
+    }
+  }, [user.profile_completed]);
 
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: "🚀" },
@@ -32,8 +38,8 @@ export default function LearningSystem({ user, onLogout, theme, onRefreshUser }:
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-50/50 via-slate-50 to-teal-50/50 flex relative overflow-hidden font-sans selection:bg-teal-100">
       {/* Decorative Background Elements */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-teal-200/20 blur-[120px] rounded-full pointer-events-none animate-pulse" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-200/20 blur-[120px] rounded-full pointer-events-none animate-pulse " style={{ animationDelay: '2s' }} />
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[radial-gradient(circle,rgba(153,246,228,0.2)_0%,transparent_70%)] rounded-full pointer-events-none animate-pulse" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[radial-gradient(circle,rgba(199,210,254,0.2)_0%,transparent_70%)] rounded-full pointer-events-none animate-pulse " style={{ animationDelay: '2s' }} />
 
       {/* Sidebar Desktop - FLOATING GLASS STYLE */}
       <aside className="hidden lg:flex w-80 flex-col fixed inset-y-6 left-6 z-50">
@@ -211,8 +217,8 @@ export default function LearningSystem({ user, onLogout, theme, onRefreshUser }:
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md animate-in fade-in" onClick={() => setUpgradeMessage(null)} />
            <div className="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg p-10 text-center animate-in zoom-in-95 duration-500 overflow-hidden">
-               <div className="absolute -top-40 -right-40 w-80 h-80 bg-amber-400/20 blur-[60px] rounded-full pointer-events-none" />
-               <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-400/20 blur-[60px] rounded-full pointer-events-none" />
+               <div className="absolute -top-40 -right-40 w-80 h-80 bg-[radial-gradient(circle,rgba(251,191,36,0.2)_0%,transparent_70%)] rounded-full pointer-events-none" />
+               <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[radial-gradient(circle,rgba(45,212,191,0.2)_0%,transparent_70%)] rounded-full pointer-events-none" />
                <div className="relative z-10 flex flex-col items-center">
                   <div className="h-24 w-24 bg-gradient-to-br from-amber-200 to-orange-100 rounded-[2rem] flex items-center justify-center text-5xl mb-6 shadow-inner ring-4 ring-white rotate-3">👑</div>
                   <h3 className="text-3xl font-black text-slate-800 italic uppercase tracking-tight mb-3">Premium Only</h3>

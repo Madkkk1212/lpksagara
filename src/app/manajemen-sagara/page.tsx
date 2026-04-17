@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata() {
   const theme = await getTheme();
   return {
-    title: `Secure Portal | ${theme?.app_name || "Reiwa LMS"}`,
+    title: `Secure Portal | ${theme?.app_name || "Sagara"}`,
     description: "Restricted Staff Access",
   };
 }

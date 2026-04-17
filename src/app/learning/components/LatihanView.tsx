@@ -80,7 +80,7 @@ export default function LatihanView({ user, theme, onUpgrade }: { user: Profile,
                   <h5 className="text-xl font-black text-slate-900 italic uppercase">Premium Only</h5>
                   <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">Upgrade untuk akses fitur ini</p>
                   <button 
-                    onClick={() => onUpgrade?.(`Halo Admin, saya ${user.full_name} ingin berlangganan Premium untuk akses ${card.title} di ${theme?.app_name || 'Reiwa LMS'}`)}
+                    onClick={() => onUpgrade?.(`Halo Admin, saya ${user.full_name} ingin berlangganan Premium untuk akses ${card.title} di ${theme?.app_name || 'Sagara'}`)}
                     className="inline-block bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:bg-indigo-600 transition-colors"
                   >
                     Hubungi Admin →
