@@ -237,7 +237,7 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
                   institution: "",
                   certificate_url: "",
                   avatar_url: "",
-                  profile_completed: true,
+                  profile_completed: false,
                 } as any);
                 setIsModalOpen(true);
               }}
@@ -525,6 +525,21 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
                            </button>
                         </div>
                      </div>
+
+                     <div className="pt-6 border-t border-slate-100 flex items-center justify-between px-4">
+                        <div>
+                           <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-1">Onboarding Status</label>
+                           <p className="text-[9px] text-slate-500 font-medium italic">Status kelengkapan data murid/alumni.</p>
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => setEditingProfile({...editingProfile, profile_completed: !editingProfile.profile_completed})}
+                          className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${editingProfile.profile_completed ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-sm shadow-emerald-500/10' : 'bg-rose-50 text-rose-600 border border-rose-200'}`}
+                        >
+                           {editingProfile.profile_completed ? '✓ DATA LENGKAP' : '⚠ DATA BELUM LENGKAP'}
+                        </button>
+                     </div>
+
                   </div>
 
                   <div className="space-y-8">
