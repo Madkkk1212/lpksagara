@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Profile, ProfileField, ProfileValue } from "@/lib/types";
-import { upsertProfile, getProfileFields, getProfileValuesByUserId } from "@/lib/db";
+import { upsertProfile, getProfileFields, getProfileValuesByUserId, upsertProfileValue } from "@/lib/db";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function ProfileView({ user }: { user: Profile }) {
