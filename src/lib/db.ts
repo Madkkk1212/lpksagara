@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { AppTheme, BannerSlide, MaterialCategory, Material, ExamLevel, ExamTest, Question, Profile, StudyLevel, StudyChapter, StudyMaterial, AdminMenuConfig } from './types'
+import { AppTheme, BannerSlide, MaterialCategory, Material, ExamLevel, ExamTest, Question, Profile, StudyLevel, StudyChapter, StudyMaterial, AdminMenuConfig, ProfileField, ProfileValue } from './types'
 
 // Theme
 export async function getTheme(): Promise<AppTheme | null> {
@@ -145,13 +145,32 @@ export async function deleteQuestion(id: string) {
 // --- PROFILES ---
 
 export async function getProfiles(): Promise<Profile[]> {
-  const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, email, full_name, phone, nip, batch, is_admin, is_teacher, is_student, is_alumni, is_premium, profile_completed, created_at')
+    .order('created_at', { ascending: false })
   if (error) return []
-  return data
+  return data as Profile[]
+}
+
+export async function getProfileById(id: string): Promise<Profile | null> {
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', id).single()
+  if (error) return null
+  return data as Profile
 }
 
 export async function getProfileByEmail(email: string): Promise<Profile | null> {
   const { data, error } = await supabase.from('profiles').select('*').eq('email', email).single()
+  if (error) return null
+  return data
+}
+
+export async function getProfileByIdentifier(identifier: string): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .or(`email.eq.${identifier},nip.eq.${identifier}`)
+    .maybeSingle()
   if (error) return null
   return data
 }
@@ -344,4 +363,42 @@ export async function updateAdminMenuConfig(config: Partial<AdminMenuConfig>) {
     .select();
   if (error) throw error;
   return data;
+}
+
+// ==========================================
+// DYNAMIC PROFILE FIELDS
+// ==========================================
+
+export async function getProfileFields(role: string = 'all'): Promise<ProfileField[]> {
+  let query = supabase
+    .from('user_profile_fields')
+    .select('*')
+    .or(`target_role.eq.all,target_role.eq.${role}`);
+  
+  const { data, error } = await query.order('sort_order', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function upsertProfileField(field: Partial<ProfileField>) {
+  const { data, error } = await supabase.from('user_profile_fields').upsert(field).select()
+  if (error) throw error
+  return data
+}
+
+export async function deleteProfileField(id: string) {
+  const { error } = await supabase.from('user_profile_fields').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function getProfileValuesByUserId(userId: string): Promise<ProfileValue[]> {
+  const { data, error } = await supabase.from('user_profile_field_values').select('*').eq('user_id', userId)
+  if (error) return []
+  return data
+}
+
+export async function upsertProfileValue(profileValue: Partial<ProfileValue>) {
+  const { data, error } = await supabase.from('user_profile_field_values').upsert(profileValue, { onConflict: 'user_id,field_id' }).select()
+  if (error) throw error
+  return data
 }

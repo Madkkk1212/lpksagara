@@ -14,11 +14,12 @@ import ReportManager from "./components/ReportManager";
 import BulkImporter from "./components/BulkImporter";
 import AnnouncementManager from "./components/AnnouncementManager";
 import MenuManager from "./components/MenuManager";
+import ProfileFieldManager from "./components/ProfileFieldManager";
 import { supabase } from "@/lib/supabase";
 import { getAdminMenuConfig } from "@/lib/db";
 import { Profile } from "@/lib/types";
 
-type AdminTab = "dashboard" | "reports" | "announcements" | "bulk-import" | "theme" | "banners" | "icons" | "materials" | "exams" | "settings" | "users" | "proposals" | "menu-manager";
+type AdminTab = "dashboard" | "reports" | "announcements" | "bulk-import" | "theme" | "banners" | "icons" | "materials" | "exams" | "settings" | "users" | "proposals" | "menu-manager" | "profile-config";
 
 export default function AdminClient() {
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
@@ -119,16 +120,26 @@ export default function AdminClient() {
   ];
 
   // Filter out inactive tabs ONLY if NOT a super admin
-  const baseTabs = userProfile?.is_super_admin 
-    ? rawBaseTabs 
+  let baseTabs = userProfile?.is_super_admin 
+    ? [...rawBaseTabs] 
     : rawBaseTabs.filter(t => (t as any).is_active !== false);
 
-  const tabs = [...baseTabs];
-  
-  // Add Menu Manager if Super Admin
-  if (userProfile?.is_super_admin) {
-    tabs.push({ id: "menu-manager", label: "Menu Manager", icon: "🔧" });
+  // Profile Config is always manually added if Super Admin and not already present
+  if (userProfile?.is_super_admin && !baseTabs.some(t => t.id === "profile-config")) {
+    const usersIdx = baseTabs.findIndex(t => t.id === "users");
+    const insertIdx = usersIdx !== -1 ? usersIdx + 1 : baseTabs.length;
+    baseTabs.splice(insertIdx, 0, { id: "profile-config", label: "Profile Config", icon: "⚙️", is_active: true } as any);
   }
+
+  // Final safety check: ensure all tab IDs are unique to prevent React key errors
+  const uniqueTabs = Array.from(new Map([...baseTabs].map(t => [t.id, t])).values());
+
+  // Add Menu Manager if Super Admin and not already present
+  if (userProfile?.is_super_admin && !uniqueTabs.some(t => t.id === "menu-manager")) {
+    uniqueTabs.push({ id: "menu-manager", label: "Menu Manager", icon: "🔧" });
+  }
+
+  const tabs = uniqueTabs;
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 text-sm">
@@ -241,9 +252,10 @@ export default function AdminClient() {
                { activeTab === "banners" && <BannerManager /> }
                { activeTab === "materials" && <StudyHierarchyManager /> }
                { activeTab === "exams" && <ExamManager /> }
-               { activeTab === "users" && <UserManager /> }
+               { activeTab === "users" && <UserManager userProfile={userProfile} /> }
                {activeTab === "settings" && <SettingsPanel />}
                {activeTab === "proposals" && <ProposalManager />}
+               {activeTab === "profile-config" && <ProfileFieldManager />}
                {activeTab === "menu-manager" && <MenuManager onConfigChange={fetchMenuConfig} />}
            </section>
         </div>

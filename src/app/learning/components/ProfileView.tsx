@@ -1,8 +1,38 @@
-"use client";
-
+import { useState } from "react";
 import { Profile } from "@/lib/types";
+import { upsertProfile } from "@/lib/db";
 
 export default function ProfileView({ user, onLogout }: { user: Profile, onLogout: () => void }) {
+  const [isChangingPass, setIsChangingPass] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      alert("Konfirmasi password tidak cocok.");
+      return;
+    }
+    if (newPassword.length < 4) {
+      alert("Password minimal 4 karakter.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await upsertProfile({ ...user, password: newPassword });
+      alert("Password berhasil diubah!");
+      setIsChangingPass(false);
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      alert("Gagal mengubah password.");
+    } finally {
+      setLoading(false);
+    }
+  };
   const profileSettings = [
     { label: "Informasi Pribadi", sub: "Ubah nama, email, dan password", icon: "👤" },
     { label: "Privasi & Keamanan", sub: "Atur siapa yang bisa melihat progres Anda di Leaderboard", icon: "🛡️" },
@@ -44,7 +74,37 @@ export default function ProfileView({ user, onLogout }: { user: Profile, onLogou
       </div>
 
       <div className="space-y-4">
-        {profileSettings.map((item, idx) => (
+        {/* Information Item */}
+        <div className="w-full bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group">
+           <div className="flex items-center gap-6">
+              <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-xl shadow-inner">
+                 👤
+              </div>
+              <div className="text-left">
+                 <h5 className="font-black text-slate-800 text-sm tracking-tight italic">Informasi Akun</h5>
+                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{user.full_name} • {user.email}</p>
+              </div>
+           </div>
+        </div>
+
+        {/* Change Password Button */}
+        <button 
+          onClick={() => setIsChangingPass(true)}
+          className="w-full bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md hover:bg-slate-50 transition-all flex items-center justify-between group"
+        >
+           <div className="flex items-center gap-6">
+              <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform">
+                 🔑
+              </div>
+              <div className="text-left">
+                 <h5 className="font-black text-slate-800 text-sm tracking-tight italic">Ubah Password</h5>
+                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Jaga keamanan akun Anda secara berkala</p>
+              </div>
+           </div>
+           <span className="text-slate-200 text-xl font-bold group-hover:text-slate-400 transition-colors">→</span>
+        </button>
+
+        {profileSettings.slice(1).map((item, idx) => (
           <button key={idx} className="w-full bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md hover:bg-slate-50 transition-all flex items-center justify-between group">
              <div className="flex items-center gap-6">
                 <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform">
@@ -55,10 +115,62 @@ export default function ProfileView({ user, onLogout }: { user: Profile, onLogou
                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{item.sub}</p>
                 </div>
              </div>
-             <span className="text-slate-200 text-xl font-bold group-hover:text-slate-400 transition-colors">›</span>
+             <span className="text-slate-200 text-xl font-bold group-hover:text-slate-400 transition-colors">→</span>
           </button>
         ))}
       </div>
+
+      {/* Change Password Modal */}
+      {isChangingPass && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsChangingPass(false)} />
+          <div className="relative w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl p-10 animate-in zoom-in-95 duration-200">
+             <h3 className="text-2xl font-black text-slate-800 mb-2 italic">Ubah Password</h3>
+             <p className="text-slate-400 text-xs font-medium mb-8 uppercase tracking-widest">Masukkan password baru Anda di bawah ini.</p>
+             
+             <form onSubmit={handlePasswordChange} className="space-y-6">
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Password Baru</label>
+                    <div className="relative">
+                       <input 
+                         type={showPassword ? "text" : "password"}
+                         required
+                         className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 outline-none transition font-bold"
+                         value={newPassword}
+                         onChange={e => setNewPassword(e.target.value)}
+                       />
+                       <button 
+                         type="button"
+                         onClick={() => setShowPassword(!showPassword)}
+                         className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-indigo-500 transition-colors"
+                       >
+                         {showPassword ? "👁️" : "👁️‍🗨️"}
+                       </button>
+                    </div>
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Konfirmasi Password</label>
+                    <div className="relative">
+                       <input 
+                         type={showPassword ? "text" : "password"}
+                         required
+                         className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 outline-none transition font-bold"
+                         value={confirmPassword}
+                         onChange={e => setConfirmPassword(e.target.value)}
+                       />
+                    </div>
+                 </div>
+                
+                <div className="pt-4 flex gap-3">
+                   <button type="button" onClick={() => setIsChangingPass(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-xs transition-all">BATAL</button>
+                   <button type="submit" disabled={loading} className="flex-[2] py-4 bg-slate-900 text-white rounded-2xl font-black text-xs shadow-xl active:scale-95 transition-all">
+                      {loading ? 'MENYIMPAN...' : 'SIMPAN PASSWORD'}
+                   </button>
+                </div>
+             </form>
+          </div>
+        </div>
+      )}
 
       <div className="pt-10 text-center">
          <button onClick={onLogout} className="text-rose-500 font-black italic hover:text-rose-600 transition-colors underline underline-offset-8 decoration-2 decoration-rose-500/20">

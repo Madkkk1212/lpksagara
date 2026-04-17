@@ -65,6 +65,21 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
     return completedMaterials.includes(materialId);
   };
 
+  const isMaterialUnlocked = (chapterId: string, materialId: string) => {
+    if (user.is_admin || user.is_premium) return true;
+    
+    const mats = chapterMaterials[chapterId];
+    if (!mats) return false;
+    
+    const sortedMats = [...mats].sort((a, b) => a.sort_order - b.sort_order);
+    const matIndex = sortedMats.findIndex(m => m.id === materialId);
+    
+    if (matIndex === 0) return true; // First material is always open
+    
+    const prevMat = sortedMats[matIndex - 1];
+    return isMaterialCompleted(prevMat.id);
+  };
+
   useEffect(() => {
     async function loadInitial() {
       const [cats, lvls, completed] = await Promise.all([
@@ -395,20 +410,22 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                            <div className="px-8 pb-8 space-y-3 animate-in fade-in slide-in-from-top-4 duration-500">
                               {chapterMaterials[chapter.id]?.map((mat) => {
                                 const matDone = isMaterialCompleted(mat.id);
+                                const matUnlocked = isMaterialUnlocked(chapter.id, mat.id);
                                 return (
                                   <button 
                                     key={mat.id}
-                                    onClick={() => setSelectedMaterial(mat)}
-                                    className={`w-full p-6 bg-white/40 hover:bg-white hover:shadow-xl rounded-3xl flex items-center justify-between group transition-all border ${matDone ? 'border-emerald-100' : 'border-transparent hover:border-white/80'}`}
+                                    disabled={!matUnlocked}
+                                    onClick={() => matUnlocked && setSelectedMaterial(mat)}
+                                    className={`w-full p-6 bg-white/40 hover:bg-white hover:shadow-xl rounded-3xl flex items-center justify-between group transition-all border ${matDone ? 'border-emerald-100' : 'border-transparent hover:border-white/80'} ${!matUnlocked ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
                                   >
                                     <div className="flex items-center gap-5">
-                                       <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform ${matDone ? 'bg-emerald-50 text-emerald-600' : 'bg-white border border-slate-50'}`}>
-                                          {matDone ? <CheckCircle2 size={18} /> : mat.material_type === 'quiz' ? '🎯' : mat.material_type === 'choukai' ? '🎧' : '📄'}
+                                       <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform ${!matUnlocked ? 'bg-slate-200' : matDone ? 'bg-emerald-50 text-emerald-600' : 'bg-white border border-slate-50'}`}>
+                                          {!matUnlocked ? <Lock size={16} className="text-slate-400" /> : matDone ? <CheckCircle2 size={18} /> : mat.material_type === 'quiz' ? '🎯' : mat.material_type === 'choukai' ? '🎧' : '📄'}
                                        </div>
-                                       <span className={`text-sm font-black transition-colors uppercase tracking-tight ${matDone ? 'text-emerald-600' : 'text-slate-600 group-hover:text-slate-900'}`}>{mat.title}</span>
+                                       <span className={`text-sm font-black transition-colors uppercase tracking-tight ${!matUnlocked ? 'text-slate-400' : matDone ? 'text-emerald-600' : 'text-slate-600 group-hover:text-slate-900'}`}>{mat.title}</span>
                                     </div>
-                                    <div className={`h-8 w-8 rounded-full flex items-center justify-center transition-all ${matDone ? 'bg-emerald-500 text-white' : 'bg-slate-50 group-hover:bg-indigo-500 group-hover:text-white'}`}>
-                                       <span className="text-xs">{matDone ? '✓' : '→'}</span>
+                                    <div className={`h-8 w-8 rounded-full flex items-center justify-center transition-all ${!matUnlocked ? 'bg-slate-100 text-slate-300' : matDone ? 'bg-emerald-500 text-white' : 'bg-slate-50 group-hover:bg-indigo-500 group-hover:text-white'}`}>
+                                       <span className="text-xs">{!matUnlocked ? '🔒' : matDone ? '✓' : '→'}</span>
                                     </div>
                                   </button>
                                 );

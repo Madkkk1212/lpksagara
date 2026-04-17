@@ -32,6 +32,7 @@ export interface AppTheme {
   social_website: string | null
   cloudinary_cloud_name: string | null
   cloudinary_upload_preset: string | null
+  nip_prefix: string | null
   updated_at: string
 }
 
@@ -141,6 +142,7 @@ export interface Profile {
   is_teacher: boolean
   is_premium: boolean
   staff_password?: string | null
+  password?: string | null
   unlocked_materials: string[] | null
   unlocked_levels: string[] | null
   exp: number
@@ -156,7 +158,34 @@ export interface Profile {
   institution?: string | null
   certificate_url?: string | null
   profile_completed?: boolean
+  is_alumni?: boolean
+  is_student?: boolean
+  batch?: string | null
+  nip?: string | null
+  category_id?: string | null
   updated_at?: string
+}
+
+export interface ProfileField {
+  id: string
+  name: string
+  type: 'text' | 'number' | 'file'
+  is_required: boolean
+  allowed_file_types: string[] | null
+  category_id: string | null
+  target_role: 'admin' | 'teacher' | 'premium' | 'standard' | 'alumni' | 'student' | 'all'
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ProfileValue {
+  id: string
+  user_id: string
+  field_id: string
+  value: string
+  created_at: string
+  updated_at: string
 }
 
 export interface StudyLevel {

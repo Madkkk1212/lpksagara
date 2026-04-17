@@ -10,6 +10,7 @@ export default function StaffLoginClient() {
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   useEffect(() => {
     const isAuthed = localStorage.getItem("luma-auth") === "true";
     if (isAuthed) {
@@ -45,16 +46,15 @@ export default function StaffLoginClient() {
         return;
       }
 
-      // Check Password
-      if (profile.staff_password !== password) {
-        // Fallback for demo: if they haven't run migration 018 yet and password is null
-        // We will strictly enforce password here, but if staff_password is null and they type admin or guru, we let it pass for ease of use?
-        // NO, strict rule: 
-        if (profile.staff_password !== password) {
-            setErrorMsg("Access Denied: Invalid password.");
-            setLoading(false);
-            return;
-        }
+      // Check Password (Unified or Fallback)
+      const isPasswordValid = 
+        (profile.password && profile.password === password) || 
+        (profile.staff_password && profile.staff_password === password);
+
+      if (!isPasswordValid) {
+        setErrorMsg("Access Denied: Invalid password.");
+        setLoading(false);
+        return;
       }
 
       // Success
@@ -106,14 +106,23 @@ export default function StaffLoginClient() {
 
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Authorization Key</label>
-            <input 
-              type="password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all placeholder:text-slate-400 font-medium tracking-widest"
-              required
-            />
+            <div className="relative">
+              <input 
+                type={showPassword ? "text" : "password"} 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all placeholder:text-slate-400 font-medium tracking-widest"
+                required
+              />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition-colors"
+              >
+                {showPassword ? "👁️" : "👁️‍🗨️"}
+              </button>
+            </div>
           </div>
 
           {errorMsg && (

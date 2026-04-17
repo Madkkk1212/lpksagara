@@ -2,27 +2,23 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
-import { getProfileByEmail, getTheme } from "@/lib/db";
+import { useState, useEffect } from "react";
+import { getProfileByIdentifier, getTheme } from "@/lib/db";
 import { AppTheme } from "@/lib/types";
-import { useEffect } from "react";
-
-const redirectLabels: Record<string, string> = {
-  dashboard: "Dashboard",
-  materi: "Materi",
-  soal: "Soal",
-  profile: "Profile",
-};
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function LoginClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") ?? "soal";
 
-  const [emailInput, setEmailInput] = useState("");
+  const [identifier, setIdentifier] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [theme, setTheme] = useState<AppTheme | null>(null);
+
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     getTheme().then(setTheme);
@@ -44,16 +40,24 @@ export default function LoginClient() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailInput) return;
+    if (!identifier || !passwordInput) return;
     
     setLoading(true);
     setErrorMsg("");
     
     try {
-      const profile = await getProfileByEmail(emailInput);
+      // Dual login support: checks both Email and NIP
+      const profile = await getProfileByIdentifier(identifier);
+      
       if (profile) {
         if (profile.is_admin || profile.is_teacher) {
-           setErrorMsg("Akses ditolak: Staf harap menggunakan /manajemen-sagara.");
+           setErrorMsg("Staff & Admin access restricted here. Please use management portal.");
+           setLoading(false);
+           return;
+        }
+
+        if (profile.password !== passwordInput) {
+           setErrorMsg("Password Invalid. Please double check.");
            setLoading(false);
            return;
         }
@@ -62,98 +66,170 @@ export default function LoginClient() {
         window.localStorage.setItem("luma-user-profile", JSON.stringify(profile));
         router.push(`/?tab=${redirect}`);
       } else {
-        setErrorMsg("Email tidak terdaftar. Silakan registrasi terlebih dahulu.");
+        setErrorMsg("Identity not recognized. Enter valid Email or NIP.");
       }
     } catch (err) {
-      setErrorMsg("Terjadi kesalahan saat mengecek akun.");
+      setErrorMsg("Connection error. Check your network.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen relative flex items-center justify-center p-6 overflow-hidden bg-[#f0f9ff]">
-      {/* Bright & Airy Background Decor */}
+    <main className="min-h-screen relative flex items-center justify-center p-6 overflow-hidden bg-[#0a0c10]">
+      {/* Premium Background Decor */}
       <div className="absolute inset-0 z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-teal-200/30 blur-[120px] rounded-full animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-100/40 blur-[150px] rounded-full" />
-        <img
-          src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1920&q=80"
-          alt="Bright Study"
-          className="h-full w-full object-cover opacity-10 mix-blend-multiply"
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.2, 1],
+            opacity: [0.3, 0.5, 0.3],
+            x: [0, 50, 0],
+            y: [0, -50, 0]
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-indigo-600/20 blur-[150px] rounded-full" 
         />
+        <motion.div 
+          animate={{ 
+            scale: [1.2, 1, 1.2],
+            opacity: [0.2, 0.4, 0.2],
+            x: [0, -60, 0],
+            y: [0, 60, 0]
+          }}
+          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+          className="absolute bottom-[-15%] right-[-10%] w-[70%] h-[70%] bg-emerald-600/10 blur-[180px] rounded-full" 
+        />
+        
+        {/* Subtle Grid Pattern */}
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.03] pointer-events-none" />
       </div>
 
-      <div className="relative z-10 w-full max-w-[450px] animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <header className="mb-10 text-center">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-white shadow-xl ring-1 ring-slate-100 mb-6 overflow-hidden">
+      <div className="relative z-10 w-full max-w-[480px]">
+        <motion.header 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          className="mb-12 text-center"
+        >
+            <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-[2.5rem] bg-white/5 backdrop-blur-xl shadow-2xl ring-1 ring-white/10 mb-8 overflow-hidden group">
                {theme?.header_use_logo_image && theme?.header_logo_url ? (
-                 <img src={theme.header_logo_url} alt="Logo" className="w-full h-full object-contain p-3" />
+                 <img src={theme.header_logo_url} alt="Logo" className="w-full h-full object-contain p-4 transition-transform duration-500 group-hover:scale-110" />
                ) : (
-                 <span className="text-4xl font-black text-teal-600 italic">{theme?.logo_text || 'L'}</span>
+                 <span className="text-5xl font-black text-white italic tracking-tighter">{theme?.logo_text?.charAt(0) || 'S'}</span>
                )}
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.5em] text-teal-600/60 mb-1">
-               {theme?.app_name || 'Reiwa LMS'} Hub
-            </p>
-            <h1 className="text-4xl font-black tracking-tight text-slate-800 mb-2 italic">
-               Welcome Back
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.6 }}
+              transition={{ delay: 0.5 }}
+              className="text-[11px] font-black uppercase tracking-[0.6em] text-indigo-400 mb-3"
+            >
+               {theme?.app_name || 'SAGARA'} ECOSYSTEM
+            </motion.p>
+            <h1 className="text-5xl font-black tracking-tight text-white mb-3 italic uppercase leading-none">
+               Hub Portal
             </h1>
-            <p className="text-sm text-slate-400 font-medium">
-               Akses materi premium dan simpan progres belajar Anda.
+            <p className="text-sm text-slate-400 font-medium leading-relaxed max-w-[300px] mx-auto italic opacity-80">
+               Enter your credentials to access your premium learning space.
             </p>
-        </header>
+        </motion.header>
 
-        <section className="rounded-[3rem] bg-white/70 backdrop-blur-2xl p-10 shadow-[0_32px_120px_rgba(20,184,166,0.12)] ring-1 ring-white">
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block ml-2">Email Address</label>
-              <div className="relative group">
+        <motion.section 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="rounded-[3.5rem] bg-white/5 backdrop-blur-[40px] p-10 md:p-14 shadow-[0_40px_100px_rgba(0,0,0,0.4)] border border-white/10 relative overflow-hidden"
+        >
+          {/* Internal Glow */}
+          <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/10 blur-[80px] rounded-full pointer-events-none" />
+          
+          <form onSubmit={handleLogin} className="space-y-8 relative z-10">
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 block ml-4">Identity (Email or NIP)</label>
+              <div className="relative">
                 <input 
-                  type="email" 
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="name@example.com"
-                  className="w-full h-16 bg-slate-50 border border-slate-100 rounded-2xl px-6 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-teal-500/20 focus:bg-white transition-all placeholder:text-slate-300"
+                  type="text" 
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="ID / Email..."
+                  className="w-full h-16 bg-white/[0.03] border border-white/10 rounded-2xl px-6 font-bold text-white outline-none focus:ring-4 focus:ring-indigo-500/20 focus:bg-white/[0.08] focus:border-indigo-500/50 transition-all placeholder:text-slate-600 shadow-inner"
                   required
                 />
+                <div className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-700 pointer-events-none">
+                   🆔
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 block ml-4">Access Password</label>
+              <div className="relative">
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full h-16 bg-white/[0.03] border border-white/10 rounded-2xl px-6 font-bold text-white outline-none focus:ring-4 focus:ring-indigo-500/20 focus:bg-white/[0.08] focus:border-indigo-500/50 transition-all placeholder:text-slate-600 tracking-[0.4em] shadow-inner"
+                  required
+                />
+                 <button 
+                   type="button"
+                   onClick={() => setShowPassword(!showPassword)}
+                   className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                 >
+                   {showPassword ? "👁️" : "👁️‍🗨️"}
+                 </button>
               </div>
             </div>
 
+            <AnimatePresence>
             {errorMsg && (
-              <div className="p-4 rounded-2xl bg-rose-50 text-rose-500 text-[10px] font-bold ring-1 ring-rose-100 italic animate-in fade-in slide-in-from-top-2">
-                ⚠️ {errorMsg}
-              </div>
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="p-5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[11px] font-black italic tracking-tight"
+              >
+                ⚠️ ERROR: {errorMsg.toUpperCase()}
+              </motion.div>
             )}
+            </AnimatePresence>
 
-            <button
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               type="submit"
               disabled={loading}
-              className="w-full h-16 rounded-2xl bg-slate-900 text-white font-black tracking-widest uppercase text-sm shadow-xl hover:bg-slate-800 hover:shadow-2xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
+              className="w-full h-18 rounded-3xl bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-black tracking-[0.3em] uppercase text-xs shadow-[0_20px_40px_rgba(79,70,229,0.3)] hover:from-indigo-500 hover:to-indigo-600 transition-all disabled:opacity-50 relative overflow-hidden group"
             >
-              {loading ? "Verifying..." : "Sign In Account →"}
-            </button>
+              <span className="relative z-10 italic flex items-center justify-center gap-3">
+                {loading ? (
+                   <>
+                     <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                     VERIFYING...
+                   </>
+                ) : (
+                  "Initiate Access →"
+                )}
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+            </motion.button>
           </form>
+        </motion.section>
 
-          <div className="mt-8 text-center pt-8 border-t border-slate-100">
-             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Don't have an account?</p>
-             <Link 
-               href={`/register?redirect=${redirect}`} 
-               className="inline-block px-10 py-3 rounded-full text-xs font-black uppercase tracking-widest text-teal-600 ring-2 ring-teal-600/10 hover:bg-teal-600 hover:text-white transition-all"
-             >
-               Register Now
-             </Link>
-          </div>
-        </section>
-
-        <footer className="mt-10 text-center">
+        <motion.footer 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+          className="mt-12 text-center"
+        >
             <Link
               href="/"
-              className="text-[10px] font-black uppercase tracking-[.3em] text-slate-400 hover:text-teal-600 transition-colors"
+              className="px-6 py-2 rounded-full border border-white/5 bg-white/[0.02] text-[10px] font-black uppercase tracking-[.4em] text-slate-500 hover:text-indigo-400 hover:bg-white/[0.05] transition-all inline-block italic"
             >
-              ← Back to Homepage
+              ← Terminate Session
             </Link>
-        </footer>
+        </motion.footer>
       </div>
     </main>
   );
