@@ -18,9 +18,10 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
     institution: user.institution || "",
   });
   const [dynamicValues, setDynamicValues] = useState<Record<string, string>>({});
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatar_url || null);
 
   useEffect(() => {
-    // Determine primary role for field filtering
+    console.log("Onboarding: Loading fields for user...", user.email);
     let userRole = 'standard';
     if (user.is_admin) userRole = 'admin';
     else if (user.is_teacher) userRole = 'teacher';
@@ -28,14 +29,20 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
     else if (user.is_student) userRole = 'student';
     else if (user.is_premium) userRole = 'premium';
     
-    getProfileFields(userRole).then(setFields);
-  }, [user.is_admin, user.is_teacher, user.is_premium, user.is_alumni, user.is_student]);
+    console.log("Onboarding: Detected Role ->", userRole);
+    
+    getProfileFields(userRole).then(data => {
+      console.log("Onboarding: Fields fetched ->", data.length);
+      setFields(data || []);
+    }).catch(err => {
+      console.error("Onboarding: Failed to fetch fields:", err);
+    });
+  }, [user.is_admin, user.is_teacher, user.is_premium, user.is_alumni, user.is_student, user.email]);
 
   const handleDynamicFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: ProfileField) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Type Validation
     if (field.allowed_file_types && field.allowed_file_types.length > 0) {
       const ext = file.name.split('.').pop()?.toLowerCase();
       if (!ext || !field.allowed_file_types.includes(ext)) {
@@ -45,7 +52,6 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
       }
     }
 
-    // Size Validation (2MB)
     if (file.size > 2 * 1024 * 1024) {
       alert("File terlalu besar. Maksimal 2MB.");
       e.target.value = "";
@@ -59,19 +65,38 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
     reader.readAsDataURL(file);
   };
 
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+        alert("Mohon pilih file gambar.");
+        return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    if (!avatarPreview) {
+      alert("Foto profil wajib diunggah.");
+      setLoading(false);
+      return;
+    }
+
     try {
-      // 1. Save Core Profile
       const updatedProfile: Profile = {
         ...user,
         ...formData,
+        avatar_url: avatarPreview,
         profile_completed: true,
       };
       await upsertProfile(updatedProfile);
 
-      // 2. Save Dynamic Values
       for (const [fieldId, value] of Object.entries(dynamicValues)) {
         if (value) {
           await upsertProfileValue({
@@ -84,6 +109,7 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
 
       onComplete(updatedProfile);
     } catch (err) {
+      console.error("Onboarding: Submit Error:", err);
       alert("Gagal menyimpan data profil. Silakan coba lagi.");
       setLoading(false);
     }
@@ -97,159 +123,209 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
           <div className="absolute top-[60%] -right-[10%] w-[50%] h-[50%] bg-indigo-200/20 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
        </div>
 
-       <motion.div 
-         initial={{ opacity: 0, y: 30 }}
-         animate={{ opacity: 1, y: 0 }}
-         transition={{ duration: 0.8, ease: "easeOut" }}
-         className="flex-1 max-w-3xl w-full mx-auto p-6 md:p-12 z-10"
-       >
-          <div className="bg-white/80 backdrop-blur-xl rounded-[3rem] shadow-2xl ring-1 ring-white/50 p-8 md:p-16 border border-slate-100">
-             <div className="text-center mb-12">
-                <motion.div 
-                  initial={{ scale: 0.5, rotate: -10 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
-                  className="h-20 w-20 bg-gradient-to-br from-teal-400 to-emerald-500 rounded-3xl flex items-center justify-center text-white text-4xl mx-auto mb-8 shadow-xl shadow-teal-500/30"
-                >
-                   ✨
-                </motion.div>
-                <h1 className="text-4xl font-black italic text-slate-900 mb-3 tracking-tight uppercase">Lengkapi Profil</h1>
-                <p className="text-slate-500 font-medium text-sm leading-relaxed max-w-md mx-auto italic">
-                   Selamat datang, <span className="text-teal-600 font-bold">{user.full_name}</span>! Mohon lengkapi data wajib berikut untuk mulai menjelajahi Dashboard Sagara.
-                </p>
-             </div>
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-12 z-10"
+        >
+           <div className="bg-white/90 backdrop-blur-2xl rounded-[3.5rem] shadow-2xl ring-1 ring-slate-200/50 p-8 md:p-16 border border-white overflow-hidden relative">
+              <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-teal-400 via-indigo-500 to-emerald-400" />
+              
+              <div className="text-center mb-16">
+                 <motion.div 
+                   initial={{ scale: 0.5, rotate: -10 }}
+                   animate={{ scale: 1, rotate: 0 }}
+                   transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
+                   className="h-24 w-24 bg-gradient-to-br from-slate-900 to-indigo-950 rounded-[2.5rem] flex items-center justify-center text-white text-4xl mx-auto mb-8 shadow-2xl shadow-indigo-500/20 ring-4 ring-white"
+                 >
+                    🛡️
+                 </motion.div>
+                 <h1 className="text-4xl font-black italic text-slate-900 mb-4 tracking-tight uppercase">Identity Onboarding</h1>
+                 <p className="text-slate-500 font-medium text-sm leading-relaxed max-w-xl mx-auto italic">
+                    Halo, <span className="text-indigo-600 font-black">{user.full_name || 'User'}</span>. Untuk menjaga validitas data di Sagara, mohon lengkapi seluruh kolom identitas dan dokumen penunjang di bawah ini.
+                 </p>
+              </div>
 
-             <form onSubmit={handleSubmit} className="space-y-8">
-                <div className="grid md:grid-cols-2 gap-8">
-                   <div className="space-y-2 group">
-                      <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4 group-focus-within:text-teal-600 transition-colors">Tanggal Lahir</label>
-                      <input 
-                        type="date" 
-                        required 
-                        value={formData.birth_date} 
-                        onChange={e => setFormData({...formData, birth_date: e.target.value})} 
-                        className="w-full bg-slate-100/50 border border-slate-200 rounded-2xl px-6 py-4 text-slate-800 focus:bg-white focus:border-teal-500 focus:ring-8 focus:ring-teal-500/5 outline-none transition-all font-bold text-sm" 
-                      />
-                   </div>
-                   <div className="space-y-2 group">
-                      <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4 group-focus-within:text-teal-600 transition-colors">Institusi</label>
-                      <input 
-                        type="text" 
-                        required 
-                        placeholder="Cth: LPK Sagara" 
-                        value={formData.institution} 
-                        onChange={e => setFormData({...formData, institution: e.target.value})} 
-                        className="w-full bg-slate-100/50 border border-slate-200 rounded-2xl px-6 py-4 text-slate-800 focus:bg-white focus:border-teal-500 focus:ring-8 focus:ring-teal-500/5 outline-none transition-all font-bold text-sm" 
-                      />
-                   </div>
-                </div>
+              <form onSubmit={handleSubmit} className="space-y-12">
+                 {/* Section 0: Foto Profil (Mandatory) */}
+                 <div className="space-y-8 flex flex-col items-center border-b border-slate-100 pb-12">
+                    <div className="flex items-center gap-4 w-full">
+                       <span className="h-2 w-2 bg-rose-500 rounded-full" />
+                       <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-400">00. Pas Foto Terbaru (Wajib)</h3>
+                    </div>
+                    
+                    <div className="relative group">
+                       <div className="h-40 w-40 rounded-[3rem] bg-slate-50 border-4 border-white shadow-2xl flex items-center justify-center overflow-hidden ring-8 ring-slate-100 transition-all group-hover:ring-indigo-100">
+                          {avatarPreview ? (
+                             <img src={avatarPreview} className="w-full h-full object-cover" alt="pfp" />
+                          ) : (
+                             <span className="text-5xl opacity-30 grayscale">👤</span>
+                          )}
+                       </div>
+                       <input 
+                         type="file" 
+                         id="pfp-input" 
+                         className="hidden" 
+                         accept="image/*"
+                         onChange={handleAvatarChange}
+                       />
+                       <label 
+                         htmlFor="pfp-input"
+                         className="absolute -bottom-2 -right-2 h-12 w-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center text-xl shadow-xl border-4 border-white cursor-pointer hover:scale-110 active:scale-95 transition-all"
+                       >
+                          📷
+                       </label>
+                    </div>
+                    <div className="text-center space-y-1">
+                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-800">Klik ikon kamera untuk unggah foto</p>
+                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Wajib diisi sebagai syarat identitas resmi Sagara</p>
+                    </div>
+                 </div>
+                 {/* Section 1: Data Identitas Dasar */}
+                 <div className="space-y-6">
+                    <div className="flex items-center gap-4 ml-2">
+                       <span className="h-2 w-2 bg-indigo-500 rounded-full" />
+                       <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-400">01. Informasi Profil Dasar</h3>
+                    </div>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-50/50 p-8 rounded-[2.5rem] border border-slate-100">
+                       <div className="space-y-2 group">
+                          <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4 group-focus-within:text-indigo-600 transition-colors">Tanggal Lahir <span className="text-rose-500">(Wajib)</span></label>
+                          <input 
+                            type="date" 
+                            required 
+                            value={formData.birth_date} 
+                            onChange={e => setFormData({...formData, birth_date: e.target.value})} 
+                            className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-slate-800 focus:border-indigo-500 outline-none transition-all font-bold text-sm shadow-sm" 
+                          />
+                       </div>
+                       <div className="space-y-2 group">
+                          <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4 group-focus-within:text-indigo-600 transition-colors">Institusi Asal <span className="text-rose-500">(Wajib)</span></label>
+                          <input 
+                            type="text" 
+                            required 
+                            placeholder="Cth: LPK Sagara" 
+                            value={formData.institution} 
+                            onChange={e => setFormData({...formData, institution: e.target.value})} 
+                            className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-slate-800 focus:border-indigo-500 outline-none transition-all font-bold text-sm shadow-sm" 
+                          />
+                       </div>
+                       <div className="space-y-2 group md:col-span-2 lg:col-span-1">
+                          <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4 group-focus-within:text-indigo-600 transition-colors">Alamat Lengkap (KTP) <span className="text-rose-500">(Wajib)</span></label>
+                          <input 
+                            placeholder="Alamat domisili..." 
+                            required
+                            value={formData.address} 
+                            onChange={e => setFormData({...formData, address: e.target.value})} 
+                            className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-slate-800 focus:border-indigo-500 outline-none transition-all font-bold text-sm shadow-sm" 
+                          />
+                       </div>
+                    </div>
+                 </div>
 
-                <div className="space-y-2 group">
-                   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4 group-focus-within:text-teal-600 transition-colors">Alamat KTP Lengkap</label>
-                   <textarea 
-                     required 
-                     placeholder="Domisili saat ini..." 
-                     value={formData.address} 
-                     onChange={e => setFormData({...formData, address: e.target.value})} 
-                     rows={3} 
-                     className="w-full bg-slate-100/50 border border-slate-200 rounded-3xl px-6 py-4 text-slate-800 focus:bg-white focus:border-teal-500 focus:ring-8 focus:ring-teal-500/5 outline-none transition-all font-bold text-sm resize-none" 
-                   />
-                </div>
+                 {/* Section 2: Dokumen Penunjang */}
+                 <div className="space-y-8">
+                    <div className="flex items-center gap-4 ml-2">
+                       <span className="h-2 w-2 bg-emerald-500 rounded-full" />
+                       <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-400">02. Dokumen Penunjang (KTP/Foto/Lainnya)</h3>
+                    </div>
 
-                {/* Dynamic Fields Section */}
-                <AnimatePresence>
-                {fields.length > 0 && (
-                   <motion.div 
-                     initial={{ opacity: 0, height: 0 }}
-                     animate={{ opacity: 1, height: 'auto' }}
-                     className="space-y-8 pt-8 border-t-2 border-dashed border-slate-100"
-                   >
-                      <div className="flex items-center gap-4">
-                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg">Required Info</span>
-                         <div className="h-px bg-slate-100 flex-1" />
-                      </div>
+                    {fields.length === 0 ? (
+                       <div className="p-12 text-center bg-slate-50 border border-dashed border-slate-200 rounded-[2.5rem]">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Tidak ada dokumen penunjang tambahan.</p>
+                       </div>
+                    ) : (
+                       <div className="grid md:grid-cols-2 gap-8">
+                          {fields
+                             .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+                             .map((field, idx) => (
+                                <motion.div 
+                                   initial={{ opacity: 0, scale: 0.95 }}
+                                   animate={{ opacity: 1, scale: 1 }}
+                                   transition={{ delay: 0.1 * idx }}
+                                   key={field.id}
+                                   className={`relative p-8 rounded-[2.5rem] border-2 transition-all flex flex-col gap-6 ${
+                                      dynamicValues[field.id] 
+                                         ? 'bg-emerald-50/50 border-emerald-200 ring-4 ring-emerald-500/5' 
+                                         : 'bg-white border-slate-100 hover:border-slate-300'
+                                   } shadow-sm group`}
+                                >
+                                   <div className="flex justify-between items-start">
+                                      <div className="space-y-1">
+                                         <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-800">
+                                            {field.name} 
+                                            <span className={`ml-2 text-[9px] px-2 py-0.5 rounded-full border ${field.is_required ? 'bg-rose-50 border-rose-100 text-rose-500' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                                               {field.is_required ? 'WAJIB' : 'OPSIONAL'}
+                                            </span>
+                                         </h4>
+                                         <p className="text-[9px] font-medium text-slate-400 uppercase tracking-widest leading-relaxed">Format: PDF/JPG • Max 2MB</p>
+                                      </div>
+                                      {dynamicValues[field.id] ? (
+                                         <div className="h-10 w-10 bg-emerald-500 text-white rounded-2xl flex items-center justify-center text-sm shadow-lg shadow-emerald-500/20">✓</div>
+                                      ) : (
+                                         <div className="h-10 w-10 bg-slate-50 text-slate-300 rounded-2xl flex items-center justify-center text-sm border border-slate-100">📁</div>
+                                      )}
+                                   </div>
 
-                      <div className="grid md:grid-cols-2 gap-8">
-                         {[...fields]
-                            .sort((a, b) => {
-                               if (a.type !== 'file' && b.type === 'file') return -1;
-                               if (a.type === 'file' && b.type !== 'file') return 1;
-                               return a.sort_order - b.sort_order;
-                            })
-                            .map((field, idx) => (
-                            <motion.div 
-                               initial={{ opacity: 0, x: -10 }}
-                               animate={{ opacity: 1, x: 0 }}
-                               transition={{ delay: 0.1 * idx }}
-                               key={field.id} 
-                               className="space-y-2 group"
-                            >
-                               <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4 group-focus-within:text-emerald-600 transition-colors flex items-center gap-2">
-                                  {field.name}
-                                  {field.is_required && <span className="text-rose-400">*</span>}
-                               </label>
-                               
-                               {field.type === 'file' ? (
-                                  <div className={`group relative p-8 bg-slate-50/50 border-2 border-slate-200 border-dashed rounded-[2rem] flex flex-col items-center justify-center text-center transition-all hover:bg-white hover:border-emerald-500/50 ${dynamicValues[field.id] ? 'bg-emerald-50 border-emerald-500/20' : ''}`}>
-                                     <input 
-                                       type="file" 
-                                       id={`file-${field.id}`}
-                                       className="hidden"
-                                       onChange={e => handleDynamicFileChange(e, field)}
-                                       required={field.is_required && !dynamicValues[field.id]}
-                                     />
-                                     <label htmlFor={`file-${field.id}`} className="cursor-pointer flex flex-col items-center">
-                                        <div className={`h-14 w-14 rounded-2xl flex items-center justify-center text-2xl mb-3 transition-transform group-hover:scale-110 shadow-sm ${dynamicValues[field.id] ? 'bg-emerald-500 text-white shadow-emerald-500/20' : 'bg-white text-slate-400'}`}>
-                                           {dynamicValues[field.id] ? '✓' : '📁'}
-                                        </div>
-                                        <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight">
-                                          {dynamicValues[field.id] ? 'Upload Berhasil' : field.name}
-                                        </p>
-                                        <p className="text-[9px] text-slate-400 mt-1 uppercase font-bold tracking-widest">
-                                          {field.allowed_file_types?.join(', ') || 'All Formats'} • 2MB Max
-                                        </p>
-                                     </label>
-                                  </div>
-                               ) : (
-                                  <input 
-                                    type={field.type === 'number' ? 'number' : 'text'}
-                                    required={field.is_required}
-                                    placeholder={`Masukkan ${field.name}...`}
-                                    className="w-full bg-slate-100/50 border border-slate-200 rounded-2xl px-6 py-4 text-slate-800 focus:bg-white focus:border-emerald-500 outline-none transition-all font-bold text-sm"
-                                    value={dynamicValues[field.id] || ""}
-                                    onChange={e => setDynamicValues({...dynamicValues, [field.id]: e.target.value})}
-                                  />
-                               )}
-                            </motion.div>
-                         ))}
-                      </div>
-                   </motion.div>
-                )}
-                </AnimatePresence>
+                                   <div className="relative">
+                                      {dynamicValues[field.id] ? (
+                                         <div className="w-full bg-white rounded-2xl p-4 border border-emerald-100 flex items-center gap-4">
+                                            {field.type === 'file' && dynamicValues[field.id]?.startsWith('data:image') ? (
+                                               <div className="h-14 w-14 rounded-xl overflow-hidden border border-emerald-50 bg-slate-50">
+                                                  <img src={dynamicValues[field.id]} className="w-full h-full object-cover" alt="preview" />
+                                               </div>
+                                            ) : (
+                                               <div className="h-14 w-14 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl">📄</div>
+                                            )}
+                                            <div className="flex-1 overflow-hidden">
+                                               <p className="text-[10px] font-black text-emerald-600 uppercase truncate">File Siap Disimpan</p>
+                                               <label htmlFor={`change-${field.id}`} className="text-[9px] font-bold text-slate-400 hover:text-indigo-600 cursor-pointer uppercase underline">Ganti Berkas</label>
+                                            </div>
+                                         </div>
+                                      ) : (
+                                         <label 
+                                           htmlFor={`file-${field.id}`} 
+                                           className="h-32 border-2 border-dashed border-slate-200 rounded-[2rem] flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 transition-colors group"
+                                         >
+                                            <span className="text-2xl opacity-40 group-hover:scale-125 transition-transform">➕</span>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pilih Dokumen</p>
+                                         </label>
+                                      )}
+                                      <input 
+                                        type="file" 
+                                        id={dynamicValues[field.id] ? `change-${field.id}` : `file-${field.id}`}
+                                        className="hidden"
+                                        onChange={e => handleDynamicFileChange(e, field)}
+                                        required={field.is_required && !dynamicValues[field.id]}
+                                      />
+                                   </div>
+                                </motion.div>
+                             ))}
+                       </div>
+                    )}
+                 </div>
 
-                <div className="pt-10">
-                   <button 
-                     disabled={loading} 
-                     type="submit" 
-                     className="w-full py-6 bg-slate-900 text-white rounded-[2rem] font-black tracking-[0.2em] text-[11px] uppercase hover:bg-slate-800 active:scale-[0.98] transition-all shadow-[0_20px_40px_rgba(0,0,0,0.1)] disabled:opacity-50 relative overflow-hidden group"
-                   >
-                     {loading ? (
-                       <span className="flex items-center justify-center gap-3">
-                          <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          MEMPROSES...
-                       </span>
-                     ) : (
-                       <>
-                         <span className="relative z-10 italic">Simpan & Mulai Belajar</span>
-                         <div className="absolute inset-0 bg-gradient-to-r from-teal-500 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                       </>
-                     )}
-                   </button>
-                   <p className="text-center text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-6 italic opacity-60">Data Anda dilindungi enkripsi standard industri.</p>
-                </div>
-             </form>
-          </div>
-       </motion.div>
+                 <div className="pt-10 flex flex-col items-center gap-6 border-t border-slate-100">
+                    <button 
+                      disabled={loading} 
+                      type="submit" 
+                      className="w-full py-8 bg-slate-900 text-white rounded-[2.5rem] font-black tracking-[0.3em] text-[11px] uppercase hover:bg-slate-800 active:scale-[0.98] transition-all shadow-2xl shadow-indigo-500/10 disabled:opacity-50 relative overflow-hidden group"
+                    >
+                      {loading ? (
+                        <span className="flex items-center justify-center gap-3">
+                           <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                           MENYIMPAN DATA...
+                        </span>
+                      ) : (
+                        <span className="relative z-10 italic">Simpan & Buka Dashboard</span>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-700 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    </button>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] italic opacity-40">Seluruh data yang Anda masukkan dilindungi oleh enkripsi Sagara System.</p>
+                 </div>
+              </form>
+           </div>
+        </motion.div>
 
        <footer className="py-10 text-center relative z-10">
           <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em]">Migii JLPT Hub &copy; 2026</p>
@@ -268,9 +344,11 @@ export default function LearningPage() {
 
   useEffect(() => {
     const init = async () => {
+      console.log("LearningPage: Initializing...");
       // 1. Check Auth
       const authed = localStorage.getItem("luma-auth") === "true";
       if (!authed) {
+        console.log("LearningPage: Not authed, redirecting to login");
         router.push("/login?redirect=learning");
         return;
       }
@@ -283,19 +361,23 @@ export default function LearningPage() {
 
         if (savedProfile) {
           const localProfile = JSON.parse(savedProfile);
+          console.log("LearningPage: Found local profile ->", localProfile.email);
+          
           const freshProfile = await getProfileByEmail(localProfile.email);
           if (freshProfile) {
+            console.log("LearningPage: Fresh profile loaded. Completed?", freshProfile.profile_completed);
             setUser(freshProfile);
             localStorage.setItem("luma-user-profile", JSON.stringify(freshProfile));
           } else {
+            console.warn("LearningPage: Could not find fresh profile in DB, using local.");
             setUser(localProfile);
           }
         } else {
-          // If no profile in storage but authed, might be a bug or cleared storage
+          console.warn("LearningPage: No profile in localStorage, redirecting.");
           router.push("/login");
         }
       } catch (err) {
-        console.error("Failed to load learning system context:", err);
+        console.error("LearningPage: Init Error:", err);
       } finally {
         setLoading(false);
       }
@@ -315,6 +397,7 @@ export default function LearningPage() {
   };
 
   const handleOnboardingComplete = (freshProfile: Profile) => {
+     console.log("LearningPage: Onboarding complete! Redirecting to System...");
      setUser(freshProfile);
      localStorage.setItem("luma-user-profile", JSON.stringify(freshProfile));
   };
@@ -330,7 +413,14 @@ export default function LearningPage() {
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    console.warn("LearningPage: Render check failed, user is null");
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+         <p className="text-slate-400 font-black uppercase tracking-[0.3em] text-[10px]">Gagal memuat sesi. Mohon <button onClick={() => router.push('/login')} className="underline">Login Ulang</button>.</p>
+      </div>
+    );
+  }
 
   // Render Onboarding if profile is not completed
   if (!user.profile_completed) {

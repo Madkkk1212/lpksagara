@@ -31,7 +31,6 @@ export async function generateMetadata() {
     title: theme?.app_name || "Reiwa LMS",
     description: theme?.tagline || "Premium Japanese Study Experience",
     manifest: "/manifest.json",
-    themeColor: theme?.primary_color || "#4f46e5",
     icons: favicon ? {
       icon: favicon,
       apple: favicon,
@@ -46,6 +45,7 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#4f46e5",
 };
 
 import SmoothScroll from "@/app/components/SmoothScroll";

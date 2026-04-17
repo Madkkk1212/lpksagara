@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getProfiles, upsertProfile, deleteProfile, getMaterials, getExamLevels, getTheme, updateTheme, getProfileById } from "@/lib/db";
-import { Profile, Material, ExamLevel, AppTheme } from "@/lib/types";
+import { getProfiles, upsertProfile, deleteProfile, getMaterials, getExamLevels, getTheme, updateTheme, getProfileById, getProfileFields, getProfileValuesByUserId, upsertProfileValue } from "@/lib/db";
+import { Profile, Material, ExamLevel, AppTheme, ProfileField } from "@/lib/types";
 
 export default function UserManager({ userProfile }: { userProfile: Profile | null }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -15,6 +15,8 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
   
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
+  const [dynamicFields, setDynamicFields] = useState<ProfileField[]>([]);
+  const [dynamicValues, setDynamicValues] = useState<Record<string, string>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -29,7 +31,7 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
   const fetchData = async () => {
     setLoading(true);
     const [pData, mData, lData, tData] = await Promise.all([
-      getProfiles(), // Now selective/lightweight
+      getProfiles(), 
       getMaterials(),
       getExamLevels(),
       getTheme()
@@ -47,8 +49,20 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
   const loadFullProfile = async (id: string, mode: 'edit' | 'view') => {
     setIsDetailLoading(true);
     try {
-      const full = await getProfileById(id);
+      const [full, fields, values] = await Promise.all([
+        getProfileById(id),
+        getProfileFields(),
+        getProfileValuesByUserId(id)
+      ]);
+
       if (full) {
+        // Map values to a record
+        const valMap: Record<string, string> = {};
+        values.forEach(v => { valMap[v.field_id] = v.value; });
+        
+        setDynamicFields(fields);
+        setDynamicValues(valMap);
+
         if (mode === 'edit') {
           setEditingProfile(full);
           setIsModalOpen(true);
@@ -69,7 +83,6 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
                     (now.getMonth() + 1).toString().padStart(2, '0') + 
                     now.getDate().toString().padStart(2, '0');
     
-    // Count how many users created today
     const countToday = profiles.filter(p => {
        if (!p.created_at) return false;
        const d = new Date(p.created_at);
@@ -94,9 +107,7 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
   };
 
   const filteredProfiles = profiles.filter(p => {
-    // SECURITY: Regular admins cannot see other admins
     if (!userProfile?.is_super_admin && p.is_admin) return false;
-
     if (roleFilter === "all") return true;
     if (roleFilter === "admin") return p.is_admin;
     if (roleFilter === "teacher") return p.is_teacher && !p.is_admin;
@@ -112,13 +123,25 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
     if (!editingProfile) return;
     
     try {
-      // SANITIZATION: PostgreSQL 'date' type rejects "" (empty string)
       const sanitized = { 
         ...editingProfile,
         birth_date: editingProfile.birth_date === "" ? null : editingProfile.birth_date,
       };
       
       await upsertProfile(sanitized);
+
+      if (editingProfile.id) {
+        for (const [fieldId, value] of Object.entries(dynamicValues)) {
+          if (value) {
+            await upsertProfileValue({
+              user_id: editingProfile.id,
+              field_id: fieldId,
+              value: value
+            });
+          }
+        }
+      }
+
       setIsModalOpen(false);
       fetchData();
     } catch (err: any) {
@@ -370,214 +393,157 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
                </div>
                <button onClick={() => setIsModalOpen(false)} className="h-12 w-12 flex items-center justify-center rounded-2xl hover:bg-white transition text-xl shadow-sm border border-slate-100">✕</button>
             </div>
-
-            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
-               <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                  <div className="lg:col-span-2 space-y-8">
-                     <div className="space-y-4">
-                        <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4">Identity Verification</label>
-                        <div className="grid grid-cols-2 gap-6">
-                           <div className="space-y-2">
-                              <p className="text-[9px] font-black uppercase text-indigo-600 ml-4 tracking-tighter">NIP (Dynamic Generation)</p>
-                              <input 
-                                 readOnly={!userProfile?.is_super_admin}
-                                 className={`w-full px-6 py-4 rounded-2xl border-2 border-transparent outline-none transition font-black shadow-sm ${!userProfile?.is_super_admin ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-slate-50 focus:border-indigo-600 text-slate-900'}`}
-                                 placeholder="NIP"
-                                 value={editingProfile.nip || ""}
-                                 onChange={e => setEditingProfile({...editingProfile, nip: e.target.value.toUpperCase()})}
-                              />
-                           </div>
-                           <div className="space-y-2">
-                              <p className="text-[9px] font-black uppercase text-slate-400 ml-4 tracking-tighter">Batch / Angkatan</p>
-                              <input 
-                                 className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-600 outline-none transition font-bold shadow-sm"
-                                 placeholder="Contoh: Batch 12"
-                                 value={editingProfile.batch || ""}
-                                 onChange={e => setEditingProfile({...editingProfile, batch: e.target.value})}
-                              />
-                           </div>
-                        </div>
-                     </div>
-
-                     <div className="space-y-4">
-                        <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4">Personal Details</label>
-                        <div className="grid grid-cols-2 gap-6">
+            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar max-w-2xl mx-auto w-full">
+               <div className="space-y-8">
+                  <div className="space-y-4">
+                     <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4">Identity Verification</label>
+                     <div className="grid grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                           <p className="text-[9px] font-black uppercase text-indigo-600 ml-4 tracking-tighter">NIP (Dynamic Generation)</p>
                            <input 
-                              className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
-                              placeholder="Nama Lengkap"
-                              value={editingProfile.full_name}
-                              onChange={e => setEditingProfile({...editingProfile, full_name: e.target.value})}
-                              required
-                           />
-                           <input 
-                              className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
-                              placeholder="Email Address"
-                              value={editingProfile.email}
-                              onChange={e => setEditingProfile({...editingProfile, email: e.target.value})}
-                              required
-                              type="email"
+                              readOnly={!userProfile?.is_super_admin}
+                              className={`w-full px-6 py-4 rounded-2xl border-2 border-transparent outline-none transition font-black shadow-sm ${!userProfile?.is_super_admin ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-slate-50 focus:border-indigo-600 text-slate-900'}`}
+                              placeholder="NIP"
+                              value={editingProfile.nip || ""}
+                              onChange={e => setEditingProfile({...editingProfile, nip: e.target.value.toUpperCase()})}
                            />
                         </div>
-                        <input 
-                           className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
-                           placeholder="Nomor Telepon / WhatsApp"
-                           value={editingProfile.phone}
-                           onChange={e => setEditingProfile({...editingProfile, phone: e.target.value})}
-                           required
-                        />
-                     </div>
-
-                     <div className="p-8 bg-indigo-50 border border-indigo-100 rounded-3xl group">
-                        <label className="text-[11px] font-black uppercase tracking-[0.2em] text-indigo-700 block mb-3 italic">Set Access Password</label>
-                        <div className="relative">
-                          <input 
-                            className="w-full px-6 py-4 rounded-2xl bg-white border border-indigo-200 focus:border-indigo-600 outline-none transition font-mono text-xl tracking-[0.3em] font-black shadow-sm"
-                            placeholder="••••••••"
-                            type={showPassword ? "text" : "password"}
-                            value={editingProfile.password || ""}
-                            onChange={e => setEditingProfile({...editingProfile, password: e.target.value})}
-                          />
-                          <button 
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-6 top-1/2 -translate-y-1/2 text-indigo-300 hover:text-indigo-600 transition-colors"
-                          >
-                            {showPassword ? "👁️" : "👁️‍🗨️"}
-                          </button>
-                        </div>
-                        <p className="text-[10px] text-indigo-600/70 font-bold uppercase mt-3 italic tracking-tight">Digunakan oleh user untuk masuk ke sistem Sagara.</p>
-                     </div>
-
-                     <div className="space-y-4 pt-6 border-t border-slate-100">
-                        <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4 italic">Kategori Peran (Exclusive)</label>
-                        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                           {userProfile?.is_super_admin && (
-                             <button 
-                               type="button" 
-                               onClick={() => setEditingProfile({
-                                 ...editingProfile, 
-                                 is_admin: !editingProfile.is_admin,
-                                 is_teacher: false, is_student: false, is_alumni: false
-                               })}
-                               className={`py-3 px-2 rounded-xl font-black text-[9px] transition uppercase tracking-widest ${editingProfile.is_admin ? 'bg-rose-600 text-white shadow-lg' : 'text-slate-400 bg-white border border-slate-100 hover:bg-slate-50'}`}
-                             >
-                                ADMIN
-                             </button>
-                           )}
-                           <button 
-                             type="button" 
-                             onClick={() => setEditingProfile({
-                               ...editingProfile, 
-                               is_teacher: !editingProfile.is_teacher,
-                               is_admin: false, is_student: false, is_alumni: false
-                             })}
-                             className={`py-3 px-2 rounded-xl font-black text-[9px] transition uppercase tracking-widest ${editingProfile.is_teacher ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 bg-white border border-slate-100 hover:bg-slate-50'}`}
-                           >
-                              GURU
-                           </button>
-                           <button 
-                             type="button" 
-                             onClick={() => setEditingProfile({...editingProfile, is_premium: !editingProfile.is_premium})}
-                             className={`py-3 px-2 rounded-xl font-black text-[9px] transition uppercase tracking-widest ${editingProfile.is_premium ? 'bg-amber-500 text-white shadow-lg' : 'text-slate-400 bg-white border border-slate-100 hover:bg-slate-50'}`}
-                           >
-                              PREMIUM
-                           </button>
-                           <button 
-                             type="button" 
-                             onClick={() => {
-                               const newState = !editingProfile.is_student;
-                               let updatedLevels = editingProfile.unlocked_levels || [];
-                               
-                               if (newState) {
-                                 // Auto-unlock N5 and N4
-                                 const n5n4 = levels.filter(l => 
-                                   l.level_code.toUpperCase() === "N5" || 
-                                   l.level_code.toUpperCase() === "N4"
-                                 ).map(l => l.id);
-                                 
-                                 // Add unique IDs
-                                 updatedLevels = Array.from(new Set([...updatedLevels, ...n5n4]));
-                               }
-
-                               setEditingProfile({ 
-                                 ...editingProfile, 
-                                 is_student: newState, 
-                                 unlocked_levels: updatedLevels,
-                                 is_alumni: false, is_teacher: false, is_admin: false
-                               });
-                             }}
-                             className={`py-3 px-2 rounded-xl font-black text-[9px] transition uppercase tracking-widest ${editingProfile.is_student ? 'bg-teal-500 text-white shadow-lg' : 'text-slate-400 bg-white border border-slate-100 hover:bg-slate-50'}`}
-                           >
-                              MURID
-                           </button>
-                           <button 
-                             type="button" 
-                             onClick={() => {
-                               setEditingProfile({ 
-                                 ...editingProfile, 
-                                 is_alumni: !editingProfile.is_alumni, 
-                                 is_student: false, is_teacher: false, is_admin: false
-                               });
-                             }}
-                             className={`py-3 px-2 rounded-xl font-black text-[9px] transition uppercase tracking-widest ${editingProfile.is_alumni ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 bg-white border border-slate-100 hover:bg-slate-50'}`}
-                           >
-                              ALUMNI
-                           </button>
+                        <div className="space-y-2">
+                           <p className="text-[9px] font-black uppercase text-slate-400 ml-4 tracking-tighter">Batch / Angkatan</p>
+                           <input 
+                              className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-600 outline-none transition font-bold shadow-sm"
+                              placeholder="Contoh: Batch 12"
+                              value={editingProfile.batch || ""}
+                              onChange={e => setEditingProfile({...editingProfile, batch: e.target.value})}
+                           />
                         </div>
                      </div>
-
-                     <div className="pt-6 border-t border-slate-100 flex items-center justify-between px-4">
-                        <div>
-                           <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-1">Onboarding Status</label>
-                           <p className="text-[9px] text-slate-500 font-medium italic">Status kelengkapan data murid/alumni.</p>
-                        </div>
-                        <button 
-                          type="button"
-                          onClick={() => setEditingProfile({...editingProfile, profile_completed: !editingProfile.profile_completed})}
-                          className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${editingProfile.profile_completed ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-sm shadow-emerald-500/10' : 'bg-rose-50 text-rose-600 border border-rose-200'}`}
-                        >
-                           {editingProfile.profile_completed ? '✓ DATA LENGKAP' : '⚠ DATA BELUM LENGKAP'}
-                        </button>
-                     </div>
-
                   </div>
 
-                  <div className="space-y-8">
-                     <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 space-y-6">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block ml-2">Progress Content</label>
-                        <div className="space-y-6">
-                           <div className="bg-white p-5 rounded-3xl border border-slate-200">
-                              <p className="text-[9px] font-black uppercase text-slate-400 mb-3 tracking-widest">Unlocked Subjects</p>
-                              <div className="space-y-2 max-h-[140px] overflow-y-auto no-scrollbar">
-                                 {materials.map(mat => (
-                                    <button 
-                                      key={mat.id}
-                                      type="button"
-                                      onClick={() => mat.id && toggleMaterial(mat.id)}
-                                      className={`w-full p-2.5 rounded-xl text-left text-[9px] font-black uppercase transition-all ${(editingProfile.unlocked_materials || []).includes(mat.id) ? 'bg-teal-500 text-white shadow-md shadow-teal-500/20' : 'bg-slate-50 text-slate-400'}`}
-                                    >
-                                      {mat.title}
-                                    </button>
-                                 ))}
-                              </div>
-                           </div>
+                  <div className="space-y-4">
+                     <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4">Personal Details</label>
+                     <div className="grid grid-cols-2 gap-6">
+                        <input 
+                           className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
+                           placeholder="Nama Lengkap"
+                           value={editingProfile.full_name}
+                           onChange={e => setEditingProfile({...editingProfile, full_name: e.target.value})}
+                           required
+                        />
+                        <input 
+                           className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
+                           placeholder="Email Address"
+                           value={editingProfile.email}
+                           onChange={e => setEditingProfile({...editingProfile, email: e.target.value})}
+                           required
+                           type="email"
+                        />
+                     </div>
+                     <input 
+                        className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-slate-800 outline-none transition font-bold"
+                        placeholder="Nomor Telepon / WhatsApp"
+                        value={editingProfile.phone}
+                        onChange={e => setEditingProfile({...editingProfile, phone: e.target.value})}
+                        required
+                     />
+                  </div>
 
-                           <div className="bg-white p-5 rounded-3xl border border-slate-200">
-                               <p className="text-[9px] font-black uppercase text-slate-400 mb-3 tracking-widest">Exam Permissions</p>
-                               <div className="grid grid-cols-2 gap-2">
-                                  {levels.map(lvl => (
-                                     <button 
-                                       key={lvl.id}
-                                       type="button"
-                                       onClick={() => lvl.id && toggleLevel(lvl.id)}
-                                       className={`p-2 rounded-xl text-center text-[10px] font-black uppercase transition-all ${(editingProfile.unlocked_levels || []).includes(lvl.id) ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-slate-50 text-slate-400'}`}
-                                     >
-                                       {lvl.level_code}
-                                     </button>
-                                  ))}
-                               </div>
-                           </div>
-                        </div>
+                  <div className="p-8 bg-indigo-50 border border-indigo-100 rounded-3xl group">
+                     <label className="text-[11px] font-black uppercase tracking-[0.2em] text-indigo-700 block mb-3 italic">Set Access Password</label>
+                     <div className="relative">
+                       <input 
+                         className="w-full px-6 py-4 rounded-2xl bg-white border border-indigo-200 focus:border-indigo-600 outline-none transition font-mono text-xl tracking-[0.3em] font-black shadow-sm"
+                         placeholder="••••••••"
+                         type={showPassword ? "text" : "password"}
+                         value={editingProfile.password || ""}
+                         onChange={e => setEditingProfile({...editingProfile, password: e.target.value})}
+                       />
+                       <button 
+                         type="button"
+                         onClick={() => setShowPassword(!showPassword)}
+                         className="absolute right-6 top-1/2 -translate-y-1/2 text-indigo-300 hover:text-indigo-600 transition-colors"
+                       >
+                         {showPassword ? "👁️" : "👁️‍🗨️"}
+                       </button>
+                     </div>
+                     <p className="text-[10px] text-indigo-600/70 font-bold uppercase mt-3 italic tracking-tight">Digunakan oleh user untuk masuk ke sistem Sagara.</p>
+                  </div>
+
+                  <div className="space-y-4 pt-6 border-t border-slate-100">
+                     <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4 italic">Kategori Peran (Exclusive)</label>
+                     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                        {userProfile?.is_super_admin && (
+                          <button 
+                            type="button" 
+                            onClick={() => setEditingProfile({
+                              ...editingProfile, 
+                              is_admin: !editingProfile.is_admin,
+                              is_teacher: false, is_student: false, is_alumni: false
+                            })}
+                            className={`py-3 px-2 rounded-xl font-black text-[9px] transition uppercase tracking-widest ${editingProfile.is_admin ? 'bg-rose-600 text-white shadow-lg' : 'text-slate-400 bg-white border border-slate-100 hover:bg-slate-50'}`}
+                          >
+                             ADMIN
+                          </button>
+                        )}
+                        <button 
+                          type="button" 
+                          onClick={() => setEditingProfile({
+                            ...editingProfile, 
+                            is_teacher: !editingProfile.is_teacher,
+                            is_admin: false, is_student: false, is_alumni: false
+                          })}
+                          className={`py-3 px-2 rounded-xl font-black text-[9px] transition uppercase tracking-widest ${editingProfile.is_teacher ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 bg-white border border-slate-100 hover:bg-slate-50'}`}
+                        >
+                           GURU
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={() => setEditingProfile({...editingProfile, is_premium: !editingProfile.is_premium})}
+                          className={`py-3 px-2 rounded-xl font-black text-[9px] transition uppercase tracking-widest ${editingProfile.is_premium ? 'bg-amber-500 text-white shadow-lg' : 'text-slate-400 bg-white border border-slate-100 hover:bg-slate-50'}`}
+                        >
+                           PREMIUM
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            const newState = !editingProfile.is_student;
+                            let updatedLevels = editingProfile.unlocked_levels || [];
+                            
+                            if (newState) {
+                              // Auto-unlock N5 and N4
+                              const n5n4 = levels.filter(l => 
+                                l.level_code.toUpperCase() === "N5" || 
+                                l.level_code.toUpperCase() === "N4"
+                              ).map(l => l.id);
+                              
+                              // Add unique IDs
+                              updatedLevels = Array.from(new Set([...updatedLevels, ...n5n4]));
+                            }
+
+                            setEditingProfile({ 
+                              ...editingProfile, 
+                              is_student: newState, 
+                              unlocked_levels: updatedLevels,
+                              is_alumni: false, is_teacher: false, is_admin: false
+                            });
+                          }}
+                          className={`py-3 px-2 rounded-xl font-black text-[9px] transition uppercase tracking-widest ${editingProfile.is_student ? 'bg-teal-500 text-white shadow-lg' : 'text-slate-400 bg-white border border-slate-100 hover:bg-slate-50'}`}
+                        >
+                           MURID
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setEditingProfile({ 
+                              ...editingProfile, 
+                              is_alumni: !editingProfile.is_alumni, 
+                              is_student: false, is_teacher: false, is_admin: false
+                            });
+                          }}
+                          className={`py-3 px-2 rounded-xl font-black text-[9px] transition uppercase tracking-widest ${editingProfile.is_alumni ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 bg-white border border-slate-100 hover:bg-slate-50'}`}
+                        >
+                           ALUMNI
+                        </button>
                      </div>
                   </div>
                </div>
@@ -636,7 +602,7 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
 
                {viewingProfile.certificate_url && (
                   <div className="space-y-3">
-                     <p className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-widest">Document Verification</p>
+                     <p className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-widest">Global Certificate</p>
                      <div className="relative group rounded-[2rem] overflow-hidden border-2 border-slate-100 shadow-sm aspect-video bg-slate-900/5 hover:border-indigo-500/30 transition-all cursor-pointer">
                         <img src={viewingProfile.certificate_url} alt="cert" className="w-full h-full object-contain" />
                         <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
@@ -645,6 +611,66 @@ export default function UserManager({ userProfile }: { userProfile: Profile | nu
                      </div>
                   </div>
                )}
+
+               {/* Dynamic Supporting Data Sections */}
+               {(() => {
+                  const role = viewingProfile.is_admin ? 'admin' : 
+                               viewingProfile.is_teacher ? 'teacher' : 
+                               viewingProfile.is_alumni ? 'alumni' : 
+                               viewingProfile.is_student ? 'student' : 
+                               viewingProfile.is_premium ? 'premium' : 'standard';
+
+                  const roleFields = dynamicFields.filter(f => f.target_role === 'all' || f.target_role === role);
+
+                  if (roleFields.length === 0) return null;
+
+                  return (
+                     <div className="space-y-6 pt-6 border-t border-slate-100">
+                        <div className="flex items-center justify-between px-2">
+                           <p className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.2em]">Data Penunjang (Dynamic)</p>
+                           <span className="text-[9px] font-bold text-slate-300 uppercase italic">Role: {role}</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                           {roleFields.map(field => {
+                              const value = dynamicValues[field.id];
+                              return (
+                                 <div key={field.id} className="space-y-3">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{field.name}</label>
+                                    
+                                    {value ? (
+                                       field.type === 'file' ? (
+                                          <div className="relative group rounded-3xl overflow-hidden border border-slate-200 bg-slate-50 aspect-video shadow-sm">
+                                             {value.startsWith('data:image') ? (
+                                                <img src={value} alt={field.name} className="w-full h-full object-contain" />
+                                             ) : (
+                                                <div className="w-full h-full flex flex-col items-center justify-center bg-indigo-50 text-indigo-400">
+                                                   <span className="text-3xl mb-2">📄</span>
+                                                   <span className="text-[9px] font-black uppercase">Document File</span>
+                                                </div>
+                                             )}
+                                             <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center p-4">
+                                                <a href={value} download={`${field.name}-${viewingProfile.full_name}.jpg`} className="px-5 py-2.5 bg-white text-slate-900 rounded-xl font-black text-[9px] uppercase shadow-xl whitespace-nowrap">Download / View</a>
+                                             </div>
+                                          </div>
+                                       ) : (
+                                          <div className="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100 shadow-sm">
+                                             <p className="text-sm font-bold text-slate-800">{value}</p>
+                                          </div>
+                                       )
+                                    ) : (
+                                       <div className="bg-slate-50/50 p-6 rounded-[2rem] border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-center opacity-60">
+                                          <span className="text-xl mb-1 grayscale opacity-30">⏳</span>
+                                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Belum diisi oleh siswa</p>
+                                          {field.is_required && <p className="text-[8px] text-rose-300 font-bold uppercase mt-1">(Wajib)</p>}
+                                       </div>
+                                    )}
+                                 </div>
+                              );
+                           })}
+                        </div>
+                     </div>
+                  );
+               })()}
             </div>
           </div>
         </div>

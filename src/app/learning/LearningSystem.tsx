@@ -85,7 +85,7 @@ export default function LearningSystem({ user, onLogout, theme, onRefreshUser }:
               onClick={() => {
                 localStorage.removeItem("luma-auth");
                 localStorage.removeItem("luma-user-profile");
-                window.location.href = "/";
+                window.location.href = "/?logout=1";
               }}
               className="w-full py-4 bg-rose-50/50 text-rose-500 rounded-2xl font-black text-[10px] hover:bg-rose-500 hover:text-white transition-all duration-500 uppercase tracking-widest"
             >
@@ -142,7 +142,8 @@ export default function LearningSystem({ user, onLogout, theme, onRefreshUser }:
               <button 
                 onClick={() => {
                   localStorage.removeItem("luma-auth");
-                  window.location.href = "/";
+                  localStorage.removeItem("luma-user-profile");
+                  window.location.href = "/?logout=1";
                 }}
                 className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl font-black text-rose-500 bg-rose-50"
               >
@@ -199,7 +200,7 @@ export default function LearningSystem({ user, onLogout, theme, onRefreshUser }:
              {activeTab === "dashboard" && <DashboardView user={user} theme={theme} onUpgrade={setUpgradeMessage} onSwitchTab={setActiveTab} />}
              {activeTab === "materi" && <MateriView user={user} theme={theme} onUpgrade={setUpgradeMessage} onRefreshUser={onRefreshUser} />}
              {activeTab === "latihan" && <LatihanView user={user} theme={theme} onUpgrade={setUpgradeMessage} />}
-             {activeTab === "profile" && <ProfileView user={user} onLogout={onLogout} />}
+             {activeTab === "profile" && <ProfileView user={user} />}
              {activeTab === "flashcards" && <FlashcardSRS userEmail={user.email} />}
            </div>
         </div>

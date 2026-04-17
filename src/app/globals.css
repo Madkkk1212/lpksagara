@@ -105,3 +105,13 @@ button, a, input, select, textarea {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* =============================================
+   SPLASH SCREEN — CSS auto-dismiss fallback
+   The splash fades out via CSS after 1.4s     
+   completely independent of React JS state.   
+   ============================================= */
+@keyframes splashFadeOut {
+  0%   { opacity: 1; pointer-events: all; }
+  100% { opacity: 0; pointer-events: none; visibility: hidden; }
+}

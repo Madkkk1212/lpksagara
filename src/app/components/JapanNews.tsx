@@ -75,7 +75,11 @@ export default function JapanNews() {
               <div className="flex gap-4 items-center">
                 {item.image && (
                   <div className="h-20 w-20 shrink-0 rounded-[1.5rem] overflow-hidden shadow-lg group-hover:scale-105 transition-transform duration-700">
-                    <img src={item.image} alt="" className="w-full h-full object-cover transition-all duration-700" />
+                    <img
+                      src={item.image}
+                      alt=""
+                      className="w-full h-full object-cover transition-all duration-700"
+                    />
                   </div>
                 )}
                 <div className="flex-1">

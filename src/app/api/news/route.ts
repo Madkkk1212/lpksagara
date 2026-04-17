@@ -24,9 +24,10 @@ export async function GET() {
       link: item.link,
       pubDate: item.pubDate,
       content: item.contentSnippet || item.content,
-      // Yahoo Japan RSS usually doesn't provide images directly in the feed 
-      // but we can try to extract from description or just use a placeholder
-      image: extractImage(item),
+      // Proxy image through our server to avoid CORS issues
+      image: extractImage(item)
+        ? `/api/image-proxy?url=${encodeURIComponent(extractImage(item)!)}`
+        : null,
     }));
 
     return NextResponse.json({

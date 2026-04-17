@@ -108,85 +108,90 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    // Splash timer — fast after logout, normal on first load
+    const isPostLogout = new URLSearchParams(window.location.search).get("logout") === "1";
+    const splashTimer = window.setTimeout(() => setShowSplash(false), isPostLogout ? 100 : 1200);
+
     const init = async () => {
-      // 1. Initial Data Fetching
-      const [t, b, c, m, l, sl, totalMatsCount] = await Promise.all([
-        getTheme(),
-        getBanners(),
-        getMaterialCategories(),
-        getMaterials(),
-        getExamLevels(),
-        getStudyLevels(),
-        getTotalStudyMaterialsCount()
-      ]);
-      setTheme(t);
-      setBanners(b);
-      setCategories(c);
-      setMaterials(m);
-      setLevels(l);
-      setStudyLevels(sl);
+      try {
+        // 1. Initial Data Fetching
+        const [t, b, c, m, l, sl, totalMatsCount] = await Promise.all([
+          getTheme(),
+          getBanners(),
+          getMaterialCategories(),
+          getMaterials(),
+          getExamLevels(),
+          getStudyLevels(),
+          getTotalStudyMaterialsCount()
+        ]);
+        setTheme(t);
+        setBanners(b);
+        setCategories(c);
+        setMaterials(m);
+        setLevels(l);
+        setStudyLevels(sl);
 
-      // 2. Auth & Profile Sync
-      const authed = isAuthed();
-      setLoggedIn(authed);
-      
-      let emailForMetrics = "";
+        // 2. Auth & Profile Sync
+        const authed = isAuthed();
+        setLoggedIn(authed);
 
-      if (authed) {
-        const saved = localStorage.getItem("luma-user-profile");
-        if (saved) {
-          const localProfile = JSON.parse(saved);
-          emailForMetrics = localProfile.email;
-          try {
-            const freshProfile = await getProfileByEmail(localProfile.email);
-            if (freshProfile) {
-              setUserProfile(freshProfile);
-              localStorage.setItem("luma-user-profile", JSON.stringify(freshProfile));
-              if (!freshProfile.profile_completed) {
-                 window.location.href = '/learning';
-                 return;
+        let emailForMetrics = "";
+
+        if (authed) {
+          const saved = localStorage.getItem("luma-user-profile");
+          if (saved) {
+            const localProfile = JSON.parse(saved);
+            emailForMetrics = localProfile.email;
+            try {
+              const freshProfile = await getProfileByEmail(localProfile.email);
+              if (freshProfile) {
+                setUserProfile(freshProfile);
+                localStorage.setItem("luma-user-profile", JSON.stringify(freshProfile));
+                // Students & alumni always go to /learning
+                if (freshProfile.is_student || freshProfile.is_alumni || !freshProfile.profile_completed) {
+                  window.location.href = '/learning';
+                  return;
+                }
+              } else {
+                setUserProfile(localProfile);
+                if (localProfile.is_student || localProfile.is_alumni || !localProfile.profile_completed) {
+                  window.location.href = '/learning';
+                  return;
+                }
               }
-            } else {
+            } catch {
               setUserProfile(localProfile);
-              if (!localProfile.profile_completed) {
-                 window.location.href = '/learning';
-                 return;
-              }
-            }
-          } catch (err) {
-            setUserProfile(localProfile);
-            if (!localProfile.profile_completed) {
-               window.location.href = '/learning';
-               return;
             }
           }
         }
-      }
 
-      // Fetch Realtime Dashboard Metrics
-      if (emailForMetrics) {
-        const completedMats = await getCompletedMaterials(emailForMetrics);
-        const lastReadArr = await getUserLastProgressDetails(emailForMetrics);
-        setDashboardMetrics({
-          totalMaterials: totalMatsCount,
-          completed: completedMats.length,
-          lastRead: lastReadArr.length > 0 ? lastReadArr[0] : null
-        });
-      } else {
-        setDashboardMetrics({ totalMaterials: totalMatsCount, completed: 0, lastRead: null });
-      }
+        // 3. Dashboard Metrics
+        if (emailForMetrics) {
+          const completedMats = await getCompletedMaterials(emailForMetrics);
+          const lastReadArr = await getUserLastProgressDetails(emailForMetrics);
+          setDashboardMetrics({
+            totalMaterials: totalMatsCount,
+            completed: completedMats.length,
+            lastRead: lastReadArr.length > 0 ? lastReadArr[0] : null
+          });
+        } else {
+          setDashboardMetrics({ totalMaterials: totalMatsCount, completed: 0, lastRead: null });
+        }
 
-      // 3. App State
-      setExamProgress(getExamProgress());
-      
-      const nextTab = new URLSearchParams(window.location.search).get("tab") as TabId | null;
-      if (nextTab && tabs.some((tab) => tab.id === nextTab)) setActiveTab(nextTab);
-      
-      window.setTimeout(() => setShowSplash(false), 1200);
+        // 4. App State
+        setExamProgress(getExamProgress());
+        const nextTab = new URLSearchParams(window.location.search).get("tab") as TabId | null;
+        if (nextTab && tabs.some((tab) => tab.id === nextTab)) setActiveTab(nextTab);
+
+      } catch (err) {
+        console.error("Landing Page Init Error:", err);
+      }
     };
 
     init();
-  }, []); // Run ONLY once on mount
+    // NOTE: intentionally NOT clearing the timer on cleanup
+    // React StrictMode calls cleanup which would cancel the timer and cause stuck splash
+  }, []); // Run only once on mount
 
   // Auto-slide carousel
   useEffect(() => {
@@ -225,8 +230,12 @@ export default function Home() {
   if (showSplash) {
     return (
       <main 
-        className="flex min-h-screen items-center justify-center px-6 overflow-hidden relative"
-        style={{ background: `linear-gradient(135deg, ${theme?.splash_gradient_from || '#0f172a'}, ${theme?.splash_gradient_to || '#1e293b'})` }}
+        className="flex min-h-screen items-center justify-center px-6 overflow-hidden relative cursor-pointer"
+        style={{ 
+          background: `linear-gradient(135deg, ${theme?.splash_gradient_from || '#0f172a'}, ${theme?.splash_gradient_to || '#1e293b'})`,
+          animation: 'splashFadeOut 0.4s ease-out 1.4s forwards'
+        }}
+        onClick={() => setShowSplash(false)}
       >
         {/* Animated Background Patterns */}
         <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
@@ -605,7 +614,7 @@ export default function Home() {
                   </div>
 
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {levels.map(lvl => {
+                    {levels.length > 0 ? levels.map(lvl => {
                       const hasAccess = !lvl.is_locked || userProfile?.is_premium || (userProfile?.unlocked_levels || []).includes(lvl.id);
                       
                       return (
@@ -643,7 +652,12 @@ export default function Home() {
                            )}
                         </button>
                       );
-                    })}
+                    }) : (
+                       <div className="col-span-full py-20 text-center bg-white/50 rounded-[3rem] border-2 border-dashed border-slate-100">
+                          <span className="text-4xl mb-4 block grayscale opacity-30">📚</span>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Materi Latihan belum tersedia.</p>
+                       </div>
+                    )}
                   </div>
                 </section>
               </div>

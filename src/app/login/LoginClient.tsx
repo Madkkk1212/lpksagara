@@ -64,7 +64,18 @@ export default function LoginClient() {
 
         window.localStorage.setItem("luma-auth", "true");
         window.localStorage.setItem("luma-user-profile", JSON.stringify(profile));
-        router.push(`/?tab=${redirect}`);
+        
+        // 🔒 Routing Logic:
+        // Students & Alumni → ALWAYS go to /learning (gatekeeper)
+        // /learning will show onboarding form if profile not completed, or dashboard if completed
+        if (profile.is_student || profile.is_alumni) {
+          router.push("/learning");
+        } else if (!profile.profile_completed) {
+          // Any other unverified user → also send to /learning
+          router.push("/learning");
+        } else {
+          router.push(`/?tab=${redirect}`);
+        }
       } else {
         setErrorMsg("Identity not recognized. Enter valid Email or NIP.");
       }
