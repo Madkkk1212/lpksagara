@@ -15,6 +15,7 @@ export default function ProfileView({ user }: { user: Profile }) {
   const [values, setValues] = useState<ProfileValue[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [uploadingFieldId, setUploadingFieldId] = useState<string | null>(null);
+  const [localValues, setLocalValues] = useState<Record<string, string>>({});
 
   const fetchData = async () => {
     try {
@@ -26,6 +27,10 @@ export default function ProfileView({ user }: { user: Profile }) {
       ]);
       setFields(f);
       setValues(v);
+      
+      const lMap: Record<string, string> = {};
+      v.forEach(val => { lMap[val.field_id] = val.value; });
+      setLocalValues(lMap);
     } catch (err) {
       console.error("ProfileView: Fetch Error:", err);
     } finally {
@@ -58,7 +63,7 @@ export default function ProfileView({ user }: { user: Profile }) {
           const base64 = reader.result as string;
           await upsertProfile({ ...user, avatar_url: base64 });
           alert("Foto profil berhasil diperbarui!");
-          window.location.reload(); // Refresh to update all UI parts
+          window.location.reload(); 
        } catch (err) {
           console.error("Avatar Upload Error:", err);
           alert("Gagal memperbarui foto profil.");
@@ -69,11 +74,27 @@ export default function ProfileView({ user }: { user: Profile }) {
     reader.readAsDataURL(file);
   };
 
+  const handleFieldUpdate = async (fieldId: string, value: string) => {
+    if (!user.id) return;
+    try {
+      setUploadingFieldId(fieldId);
+      await upsertProfileValue({
+        user_id: user.id,
+        field_id: fieldId,
+        value: value
+      });
+      fetchData();
+    } catch (err) {
+      alert("Gagal memperbarui data.");
+    } finally {
+      setUploadingFieldId(null);
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: ProfileField) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validation
     if (field.allowed_file_types && field.allowed_file_types.length > 0) {
       const ext = file.name.split('.').pop()?.toLowerCase();
       if (!ext || !field.allowed_file_types.includes(ext)) {
@@ -98,7 +119,7 @@ export default function ProfileView({ user }: { user: Profile }) {
           value: base64
         });
         alert(`${field.name} berhasil diunggah!`);
-        await fetchData(); // Refresh data
+        await fetchData();
       } catch (err) {
         console.error("Upload Error:", err);
         alert("Gagal mengunggah berkas.");
@@ -287,16 +308,17 @@ export default function ProfileView({ user }: { user: Profile }) {
                          <div className="h-10 w-10 border-4 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin" />
                       </div>
                    ) : fields.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-12">
                          {fields.map((field) => {
                             const val = values.find(v => v.field_id === field.id)?.value;
                             const isFilled = !!val;
                             const isUploading = uploadingFieldId === field.id;
+                            const localVal = localValues[field.id] || "";
 
                             return (
-                               <div key={field.id} className="space-y-2">
+                               <div key={field.id} className="space-y-4">
                                   <div className="flex items-center justify-between ml-2">
-                                     <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">{field.name}</span>
+                                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{field.name}</span>
                                      <div className="flex gap-2">
                                         <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase ${field.is_required ? 'bg-rose-50 border-rose-100 text-rose-500' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
                                            {field.is_required ? 'Wajib' : 'Opsional'}
@@ -304,39 +326,67 @@ export default function ProfileView({ user }: { user: Profile }) {
                                      </div>
                                   </div>
 
-                                  <div className={`relative border rounded-[1.5rem] p-5 transition-all ${isFilled ? 'bg-emerald-50/20 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
-                                    <div className="flex items-center justify-between">
-                                       <div className="flex items-center gap-4 overflow-hidden">
-                                          <div className={`h-12 w-12 rounded-xl flex items-center justify-center text-2xl ${isFilled ? 'bg-white shadow-sm' : 'bg-slate-100 opacity-40'}`}>
-                                             {isFilled ? (val.startsWith('data:image') ? <img src={val} className="h-full w-full object-cover rounded-xl" alt="preview"/> : '📄') : '📁'}
-                                          </div>
-                                          <div className="overflow-hidden">
-                                             <h6 className={`text-sm font-black truncate ${isFilled ? 'text-emerald-700' : 'text-slate-400'}`}>
-                                                {isFilled ? 'File Terverifikasi' : 'Berkas Belum Ada'}
-                                             </h6>
-                                             <input 
-                                               type="file" 
-                                               id={`upload-${field.id}`}
-                                               className="hidden"
-                                               onChange={e => handleFileUpload(e, field)}
-                                               accept={field.allowed_file_types?.map(t => `.${t}`).join(',')}
-                                             />
-                                             <label 
-                                               htmlFor={`upload-${field.id}`}
-                                               className={`text-[9px] font-black uppercase tracking-widest cursor-pointer hover:underline ${isFilled ? 'text-indigo-500' : 'text-slate-500'}`}
-                                             >
-                                                {isUploading ? 'SEDANG MENGUNGGAH...' : isFilled ? 'GANTI BERKAS' : 'UNGGAH SEKARANG'}
-                                             </label>
-                                          </div>
-                                       </div>
-                                       {isFilled && !isUploading && (
-                                          <div className="h-8 w-8 bg-emerald-500 text-white rounded-xl shadow-lg flex items-center justify-center text-xs">✓</div>
-                                       )}
-                                       {isUploading && (
-                                          <div className="h-8 w-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
-                                       )}
+                                  {field.type === 'file' ? (
+                                    <div className={`relative border-2 rounded-[2rem] p-6 transition-all ${isFilled ? 'bg-emerald-50/20 border-emerald-100' : 'bg-slate-50 border-slate-100 border-dashed hover:border-indigo-200'}`}>
+                                      <div className="flex items-center justify-between">
+                                         <div className="flex items-center gap-5 overflow-hidden">
+                                            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center text-3xl ${isFilled ? 'bg-white shadow-md' : 'bg-slate-100 opacity-40'}`}>
+                                               {isFilled ? (val.startsWith('data:image') ? <img src={val} className="h-full w-full object-cover rounded-2xl" alt="preview"/> : '📄') : '📁'}
+                                            </div>
+                                            <div className="overflow-hidden">
+                                               <h6 className={`text-sm font-black truncate ${isFilled ? 'text-emerald-700' : 'text-slate-400 opacity-60'}`}>
+                                                  {isFilled ? 'File Terunggah' : 'Menunggu Berkas'}
+                                               </h6>
+                                               <input 
+                                                 type="file" 
+                                                 id={`upload-${field.id}`}
+                                                 className="hidden"
+                                                 onChange={e => handleFileUpload(e, field)}
+                                                 accept={field.allowed_file_types?.map(t => `.${t}`).join(',')}
+                                               />
+                                               <label 
+                                                 htmlFor={`upload-${field.id}`}
+                                                 className={`text-[9px] font-black uppercase tracking-widest cursor-pointer hover:text-indigo-600 transition-colors ${isFilled ? 'text-indigo-400' : 'text-slate-400 underline'}`}
+                                               >
+                                                  {isUploading ? 'PROSES...' : isFilled ? 'UBAH DATA' : 'KLIK UNTUK UNGGAH'}
+                                               </label>
+                                            </div>
+                                         </div>
+                                         {isFilled && !isUploading && (
+                                            <div className="h-10 w-10 bg-emerald-500 text-white rounded-[1.25rem] shadow-lg flex items-center justify-center text-lg animate-in zoom-in-50">✓</div>
+                                         )}
+                                         {isUploading && (
+                                            <div className="h-10 w-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+                                         )}
+                                      </div>
                                     </div>
-                                  </div>
+                                  ) : (
+                                    <div className="relative group">
+                                      <div className="flex bg-slate-50 rounded-[1.5rem] border border-slate-100 p-2 focus-within:bg-white focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-50 transition-all">
+                                        <input 
+                                          type={field.type === 'number' ? 'number' : 'text'}
+                                          className="flex-1 bg-transparent px-4 py-3 outline-none font-bold text-slate-800 text-sm placeholder:text-slate-300 italic"
+                                          placeholder={`Masukkan ${field.name.toLowerCase()}...`}
+                                          value={localVal}
+                                          onChange={(e) => setLocalValues({ ...localValues, [field.id]: e.target.value })}
+                                        />
+                                        <button 
+                                          onClick={() => handleFieldUpdate(field.id, localVal)}
+                                          disabled={isUploading || localVal === val}
+                                          className={`px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${
+                                            localVal === val 
+                                              ? 'text-slate-300 cursor-default' 
+                                              : 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 hover:bg-slate-900 active:scale-95'
+                                          }`}
+                                        >
+                                          {isUploading ? '...' : 'SIMPAN'}
+                                        </button>
+                                      </div>
+                                      {isFilled && localVal === val && (
+                                        <div className="absolute -right-2 -top-2 h-6 w-6 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[10px] shadow-lg border-2 border-white animate-in zoom-in-50">✓</div>
+                                      )}
+                                    </div>
+                                  )}
                                </div>
                             );
                          })}
