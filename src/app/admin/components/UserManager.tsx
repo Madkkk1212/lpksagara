@@ -439,7 +439,7 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
                                                 )}
                                                 <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center flex-col gap-2 p-4">
                                                    <label htmlFor={`admin-file-${field.id}`} className="px-5 py-2.5 bg-white text-slate-900 rounded-xl font-black text-[9px] uppercase shadow-xl cursor-pointer hover:bg-slate-50">Ganti Dokumen</label>
-                                                   <a href={value} download={`${field.name}.jpg`} className="text-white text-[9px] font-bold uppercase underline">Pratinjau Full</a>
+                                                   <a href={value} download={field.name.replace(/\s+/g, '-')} className="text-white text-[9px] font-bold uppercase underline">Pratinjau Full</a>
                                                 </div>
                                              </div>
                                           ) : (
@@ -618,7 +618,7 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
                      <div className="relative group rounded-[2rem] overflow-hidden border-2 border-slate-100 shadow-sm aspect-video bg-slate-900/5 hover:border-indigo-500/30 transition-all cursor-pointer">
                         <img src={viewingProfile.certificate_url} alt="cert" className="w-full h-full object-contain" />
                         <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                           <a href={viewingProfile.certificate_url} download={`sertifikat-${viewingProfile.full_name}.jpg`} className="px-6 py-3 bg-white text-slate-900 rounded-2xl font-black text-[10px] uppercase shadow-2xl">Download / View Full</a>
+                           <a href={viewingProfile.certificate_url} download={`sertifikat-${viewingProfile.full_name.replace(/\s+/g, '-')}`} className="px-6 py-3 bg-white text-slate-900 rounded-2xl font-black text-[10px] uppercase shadow-2xl">Download / View Full</a>
                         </div>
                      </div>
                   </div>
@@ -660,7 +660,7 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
                                                 </div>
                                              )}
                                              <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center p-4">
-                                                <a href={value} download={`\${field.name}-\${viewingProfile.full_name}.jpg`} className="px-5 py-2.5 bg-white text-slate-900 rounded-xl font-black text-[9px] uppercase shadow-xl whitespace-nowrap">Download / View</a>
+                                                <a href={value} download={`\${field.name.replace(/\\s+/g, '-')}-\${viewingProfile.full_name.replace(/\\s+/g, '-')}`} className="px-5 py-2.5 bg-white text-slate-900 rounded-xl font-black text-[9px] uppercase shadow-xl whitespace-nowrap">Download / View</a>
                                              </div>
                                           </div>
                                        ) : (

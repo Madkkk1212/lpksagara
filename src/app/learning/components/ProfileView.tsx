@@ -358,8 +358,13 @@ export default function ProfileView({ user }: { user: Profile }) {
                              return (
                                 <div key={field.id} className="space-y-4">
                                    <div className="flex items-center justify-between ml-2">
-                                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{field.name}</span>
-                                      <div className="flex gap-2">
+                                      <div>
+                                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{field.name}</span>
+                                         <span className="block mt-0.5 text-[8px] font-bold text-slate-400 uppercase">
+                                            (Format: {field.allowed_file_types?.join(', ') || 'Bebas'})
+                                         </span>
+                                      </div>
+                                      <div className="flex gap-2 items-start">
                                          <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase ${field.is_required ? 'bg-rose-50 border-rose-100 text-rose-500' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
                                             {field.is_required ? 'Wajib' : 'Opsional'}
                                          </span>
@@ -409,7 +414,7 @@ export default function ProfileView({ user }: { user: Profile }) {
                  </div>
                  <div className="p-8 bg-indigo-50/30 rounded-[2rem] border border-indigo-50/50 text-center">
                     <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest leading-relaxed">
-                      Pilih file (JPG/PDF) maksimal 2MB. Pastikan berkas terlihat jelas dan asli.
+                      Pilih file sesuai format yang diminta (maksimal 2MB). Pastikan berkas terlihat jelas dan asli.
                     </p>
                  </div>
                </section>

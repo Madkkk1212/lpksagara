@@ -276,7 +276,7 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                                                {field.is_required ? 'WAJIB' : 'OPSIONAL'}
                                             </span>
                                          </h4>
-                                         <p className="text-[9px] font-medium text-slate-400 uppercase tracking-widest leading-relaxed">Format: PDF/JPG • Max 2MB</p>
+                                         <p className="text-[9px] font-medium text-slate-400 uppercase tracking-widest leading-relaxed">Format: {field.allowed_file_types?.join(', ').toUpperCase() || 'BEBAS'} • Max 2MB</p>
                                       </div>
                                       {dynamicValues[field.id] ? (
                                          <div className="h-10 w-10 bg-emerald-500 text-white rounded-2xl flex items-center justify-center text-sm shadow-lg shadow-emerald-500/20">✓</div>
@@ -315,6 +315,7 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                                         className="hidden"
                                         onChange={e => handleDynamicFileChange(e, field)}
                                         required={field.is_required && !dynamicValues[field.id]}
+                                        accept={field.allowed_file_types?.map(t => `.${t}`).join(',')}
                                       />
                                    </div>
                                 </motion.div>
