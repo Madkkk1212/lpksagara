@@ -1,10 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-<<<<<<< HEAD
-=======
-import { Profile, ProfileField, StudyLevel } from "@/lib/types";
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
 import { 
   getProfiles, 
   deleteProfile, 
@@ -12,7 +8,6 @@ import {
   getProfileFields, 
   getProfileValuesByUserId, 
   upsertProfileValue,
-<<<<<<< HEAD
   getStudyLevels,
   getStudentBatches,
   getTeacherStudents,
@@ -29,17 +24,6 @@ export default function UserManager({ user: userProfile, initialRole = "all" }: 
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState<"all" | "admin" | "teacher" | "student" | "alumni">(initialRole);
-=======
-  getStudyLevels
-} from "@/lib/db";
-import { motion, AnimatePresence } from "framer-motion";
-
-export default function UserManager({ user: userProfile }: { user: Profile }) {
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filterRole, setFilterRole] = useState<"all" | "admin" | "teacher" | "student" | "alumni">("all");
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,7 +31,6 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
   const [dynamicFields, setDynamicFields] = useState<ProfileField[]>([]);
   const [dynamicValues, setDynamicValues] = useState<Record<string, string>>({});
   const [levels, setLevels] = useState<StudyLevel[]>([]);
-<<<<<<< HEAD
   const [batches, setBatches] = useState<StudentBatch[]>([]);
   const [filterBatch, setFilterBatch] = useState<string>("all");
   const [filterLevel, setFilterLevel] = useState<string>("all");
@@ -57,145 +40,12 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
   
   const [managingTeacherStudents, setManagingTeacherStudents] = useState<Profile | null>(null);
   const [assignedStudentIds, setAssignedStudentIds] = useState<string[]>([]);
-=======
-
-  const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
-  const [isDetailLoading, setIsDetailLoading] = useState(false);
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
 
   useEffect(() => {
     fetchProfiles();
     getProfileFields('all').then(setDynamicFields);
     getStudyLevels().then(setLevels);
-<<<<<<< HEAD
     getStudentBatches().then(setBatches);
-=======
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
-  }, []);
-
-  const fetchProfiles = async () => {
-    setLoading(true);
-    try {
-      const data = await getProfiles();
-      setProfiles(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async (id: string, email: string) => {
-    if (email === userProfile.email) {
-      alert("Anda tidak bisa menghapus akun Anda sendiri.");
-      return;
-    }
-    if (!confirm("Hapus pengguna ini secara permanen?")) return;
-    try {
-      await deleteProfile(id);
-      fetchProfiles();
-    } catch (err) {
-      alert("Gagal menghapus.");
-    }
-  };
-
-  const handleEdit = async (p: Profile) => {
-    setEditingProfile(p);
-    setIsModalOpen(true);
-    if (p.id) {
-       const vals = await getProfileValuesByUserId(p.id);
-       const valMap: Record<string, string> = {};
-       vals.forEach(v => { valMap[v.field_id] = v.value; });
-       setDynamicValues(valMap);
-    }
-  };
-
-  const handleAdminAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !editingProfile) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-       setEditingProfile({ ...editingProfile, avatar_url: reader.result as string });
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleDynamicFileChange = (e: React.ChangeEvent<HTMLInputElement>, fieldId: string) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-       setDynamicValues(prev => ({ ...prev, [fieldId]: reader.result as string }));
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleAdminUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingProfile) return;
-    try {
-      await upsertProfile(editingProfile);
-      for (const [fieldId, value] of Object.entries(dynamicValues)) {
-        if (value) {
-            await upsertProfileValue({
-                user_id: editingProfile.id!,
-                field_id: fieldId,
-                value: value
-            });
-        }
-      }
-      setIsModalOpen(false);
-      fetchProfiles();
-      alert("Profil berhasil diperbarui.");
-    } catch (err) {
-      alert("Gagal memperbarui profil.");
-    }
-  };
-
-  const handleViewDetails = async (p: Profile) => {
-     setViewingProfile(p);
-     setIsDetailLoading(true);
-     try {
-        if (p.id) {
-           const vals = await getProfileValuesByUserId(p.id);
-           const valMap: Record<string, string> = {};
-           vals.forEach(v => { valMap[v.field_id] = v.value; });
-           setDynamicValues(valMap);
-        }
-     } catch (err) {
-        console.error(err);
-     } finally {
-        setIsDetailLoading(false);
-     }
-  };
-
-<<<<<<< HEAD
-  const handleManageStudents = async (p: Profile) => {
-     setManagingTeacherStudents(p);
-     if (p.id) {
-        const ids = await getTeacherStudents(p.id);
-        setAssignedStudentIds(ids);
-     }
-  };
-
-  const toggleStudentAssignment = async (studentId: string) => {
-     if (!managingTeacherStudents?.id) return;
-     const isAssigned = assignedStudentIds.includes(studentId);
-     try {
-        if (isAssigned) {
-           await removeStudentFromTeacher(managingTeacherStudents.id, studentId);
-           setAssignedStudentIds(prev => prev.filter(id => id !== studentId));
-        } else {
-           await assignStudentToTeacher(managingTeacherStudents.id, studentId);
-           setAssignedStudentIds(prev => [...prev, studentId]);
-        }
-     } catch (err) {
-        alert("Gagal memperbarui relasi guru-murid.");
-     }
-  };
-
-=======
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   const filtered = profiles.filter(p => {
     if (!userProfile.is_super_admin && (p.is_admin || p.is_super_admin)) {
       if (p.email !== userProfile.email) return false;
@@ -206,7 +56,6 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
       p.email.toLowerCase().includes(search.toLowerCase()) || 
       p.nip?.toLowerCase().includes(search.toLowerCase());
     
-<<<<<<< HEAD
     const matchesBatch = filterBatch === "all" || p.batch === filterBatch;
     const matchesLevel = filterLevel === "all" || p.target_level === filterLevel;
     
@@ -247,16 +96,6 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
     exportToPDF('Data User LPK Sagara', columns, rows, `Data_User_${new Date().toISOString().split('T')[0]}`);
   };
 
-=======
-    if (filterRole === "all") return matchesSearch;
-    if (filterRole === "admin") return matchesSearch && p.is_admin;
-    if (filterRole === "teacher") return matchesSearch && p.is_teacher;
-    if (filterRole === "alumni") return matchesSearch && p.is_alumni;
-    if (filterRole === "student") return matchesSearch && p.is_student;
-    return matchesSearch;
-  });
-
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   return (
     <div className="space-y-10">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -286,7 +125,6 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
-<<<<<<< HEAD
               <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               </span>
@@ -313,10 +151,6 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
                  <option key={l.id} value={l.level_code}>{l.level_code}</option>
               ))}
            </select>
-=======
-              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors">🔍</span>
-           </div>
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
            
            <button 
              onClick={() => {
@@ -352,7 +186,6 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
            >
               + Tambah User
            </button>
-<<<<<<< HEAD
             
             <div className="flex gap-2">
                <button onClick={handleExportExcel} className="px-4 py-4 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center justify-center" title="Export Excel">
@@ -362,100 +195,6 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
                   <FileText className="w-4 h-4" />
                </button>
             </div>
-=======
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
-        </div>
-      </div>
-
-      <div className="bg-white rounded-[3rem] shadow-sm border border-black/[0.03] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-slate-50">
-                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Identity</th>
-                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Roles / Stats</th>
-                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Status</th>
-                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 text-right">Settings</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {filtered.map(p => (
-                <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className="px-8 py-6">
-                    <div className="flex items-center gap-5">
-                      <div className="h-14 w-14 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center font-black text-slate-300 relative group-hover:scale-105 transition-transform duration-500 shadow-sm">
-                        {p.avatar_url ? (
-                          <img src={p.avatar_url} className="w-full h-full object-cover" alt="avatar" />
-                        ) : (
-                          p.full_name.charAt(0)
-                        )}
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="font-black text-slate-900 italic uppercase text-sm tracking-tight">{p.full_name}</p>
-                        <p className="text-[10px] font-bold text-slate-400 tracking-tighter font-mono">{p.email}</p>
-                        {p.nip && <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-1">ID: {p.nip}</p>}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <div className="flex flex-wrap gap-2">
-                       {p.is_admin && <span className="px-3 py-1 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-rose-100">Admin</span>}
-                       {p.is_teacher && <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-indigo-100">Guru</span>}
-                       {p.is_student && <span className="px-3 py-1 bg-teal-50 text-teal-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-teal-100">Murid</span>}
-                       {p.is_alumni && <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-slate-200">Alumni</span>}
-                       {p.is_premium && <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-amber-100 italic">Premium</span>}
-                    </div>
-                  </td>
-                  <td className="px-8 py-6">
-                     <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-2 w-fit ${p.profile_completed ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${p.profile_completed ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
-                        {p.profile_completed ? 'Lengkap' : 'Menunggu'}
-                     </span>
-                  </td>
-                  <td className="px-8 py-6">
-                    <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={() => handleViewDetails(p)}
-                        className="h-10 px-5 bg-white border border-slate-200 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm"
-                      >
-                         View Info
-                      </button>
-                      <button 
-                        onClick={() => handleEdit(p)}
-<<<<<<< HEAD
-                        className="h-10 px-4 bg-white border border-slate-200 text-slate-400 rounded-xl flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all shadow-sm font-black text-[9px] uppercase tracking-widest"
-                        title="Edit User"
-                      >
-                         Edit
-                      </button>
-                      {p.is_teacher && (userProfile.is_admin || userProfile.is_super_admin) && (
-                         <button 
-                           onClick={() => handleManageStudents(p)}
-                           className="h-10 px-4 bg-white border border-slate-200 text-indigo-400 rounded-xl flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all shadow-sm font-black text-[9px] uppercase tracking-widest"
-                           title="Kelola Murid"
-                         >
-                            Murid
-                         </button>
-                      )}
-                      <button 
-                        onClick={() => handleDelete(p.id!, p.email)}
-                        className="h-10 px-4 bg-white border border-slate-200 text-rose-300 rounded-xl flex items-center justify-center hover:bg-rose-600 hover:text-white transition-all shadow-sm font-black text-[9px] uppercase tracking-widest"
-                        title="Delete User"
-                      >
-                         Hapus
-=======
-                        className="h-10 w-10 bg-white border border-slate-200 text-slate-400 rounded-xl flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
-                        title="Edit User"
-                      >
-                         ✍️
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(p.id!, p.email)}
-                        className="h-10 w-10 bg-white border border-slate-200 text-rose-300 rounded-xl flex items-center justify-center hover:bg-rose-600 hover:text-white transition-all shadow-sm"
-                        title="Delete User"
-                      >
-                         🗑️
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
                       </button>
                     </div>
                   </td>
@@ -495,11 +234,7 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
                              {editingProfile.avatar_url ? (
                                 <img src={editingProfile.avatar_url} className="w-full h-full object-cover" alt="avatar" />
                              ) : (
-<<<<<<< HEAD
                                 <span className="text-sm">{editingProfile.full_name?.charAt(0) || "U"}</span>
-=======
-                                <span className="text-4xl grayscale opacity-20">👤</span>
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
                              )}
                           </div>
                           <input type="file" id="admin-pfp" className="hidden" accept="image/*" onChange={handleAdminAvatarChange} />
@@ -525,7 +260,6 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
                         </div>
                         <div className="space-y-2">
                            <p className="text-[9px] font-black uppercase text-slate-400 ml-4 tracking-tighter">Batch / Angkatan</p>
-<<<<<<< HEAD
                            <select 
                               className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-600 outline-none transition font-bold shadow-sm"
                               value={editingProfile.batch || ""}
@@ -536,14 +270,6 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
                                  <option key={name} value={name}>{name}</option>
                               ))}
                            </select>
-=======
-                           <input 
-                              className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-600 outline-none transition font-bold shadow-sm"
-                              placeholder="Contoh: Batch 12"
-                              value={editingProfile.batch || ""}
-                              onChange={e => setEditingProfile({...editingProfile, batch: e.target.value})}
-                           />
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
                         </div>
                      </div>
                   </div>
@@ -945,7 +671,6 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
         </div>
       )}
 
-<<<<<<< HEAD
       {/* TEACHER-STUDENT RELATIONSHIP MODAL */}
       {managingTeacherStudents && (
          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
@@ -1033,8 +758,6 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
          </div>
       )}
 
-=======
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
       <style jsx global>{`
         @keyframes shimmer {
           0% { transform: translateX(-100%); }

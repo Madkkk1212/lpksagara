@@ -1,13 +1,8 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-<<<<<<< HEAD
 import { Profile, AppTheme, WeeklyTarget } from "@/lib/types";
 import { getLeaderboard, getUserLastProgressDetails, getStudentWeeklyTargets } from "@/lib/db";
-=======
-import { Profile, AppTheme } from "@/lib/types";
-import { getLeaderboard, getUserLastProgressDetails } from "@/lib/db";
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
 import { supabase } from "@/lib/supabase";
 import AISenseiChat from "./AISenseiChat";
 import { Flame, Trophy, Calendar, Bell, ChevronRight, Zap } from "lucide-react";
@@ -20,57 +15,7 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
   const [isLeaderboardOpen, setLeaderboardOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAnnouncement, setShowAnnouncement] = useState(false);
-<<<<<<< HEAD
   const [weeklyTargets, setWeeklyTargets] = useState<WeeklyTarget[]>([]);
-=======
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
-  
-  const currentExp = user.exp || 0;
-  // Progress formula: assuming levels are 1000 exp each
-  const levelProgress = currentExp % 1000;
-  const progressPercent = Math.min(levelProgress / 10, 100);
-
-  useEffect(() => {
-    async function loadDashboard() {
-      // 1. Fetch active announcements
-      const { data: ann } = await supabase
-        .from('announcements')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      
-      if (ann && ann.length > 0) {
-        setAnnouncements(ann);
-        setShowAnnouncement(true);
-      }
-
-      // 2. Fetch earned achievements
-      const { data: ach } = await supabase
-        .from('user_achievements')
-        .select('achievement_id, achievements(*)')
-        .eq('user_email', user.email);
-      setAchievements(ach || []);
-
-<<<<<<< HEAD
-      // 3. Fetch Leaderboard, Progress & Targets
-      const [lb, lp, wt] = await Promise.all([
-        getLeaderboard(),
-        getUserLastProgressDetails(user.email),
-        getStudentWeeklyTargets(user.id!, user.batch || undefined)
-      ]);
-      setLeaderboard(lb.filter(p => !p.is_admin && !p.is_teacher));
-      setLastProgress(lp);
-      setWeeklyTargets(wt || []);
-=======
-      // 3. Fetch Leaderboard & Progress
-      const [lb, lp] = await Promise.all([
-        getLeaderboard(),
-        getUserLastProgressDetails(user.email)
-      ]);
-      setLeaderboard(lb.filter(p => !p.is_admin && !p.is_teacher));
-      setLastProgress(lp);
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
     }
     loadDashboard();
   }, [user.email]);
@@ -217,7 +162,6 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
              <span className="p-2 bg-white rounded-xl shadow-sm border border-slate-100">📅</span>
              Quest Mingguan
            </h3>
-<<<<<<< HEAD
            <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[3rem] p-8 space-y-4 min-h-[160px] flex flex-col justify-center">
               {weeklyTargets.length === 0 ? (
                  <div className="text-center">
@@ -240,24 +184,6 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
                   )
                 })
               )}
-=======
-           <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[3rem] p-8 space-y-4">
-              {[
-                { label: "Video Materi Bab 1", exp: 50, completed: true },
-                { label: "Quiz Moji-Goi Bab 1", exp: 50, completed: false },
-                { label: "Kaiwa AI 10 Menit", exp: 50, completed: false },
-              ].map((target, idx) => (
-                <div key={idx} className={`p-5 rounded-3xl border flex items-center justify-between transition-all duration-500 ${target.completed ? 'bg-white/20 border-teal-100 opacity-60' : 'bg-white border-white/80 shadow-sm hover:shadow-lg'}`}>
-                   <div className="flex items-center gap-4">
-                      <div className={`h-8 w-8 rounded-full flex items-center justify-center border-2 transition-all ${target.completed ? 'bg-teal-500 border-teal-500 text-white' : 'bg-slate-50 border-slate-100 text-slate-200'}`}>
-                        {target.completed && '✓'}
-                      </div>
-                      <span className={`text-xs font-black ${target.completed ? 'text-slate-400 line-through italic' : 'text-slate-700'}`}>{target.label}</span>
-                   </div>
-                   {!target.completed && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-2 py-1 rounded-md">+{target.exp} XP</span>}
-                </div>
-              ))}
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
            </div>
         </div>
       </div>

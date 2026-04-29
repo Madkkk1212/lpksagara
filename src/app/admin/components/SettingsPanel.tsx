@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-<<<<<<< HEAD
 import { getTheme, updateTheme } from "@/lib/db";
 import { AppTheme } from "@/lib/types";
 
@@ -12,16 +11,10 @@ export default function SettingsPanel() {
   const [saving, setSaving] = useState(false);
 
   const [config] = useState({
-=======
-
-export default function SettingsPanel() {
-  const [config, setConfig] = useState({
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
     url: process.env.NEXT_PUBLIC_SUPABASE_URL,
     key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 10) + "...",
   });
 
-<<<<<<< HEAD
   useEffect(() => {
     loadTheme();
   }, []);
@@ -49,63 +42,6 @@ export default function SettingsPanel() {
     }
   };
 
-=======
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
-  const handleResetLocalStorage = () => {
-    if (confirm("Reset local auth data? You will be logged out of admin.")) {
-      localStorage.removeItem("luma-admin-auth");
-      window.location.reload();
-    }
-  };
-
-<<<<<<< HEAD
-  if (loading) return <div className="p-10 text-slate-400 font-bold">Loading settings...</div>;
-
-  return (
-    <div className="space-y-6 font-sans">
-      {/* Cloudinary Settings */}
-      <section className="bg-white border border-slate-200 rounded-2xl p-6 lg:p-8 shadow-sm">
-        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-6 border-b border-slate-100 pb-4 flex items-center gap-2">
-          ☁️ Cloudinary Configuration
-        </h3>
-        <p className="text-xs text-slate-500 mb-6">
-          Cloudinary is required for uploading large videos (&gt;50MB) and automatic image optimization.
-        </p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-           <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Cloud Name</label>
-              <input 
-                value={theme?.cloudinary_cloud_name || ""} 
-                onChange={e => setTheme(theme ? {...theme, cloudinary_cloud_name: e.target.value} : null)}
-                placeholder="ex: lpk-sagara"
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-bold text-sm focus:outline-none focus:border-indigo-400 transition-all"
-              />
-           </div>
-           <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Upload Preset</label>
-              <input 
-                value={theme?.cloudinary_upload_preset || ""} 
-                onChange={e => setTheme(theme ? {...theme, cloudinary_upload_preset: e.target.value} : null)}
-                placeholder="ex: ml_default"
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 font-bold text-sm focus:outline-none focus:border-indigo-400 transition-all"
-              />
-           </div>
-        </div>
-        
-        <button 
-          onClick={handleSaveCloudinary}
-          disabled={saving}
-          className="px-8 py-3 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg active:scale-95 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save Cloudinary Settings"}
-        </button>
-      </section>
-
-=======
-  return (
-    <div className="space-y-6 font-sans">
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
       <section className="bg-white border border-slate-200 rounded-2xl p-6 lg:p-8 shadow-sm">
         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-6 border-b border-slate-100 pb-4">Supabase Connection Parameters</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

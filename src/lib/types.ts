@@ -34,137 +34,14 @@ export interface AppTheme {
   cloudinary_upload_preset: string | null
   nip_prefix: string | null
   ai_sensei_active: boolean | null
-<<<<<<< HEAD
   show_weekly_reports_to_admin: boolean | null
-=======
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
-  updated_at: string
-}
-
-export interface BannerSlide {
-  id: string
-  image_url: string
-  title: string
-  subtitle: string | null
-  cta_text: string | null
-  badge_text: string | null
-  badge_color: string | null
-  title_color: string | null
-  overlay_color: string | null
-  overlay_opacity: number | null
-  is_active: boolean
-  sort_order: number
-  created_at: string
-  updated_at: string
-}
-
-export interface MaterialCategory {
-  id: string
-  name: string
-  description: string | null
-  badge_color: string | null
-  icon_url: string | null
-  sort_order: number
-  created_at: string
-  updated_at: string
-}
-
-export interface Material {
-  id: string
-  category_id: string
-  slug: string
-  title: string
-  subtitle: string | null
-  japanese_text: string | null
-  indonesian_text: string | null
-  example_sentence: string | null
-  is_locked: boolean
-  icon_url: string | null
-  card_accent_color: string | null
-  tag_color: string | null
-  detail_content: Json | null
-  sort_order: number
-  created_at: string
-  updated_at: string
-}
-
-export interface ExamLevel {
-  id: string
-  level_code: string
-  title: string
-  description: string | null
-  gradient_from: string | null
-  gradient_to: string | null
-  badge_color: string | null
-  icon_url: string | null
-  is_locked: boolean
-  sort_order: number
-  created_at: string
-  updated_at: string
-}
-
-export interface ExamTest {
-  id: string
-  level_id: string
-  category: 'full' | 'mini' | 'skill'
-  title: string
-  duration_minutes: number
-  pass_point: number
-  difficulty: 'Easy' | 'Medium' | 'Hard'
-  is_active: boolean
-  sort_order: number
-  created_at: string
-  updated_at: string
-}
-
-export interface Question {
-  id: string
-  test_id: string
-  question_type: 'multiple_choice' | 'listening' | 'reading' | 'image_based' | 'video_based'
-  question_text: string
-  audio_url?: string | null
-  image_url?: string | null
-  video_url?: string | null
-  option_a: string
-  option_b: string
-  option_c: string
-  option_d: string
-  correct_option: number
-  explanation: string | null
-  sort_order: number
-  created_at: string
-  updated_at: string
-}
-
-export interface Profile {
-  id?: string
-  email: string
-  full_name: string
-<<<<<<< HEAD
-  nickname?: string | null
-=======
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   gender: 'Laki-laki' | 'Perempuan'
   phone: string
   is_admin: boolean
   is_super_admin?: boolean
   is_teacher: boolean
   is_premium: boolean
-<<<<<<< HEAD
   avatar_url?: string | null
-=======
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
-  staff_password?: string | null
-  password?: string | null
-  unlocked_materials: string[] | null
-  unlocked_levels: string[] | null
-  exp: number
-  level: number
-  target_level: string | null
-<<<<<<< HEAD
-=======
-  avatar_url: string | null
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   birth_date?: string | null
   current_streak?: number
   longest_streak?: number
@@ -177,28 +54,7 @@ export interface Profile {
   is_alumni?: boolean
   is_student?: boolean
   batch?: string | null
-<<<<<<< HEAD
   batch_id?: string | null
-=======
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
-  nip?: string | null
-  category_id?: string | null
-  updated_at?: string
-}
-
-<<<<<<< HEAD
-export interface StudentBatch {
-  id: string
-  name: string
-  description: string | null
-  start_date: string | null
-  end_date: string | null
-  created_at: string
-  updated_at: string
-}
-
-=======
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
 export interface ProfileField {
   id: string
   name: string
@@ -285,7 +141,6 @@ export interface AdminMenuConfig {
   created_at: string;
   updated_at: string;
 }
-<<<<<<< HEAD
 
 export interface WeeklyTarget {
   id: string;
@@ -344,5 +199,3 @@ export interface WeeklyReport {
     full_name: string;
   };
 }
-=======
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790

@@ -23,18 +23,12 @@ export default function MenuManager({ onConfigChange }: MenuManagerProps) {
   }, []);
 
   const handleToggle = async (tabId: string, currentState: boolean) => {
-<<<<<<< HEAD
     const config = configs.find(c => c.tab_id === tabId);
     if (!config) return;
 
     setSaving(tabId);
     try {
       await updateAdminMenuConfig({ ...config, is_active: !currentState });
-=======
-    setSaving(tabId);
-    try {
-      await updateAdminMenuConfig({ tab_id: tabId, is_active: !currentState });
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
       setConfigs(prev => prev.map(c => c.tab_id === tabId ? { ...c, is_active: !currentState } : c));
       if (onConfigChange) onConfigChange();
     } catch (err: any) {
@@ -46,18 +40,12 @@ export default function MenuManager({ onConfigChange }: MenuManagerProps) {
 
   const handleRename = async (tabId: string, newLabel: string) => {
     if (!newLabel.trim()) return;
-<<<<<<< HEAD
     const config = configs.find(c => c.tab_id === tabId);
     if (!config) return;
 
     setSaving(tabId);
     try {
       await updateAdminMenuConfig({ ...config, label: newLabel });
-=======
-    setSaving(tabId);
-    try {
-      await updateAdminMenuConfig({ tab_id: tabId, label: newLabel });
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
       setConfigs(prev => prev.map(c => c.tab_id === tabId ? { ...c, label: newLabel } : c));
       if (onConfigChange) onConfigChange();
     } catch (err: any) {
@@ -70,7 +58,6 @@ export default function MenuManager({ onConfigChange }: MenuManagerProps) {
   const adminMenus = configs.filter(c => c.scope === 'admin' || !c.scope);
   const teacherMenus = configs.filter(c => c.scope === 'teacher');
 
-<<<<<<< HEAD
   const coreTabIds = [
     { id: "dashboard", label: "Dashboard", icon: "🚀" },
     { id: "reports", label: "Statistik", icon: "📊" },
@@ -115,108 +102,6 @@ export default function MenuManager({ onConfigChange }: MenuManagerProps) {
     }
   };
 
-=======
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
-  if (loading) {
-    return <div className="flex justify-center p-12 text-slate-400 font-medium">Loading Menu Configuration...</div>;
-  }
-
-  const MenuList = ({ title, items, description }: { title: string, items: AdminMenuConfig[], description: string }) => (
-    <div className="mb-12">
-      <div className="mb-6">
-        <h3 className="text-lg font-bold text-slate-900">{title}</h3>
-        <p className="text-sm text-slate-500">{description}</p>
-      </div>
-      <div className="grid gap-4">
-        {items.map((menu) => (
-          <div 
-            key={menu.id} 
-            className={`p-5 bg-white border rounded-2xl transition-all flex flex-col md:flex-row md:items-center gap-6 ${menu.is_active ? 'border-slate-200' : 'border-slate-100 bg-slate-50/50 opacity-70'}`}
-          >
-            <div className="flex items-center gap-4 flex-1">
-               <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-xl shadow-inner">
-                  {menu.icon || '📌'}
-               </div>
-               <div className="flex-1">
-                  <span className="text-[10px] font-mono text-slate-400 block mb-1">ID: {menu.tab_id}</span>
-                  <input 
-                    type="text" 
-                    defaultValue={menu.label}
-                    onBlur={(e) => {
-                      if (e.target.value !== menu.label) {
-                        handleRename(menu.tab_id, e.target.value);
-                      }
-                    }}
-                    className="w-full bg-transparent border-none p-0 text-sm font-bold text-slate-800 focus:ring-0 focus:outline-none"
-                    placeholder="Menu Label"
-                  />
-               </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-               <div className="flex items-center gap-2 mr-4">
-                  <span className={`text-[10px] font-bold ${menu.is_active ? 'text-emerald-600' : 'text-slate-400'}`}>
-                    {menu.is_active ? 'ACTIVE' : 'INACTIVE'}
-                  </span>
-                  <button 
-                    onClick={() => handleToggle(menu.tab_id, menu.is_active)}
-                    disabled={saving === menu.tab_id}
-                    className={`relative w-11 h-6 rounded-full transition-colors ${menu.is_active ? 'bg-indigo-600' : 'bg-slate-300'} ${saving === menu.tab_id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${menu.is_active ? 'translate-x-5' : 'translate-x-0'}`} />
-                  </button>
-               </div>
-               
-               {saving === menu.tab_id && (
-                 <div className="animate-spin h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full" />
-               )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between mb-10">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Global Workspace Navigation</h2>
-          <p className="text-sm text-slate-500">Configure menus for all staff dashboards.</p>
-        </div>
-        <div className="px-3 py-1 bg-amber-50 text-amber-700 text-[10px] font-bold uppercase tracking-wider rounded-full border border-amber-100">
-           Super Admin Access Only
-        </div>
-      </div>
-
-<<<<<<< HEAD
-      {missingCoreTabs.length > 0 && (
-        <div className="mb-12 bg-indigo-50/50 border border-indigo-100 rounded-[2rem] p-8">
-           <div className="mb-6">
-              <h3 className="text-lg font-bold text-indigo-900">Modul Tersedia (Belum Terdaftar)</h3>
-              <p className="text-xs text-indigo-600 font-medium">Klik daftar untuk mengaktifkan pengaturan menu pada modul ini.</p>
-           </div>
-           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {missingCoreTabs.map(tab => (
-                 <button 
-                   key={tab.id}
-                   disabled={saving === tab.id}
-                   onClick={() => handleCreate(tab.id, tab.label, tab.icon)}
-                   className="flex items-center justify-between p-4 bg-white border border-indigo-100 rounded-xl hover:shadow-lg transition-all group"
-                 >
-                    <div className="flex items-center gap-3">
-                       <span className="text-xl group-hover:scale-125 transition-transform">{tab.icon}</span>
-                       <span className="text-xs font-bold text-slate-700">{tab.label}</span>
-                    </div>
-                    <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md group-hover:bg-indigo-600 group-hover:text-white transition-colors">DAFTARKAN</span>
-                 </button>
-              ))}
-           </div>
-        </div>
-      )}
-
-=======
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
       <MenuList 
         title="Admin Workspace" 
         items={adminMenus} 

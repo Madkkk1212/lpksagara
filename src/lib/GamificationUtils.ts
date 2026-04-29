@@ -104,7 +104,6 @@ export const checkAchievements = async (userEmail: string, criteriaType: string,
     console.error("Error checking achievements:", err);
   }
 };
-<<<<<<< HEAD
 /**
  * Calculates XP distribution for a chapter based on weighted rules.
  * Total XP per chapter is fixed at 1000.
@@ -178,5 +177,3 @@ export const distributeChapterXP = (numMaterials: number, numQuizzes: number): X
         total: materials.reduce((a, b) => a + b, 0) + quizzes.reduce((a, b) => a + b, 0)
     };
 };
-=======
->>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
