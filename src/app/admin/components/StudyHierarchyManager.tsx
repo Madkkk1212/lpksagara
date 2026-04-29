@@ -11,8 +11,11 @@ import {
 } from "@/lib/db";
 import { StudyLevel, StudyChapter, StudyMaterial, IconCategory, IconLibraryItem, MaterialCategory } from "@/lib/types";
 import MediaUploader from "@/app/components/MediaUploader";
+<<<<<<< HEAD
 import { motion, Reorder } from "framer-motion";
 import Link from "next/link";
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
 
 export default function StudyHierarchyManager() {
   const [levels, setLevels] = useState<StudyLevel[]>([]);
@@ -216,7 +219,11 @@ export default function StudyHierarchyManager() {
           <button onClick={() => setFormContent({...formContent, exercises: formContent.exercises.filter((_:any, idx:number) => idx !== i)})} className="absolute top-4 right-4 text-rose-500 font-bold text-xs p-2 bg-rose-50 rounded-lg">✕</button>
           
           <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Pertanyaan</label>
+<<<<<<< HEAD
           <input value={ex.q || ""} onChange={e => {
+=======
+          <input value={ex.q} onChange={e => {
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
             const newEx = [...formContent.exercises];
             newEx[i].q = e.target.value;
             setFormContent({...formContent, exercises: newEx});
@@ -230,7 +237,11 @@ export default function StudyHierarchyManager() {
           }} className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 font-bold mb-4" />
 
           <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Index Jawaban Benar (0, 1, 2, ...)</label>
+<<<<<<< HEAD
           <input type="number" value={ex.answer ?? 0} onChange={e => {
+=======
+          <input type="number" value={ex.answer} onChange={e => {
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
             const newEx = [...formContent.exercises];
             newEx[i].answer = parseInt(e.target.value);
             setFormContent({...formContent, exercises: newEx});
@@ -306,7 +317,11 @@ export default function StudyHierarchyManager() {
             <MediaUploader
               label="File Audio Materi Choukai (MP3/OGG)"
               mediaType="audio"
+<<<<<<< HEAD
               value={formContent.audioUrl || ""}
+=======
+              value={formContent.audioUrl}
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
               onChange={(url) => setFormContent({...formContent, audioUrl: url})}
             />
           </div>
@@ -322,6 +337,7 @@ export default function StudyHierarchyManager() {
     return null;
   };
 
+<<<<<<< HEAD
   // Reordering logic
   const handleReorderCategories = async (newOrder: MaterialCategory[]) => {
     setAppCategories(newOrder);
@@ -363,6 +379,8 @@ export default function StudyHierarchyManager() {
     } catch (e) { console.error(e); }
   };
 
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   if (loading) return <div className="p-10 font-bold text-slate-400">Loading data...</div>;
 
   return (
@@ -372,11 +390,16 @@ export default function StudyHierarchyManager() {
           <div className="mb-6 flex justify-between items-center">
              <div>
                 <h3 className="text-xl font-black italic">0. Select Category First</h3>
+<<<<<<< HEAD
                 <p className="text-slate-400 text-sm font-medium">Pilih jalur sertifikasi untuk melihat level studinya. (Seret untuk atur posisi)</p>
+=======
+                <p className="text-slate-400 text-sm font-medium">Pilih jalur sertifikasi untuk melihat level studinya.</p>
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
              </div>
              <button 
                 onClick={() => setEditingCategory({ name: "Kategori Baru", description: "", badge_color: "#14b8a6", sort_order: appCategories.length + 1 })}
                 className="px-6 py-2 bg-white text-slate-900 rounded-xl font-black text-[10px] tracking-widest uppercase shadow-lg hover:scale-105 transition active:scale-95"
+<<<<<<< HEAD
               >
                 + Add Category
               </button>
@@ -413,6 +436,29 @@ export default function StudyHierarchyManager() {
                     </div>
                  </div>
                   <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-all z-20">
+=======
+             >
+                + Add Category
+             </button>
+          </div>
+         <div className="flex flex-wrap gap-4">
+            {appCategories.map(cat => (
+               <div key={cat.id} className="relative group">
+                 <button 
+                    onClick={() => { setSelectedCategoryFilter(cat.id); setSelectedLevel(null); setChapters([]); setMaterials([]); }}
+                    className={`px-8 py-4 rounded-2xl font-black flex items-center gap-4 cursor-pointer shadow-lg transition-all border border-white/10 ${selectedCategoryFilter === cat.id ? 'bg-teal-500 scale-105 ring-4 ring-teal-500/20' : 'bg-white/5 hover:bg-white/10'}`}
+                 >
+                    {cat.icon_url ? (
+                      <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center p-1.5 shadow-sm">
+                        <img src={cat.icon_url || undefined} alt="icon" className="w-full h-full object-contain" />
+                      </div>
+                    ) : (
+                      <span className="text-xl">🌟</span>
+                    )}
+                    {cat.name}
+                 </button>
+                  <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all z-20">
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
                     <button 
                       onClick={(e) => { e.stopPropagation(); openIconPicker('category', cat); }}
                       className="h-8 w-8 rounded-xl bg-white text-slate-900 border shadow-xl flex items-center justify-center text-xs hover:scale-110 active:scale-95"
@@ -435,9 +481,15 @@ export default function StudyHierarchyManager() {
                       ✕
                     </button>
                   </div>
+<<<<<<< HEAD
                </Reorder.Item>
             ))}
           </Reorder.Group>
+=======
+               </div>
+            ))}
+         </div>
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
       </section>
 
       {/* 1. LEVELS */}
@@ -447,6 +499,7 @@ export default function StudyHierarchyManager() {
               <h3 className="text-xl font-black text-slate-800">1. Select Level in Category</h3>
               <button onClick={() => setEditingLevel({ level_code: "nX", title: "New Level", badge_color: "#14b8a6", sort_order: levels.length + 1, category_id: selectedCategoryFilter })} className="text-[10px] font-black uppercase tracking-widest bg-slate-900 text-white px-4 py-2 rounded-xl">Add Level</button>
            </div>
+<<<<<<< HEAD
            <Reorder.Group 
               axis="x" 
               values={levels.filter(l => l.category_id === selectedCategoryFilter)} 
@@ -466,6 +519,14 @@ export default function StudyHierarchyManager() {
                    <div 
                       onClick={() => handleSelectLevel(lvl)}
                       className={`px-8 py-4 flex flex-col items-center gap-2 rounded-2xl font-black transition-all ${selectedLevel?.id === lvl.id ? 'bg-slate-900 text-white shadow-xl' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+=======
+           <div className="flex gap-4 overflow-x-auto pb-4">
+              {levels.filter(l => l.category_id === selectedCategoryFilter).map(lvl => (
+                 <div key={lvl.id} className="relative group">
+                   <button 
+                      onClick={() => handleSelectLevel(lvl)}
+                      className={`px-8 py-4 flex flex-col items-center gap-2 rounded-2xl font-black transition-all ${selectedLevel?.id === lvl.id ? 'bg-slate-900 text-white shadow-xl scale-105' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
                    >
                       {lvl.icon_url && (
                         <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center p-1.5 shadow-sm">
@@ -474,17 +535,29 @@ export default function StudyHierarchyManager() {
                       )}
                       <span className="text-sm">{lvl.level_code.toUpperCase()}</span>
                       <span className="text-[10px] font-medium opacity-50">{lvl.title}</span>
+<<<<<<< HEAD
                    </div>
+=======
+                   </button>
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
                    <div className="absolute -top-3 -right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition z-10">
                       <button onClick={() => setEditingLevel(lvl)} className="p-1.5 bg-slate-100 rounded-lg text-[10px] shadow-sm hover:scale-110 transition">✎</button>
                       <button onClick={() => handleDeleteLevel(lvl.id)} className="p-1.5 bg-rose-500 text-white rounded-lg text-[10px] shadow-sm hover:scale-110 transition">✕</button>
                    </div>
+<<<<<<< HEAD
                  </Reorder.Item>
+=======
+                 </div>
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
               ))}
               {levels.filter(l => l.category_id === selectedCategoryFilter).length === 0 && (
                 <div className="text-slate-400 font-bold italic py-4">Belum ada Level di kategori ini.</div>
               )}
+<<<<<<< HEAD
            </Reorder.Group>
+=======
+           </div>
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
         </section>
       )}
 
@@ -495,6 +568,7 @@ export default function StudyHierarchyManager() {
              <h3 className="text-xl font-black text-slate-800">2. Chapters in {selectedLevel.level_code.toUpperCase()}</h3>
              <button onClick={() => setEditingChapter({ title: "New Bab", is_locked: false, sort_order: chapters.length + 1 })} className="text-[10px] font-black uppercase tracking-widest bg-slate-900 text-white px-4 py-2 rounded-xl">Add Chapter</button>
            </div>
+<<<<<<< HEAD
            <Reorder.Group 
               axis="x" 
               values={chapters} 
@@ -508,6 +582,12 @@ export default function StudyHierarchyManager() {
                     className="relative group cursor-grab active:cursor-grabbing"
                  >
                    <div 
+=======
+           <div className="flex flex-wrap gap-3">
+              {chapters.map(chap => (
+                 <div key={chap.id} className="relative group">
+                   <button 
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
                       onClick={() => handleSelectChapter(chap)}
                       className={`px-5 py-3 flex items-center gap-3 rounded-xl text-sm font-bold transition-all ${selectedChapter?.id === chap.id ? 'bg-teal-500 text-white shadow-lg' : 'bg-white ring-1 ring-slate-200 text-slate-600 hover:ring-teal-500'}`}
                    >
@@ -518,15 +598,26 @@ export default function StudyHierarchyManager() {
                       )}
                       {chap.is_locked && <span className="text-xs">🔒</span>}
                       {chap.title}
+<<<<<<< HEAD
                    </div>
+=======
+                   </button>
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
                    <div className="absolute -top-3 -right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition z-10">
                       <button onClick={() => setEditingChapter(chap)} className="p-1.5 bg-slate-100 shadow-sm ring-1 ring-black/5 rounded-lg text-[10px]">✎</button>
                       <button onClick={() => handleDeleteChapter(chap.id)} className="p-1.5 bg-rose-500 shadow-sm text-white rounded-lg text-[10px]">✕</button>
                    </div>
+<<<<<<< HEAD
                  </Reorder.Item>
               ))}
               {chapters.length === 0 && <p className="text-slate-400 font-medium text-sm">No chapters found.</p>}
            </Reorder.Group>
+=======
+                 </div>
+              ))}
+              {chapters.length === 0 && <p className="text-slate-400 font-medium text-sm">No chapters found.</p>}
+           </div>
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
         </section>
       )}
 
@@ -542,6 +633,7 @@ export default function StudyHierarchyManager() {
                  Add Material
               </button>
            </div>
+<<<<<<< HEAD
            <Reorder.Group 
               axis="y" 
               values={materials} 
@@ -554,6 +646,11 @@ export default function StudyHierarchyManager() {
                   value={mat}
                   className="p-6 bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 relative group flex items-center justify-between cursor-grab active:cursor-grabbing"
                 >
+=======
+           <div className="grid md:grid-cols-2 gap-4">
+              {materials.map(mat => (
+                <div key={mat.id} className="p-6 bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 relative group flex items-center justify-between">
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
                    <div className="flex items-center gap-4">
                       {mat.icon_url && (
                         <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center p-1.5 shadow-sm">
@@ -571,10 +668,17 @@ export default function StudyHierarchyManager() {
                        </button>
                        <button onClick={() => handleDeleteMaterial(mat.id)} className="px-3 py-2 bg-rose-50 text-rose-500 rounded-lg text-xs font-bold hover:bg-rose-100">✕</button>
                    </div>
+<<<<<<< HEAD
                 </Reorder.Item>
               ))}
               {materials.length === 0 && <p className="text-slate-400 text-sm font-medium">No materials in this chapter.</p>}
            </Reorder.Group>
+=======
+                </div>
+              ))}
+              {materials.length === 0 && <p className="text-slate-400 text-sm font-medium">No materials in this chapter.</p>}
+           </div>
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
         </section>
       )}
 
@@ -757,13 +861,21 @@ export default function StudyHierarchyManager() {
                         <MediaUploader
                           label="Video Materi (MP4/WebM)"
                           mediaType="video"
+<<<<<<< HEAD
                           value={editingMaterial.video_url || ""}
+=======
+                          value={editingMaterial.video_url}
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
                           onChange={(url) => setEditingMaterial({...editingMaterial, video_url: url})}
                         />
                         <MediaUploader
                           label="Gambar Pendukung"
                           mediaType="image"
+<<<<<<< HEAD
                           value={editingMaterial.image_url || ""}
+=======
+                          value={editingMaterial.image_url}
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
                           onChange={(url) => setEditingMaterial({...editingMaterial, image_url: url})}
                         />
                      </div>

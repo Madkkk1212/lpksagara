@@ -23,12 +23,18 @@ export default function MenuManager({ onConfigChange }: MenuManagerProps) {
   }, []);
 
   const handleToggle = async (tabId: string, currentState: boolean) => {
+<<<<<<< HEAD
     const config = configs.find(c => c.tab_id === tabId);
     if (!config) return;
 
     setSaving(tabId);
     try {
       await updateAdminMenuConfig({ ...config, is_active: !currentState });
+=======
+    setSaving(tabId);
+    try {
+      await updateAdminMenuConfig({ tab_id: tabId, is_active: !currentState });
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
       setConfigs(prev => prev.map(c => c.tab_id === tabId ? { ...c, is_active: !currentState } : c));
       if (onConfigChange) onConfigChange();
     } catch (err: any) {
@@ -40,12 +46,18 @@ export default function MenuManager({ onConfigChange }: MenuManagerProps) {
 
   const handleRename = async (tabId: string, newLabel: string) => {
     if (!newLabel.trim()) return;
+<<<<<<< HEAD
     const config = configs.find(c => c.tab_id === tabId);
     if (!config) return;
 
     setSaving(tabId);
     try {
       await updateAdminMenuConfig({ ...config, label: newLabel });
+=======
+    setSaving(tabId);
+    try {
+      await updateAdminMenuConfig({ tab_id: tabId, label: newLabel });
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
       setConfigs(prev => prev.map(c => c.tab_id === tabId ? { ...c, label: newLabel } : c));
       if (onConfigChange) onConfigChange();
     } catch (err: any) {
@@ -58,6 +70,7 @@ export default function MenuManager({ onConfigChange }: MenuManagerProps) {
   const adminMenus = configs.filter(c => c.scope === 'admin' || !c.scope);
   const teacherMenus = configs.filter(c => c.scope === 'teacher');
 
+<<<<<<< HEAD
   const coreTabIds = [
     { id: "dashboard", label: "Dashboard", icon: "🚀" },
     { id: "reports", label: "Statistik", icon: "📊" },
@@ -102,6 +115,8 @@ export default function MenuManager({ onConfigChange }: MenuManagerProps) {
     }
   };
 
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   if (loading) {
     return <div className="flex justify-center p-12 text-slate-400 font-medium">Loading Menu Configuration...</div>;
   }
@@ -174,6 +189,7 @@ export default function MenuManager({ onConfigChange }: MenuManagerProps) {
         </div>
       </div>
 
+<<<<<<< HEAD
       {missingCoreTabs.length > 0 && (
         <div className="mb-12 bg-indigo-50/50 border border-indigo-100 rounded-[2rem] p-8">
            <div className="mb-6">
@@ -199,6 +215,8 @@ export default function MenuManager({ onConfigChange }: MenuManagerProps) {
         </div>
       )}
 
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
       <MenuList 
         title="Admin Workspace" 
         items={adminMenus} 

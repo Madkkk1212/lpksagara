@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+<<<<<<< HEAD
 import { getTheme, updateTheme } from "@/lib/db";
 import { AppTheme } from "@/lib/types";
 
@@ -11,10 +12,16 @@ export default function SettingsPanel() {
   const [saving, setSaving] = useState(false);
 
   const [config] = useState({
+=======
+
+export default function SettingsPanel() {
+  const [config, setConfig] = useState({
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
     url: process.env.NEXT_PUBLIC_SUPABASE_URL,
     key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 10) + "...",
   });
 
+<<<<<<< HEAD
   useEffect(() => {
     loadTheme();
   }, []);
@@ -42,6 +49,8 @@ export default function SettingsPanel() {
     }
   };
 
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   const handleResetLocalStorage = () => {
     if (confirm("Reset local auth data? You will be logged out of admin.")) {
       localStorage.removeItem("luma-admin-auth");
@@ -49,6 +58,7 @@ export default function SettingsPanel() {
     }
   };
 
+<<<<<<< HEAD
   if (loading) return <div className="p-10 text-slate-400 font-bold">Loading settings...</div>;
 
   return (
@@ -92,6 +102,10 @@ export default function SettingsPanel() {
         </button>
       </section>
 
+=======
+  return (
+    <div className="space-y-6 font-sans">
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
       <section className="bg-white border border-slate-200 rounded-2xl p-6 lg:p-8 shadow-sm">
         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-6 border-b border-slate-100 pb-4">Supabase Connection Parameters</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

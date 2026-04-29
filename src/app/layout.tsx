@@ -36,7 +36,11 @@ export async function generateMetadata() {
       apple: favicon,
       shortcut: favicon,
     } : {
+<<<<<<< HEAD
       icon: "/file.svg",
+=======
+      icon: "/favicon.ico",
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
     },
   };
 }

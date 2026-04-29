@@ -1,10 +1,14 @@
 import { supabase } from './supabase'
+<<<<<<< HEAD
 import { 
   AppTheme, BannerSlide, MaterialCategory, Material, ExamLevel, ExamTest, 
   Question, Profile, StudyLevel, StudyChapter, StudyMaterial, AdminMenuConfig, 
   ProfileField, ProfileValue, IconCategory, IconLibraryItem, StudentBatch,
   WeeklyTarget, WeeklyReport 
 } from './types'
+=======
+import { AppTheme, BannerSlide, MaterialCategory, Material, ExamLevel, ExamTest, Question, Profile, StudyLevel, StudyChapter, StudyMaterial, AdminMenuConfig, ProfileField, ProfileValue } from './types'
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
 
 // Theme
 export async function getTheme(): Promise<AppTheme | null> {
@@ -152,7 +156,11 @@ export async function deleteQuestion(id: string) {
 export async function getProfiles(): Promise<Profile[]> {
   const { data, error } = await supabase
     .from('profiles')
+<<<<<<< HEAD
     .select('id, email, full_name, nickname, phone, nip, batch, is_admin, is_teacher, is_student, is_alumni, is_premium, profile_completed, created_at, password, avatar_url, level, exp, target_level, unlocked_levels, unlocked_materials, institution, address, gender, birth_date, certificate_url')
+=======
+    .select('id, email, full_name, phone, nip, batch, is_admin, is_teacher, is_student, is_alumni, is_premium, profile_completed, created_at, password, avatar_url')
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
     .order('created_at', { ascending: false })
   if (error) return []
   return data as Profile[]
@@ -221,12 +229,15 @@ export async function getStudyChapters(levelId: string): Promise<StudyChapter[]>
   return data
 }
 
+<<<<<<< HEAD
 export async function getAllStudyChapters(): Promise<StudyChapter[]> {
   const { data, error } = await supabase.from('study_chapters').select('*').order('sort_order', { ascending: true })
   if (error) return []
   return data as StudyChapter[]
 }
 
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
 export async function upsertStudyChapter(chapter: Partial<StudyChapter>) {
   const { data, error } = await supabase.from('study_chapters').upsert(chapter).select()
   if (error) throw error
@@ -264,6 +275,10 @@ export async function deleteStudyMaterial(id: string) {
 // ==========================================
 // ICON GALLERY MANAGER
 // ==========================================
+<<<<<<< HEAD
+=======
+import { IconCategory, IconLibraryItem } from './types';
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
 
 export async function getIconCategories(): Promise<IconCategory[]> {
   const { data, error } = await supabase.from('icon_categories').select('*').order('created_at', { ascending: true })
@@ -366,6 +381,7 @@ export async function getAdminMenuConfig(scope?: 'admin' | 'teacher'): Promise<A
 }
 
 export async function updateAdminMenuConfig(config: Partial<AdminMenuConfig>) {
+<<<<<<< HEAD
   // Try to find if it exists first since tab_id might not have a unique constraint
   const { data: existing } = await supabase
     .from('admin_menu_config')
@@ -389,6 +405,15 @@ export async function updateAdminMenuConfig(config: Partial<AdminMenuConfig>) {
     if (error) throw error;
     return data;
   }
+=======
+  const { data, error } = await supabase
+    .from('admin_menu_config')
+    .update(config)
+    .eq('tab_id', config.tab_id)
+    .select();
+  if (error) throw error;
+  return data;
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
 }
 
 // ==========================================
@@ -396,7 +421,11 @@ export async function updateAdminMenuConfig(config: Partial<AdminMenuConfig>) {
 // ==========================================
 
 export async function getProfileFields(role: string = 'all'): Promise<ProfileField[]> {
+<<<<<<< HEAD
   const query = supabase
+=======
+  let query = supabase
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
     .from('user_profile_fields')
     .select('*')
     .or(`target_role.eq.all,target_role.eq.${role}`);
@@ -428,6 +457,7 @@ export async function upsertProfileValue(profileValue: Partial<ProfileValue>) {
   if (error) throw error
   return data
 }
+<<<<<<< HEAD
 
 // ==========================================
 // STUDENT BATCHES
@@ -575,3 +605,5 @@ export async function deleteWeeklyReport(id: string) {
   const { error } = await supabase.from('weekly_reports').delete().eq('id', id);
   if (error) throw error;
 }
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790

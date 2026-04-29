@@ -3,8 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+<<<<<<< HEAD
     "dev": "next dev --webpack",
     "build": "next build --webpack",
+=======
+    "dev": "next dev",
+    "build": "next build",
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
     "start": "next start",
     "lint": "eslint"
   },

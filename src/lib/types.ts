@@ -34,7 +34,10 @@ export interface AppTheme {
   cloudinary_upload_preset: string | null
   nip_prefix: string | null
   ai_sensei_active: boolean | null
+<<<<<<< HEAD
   show_weekly_reports_to_admin: boolean | null
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   updated_at: string
 }
 
@@ -137,14 +140,20 @@ export interface Profile {
   id?: string
   email: string
   full_name: string
+<<<<<<< HEAD
   nickname?: string | null
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   gender: 'Laki-laki' | 'Perempuan'
   phone: string
   is_admin: boolean
   is_super_admin?: boolean
   is_teacher: boolean
   is_premium: boolean
+<<<<<<< HEAD
   avatar_url?: string | null
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   staff_password?: string | null
   password?: string | null
   unlocked_materials: string[] | null
@@ -152,6 +161,10 @@ export interface Profile {
   exp: number
   level: number
   target_level: string | null
+<<<<<<< HEAD
+=======
+  avatar_url: string | null
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   birth_date?: string | null
   current_streak?: number
   longest_streak?: number
@@ -164,12 +177,16 @@ export interface Profile {
   is_alumni?: boolean
   is_student?: boolean
   batch?: string | null
+<<<<<<< HEAD
   batch_id?: string | null
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   nip?: string | null
   category_id?: string | null
   updated_at?: string
 }
 
+<<<<<<< HEAD
 export interface StudentBatch {
   id: string
   name: string
@@ -180,6 +197,8 @@ export interface StudentBatch {
   updated_at: string
 }
 
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
 export interface ProfileField {
   id: string
   name: string
@@ -266,6 +285,7 @@ export interface AdminMenuConfig {
   created_at: string;
   updated_at: string;
 }
+<<<<<<< HEAD
 
 export interface WeeklyTarget {
   id: string;
@@ -324,3 +344,5 @@ export interface WeeklyReport {
     full_name: string;
   };
 }
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790

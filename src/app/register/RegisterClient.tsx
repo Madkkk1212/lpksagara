@@ -1,10 +1,18 @@
 "use client";
 
+<<<<<<< HEAD
 import { useState, useEffect } from "react";
+=======
+import { useState } from "react";
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { upsertProfile, getProfileByEmail, getTheme } from "@/lib/db";
 import { AppTheme } from "@/lib/types";
+<<<<<<< HEAD
+=======
+import { useEffect } from "react";
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
 
 export default function RegisterClient() {
   const router = useRouter();
@@ -13,7 +21,10 @@ export default function RegisterClient() {
 
   const [formData, setFormData] = useState({
     full_name: "",
+<<<<<<< HEAD
     nickname: "",
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
     email: "",
     gender: "Laki-laki" as "Laki-laki" | "Perempuan",
     phone: "",
@@ -89,6 +100,7 @@ export default function RegisterClient() {
               />
             </div>
             <div className="rounded-2xl bg-slate-50 px-5 py-4 ring-1 ring-slate-100 focus-within:ring-teal-500 transition-all">
+<<<<<<< HEAD
               <p className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Nama Panggilan</p>
               <input 
                 type="text" 
@@ -103,6 +115,8 @@ export default function RegisterClient() {
 
           <div className="grid gap-5 md:grid-cols-2">
             <div className="rounded-2xl bg-slate-50 px-5 py-4 ring-1 ring-slate-100 focus-within:ring-teal-500 transition-all">
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
               <p className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Alamat Email</p>
               <input 
                 type="email" 
@@ -113,6 +127,23 @@ export default function RegisterClient() {
                 required
               />
             </div>
+<<<<<<< HEAD
+=======
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <div className="rounded-2xl bg-slate-50 px-5 py-4 ring-1 ring-slate-100 focus-within:ring-teal-500 transition-all">
+              <p className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Jenis Kelamin</p>
+              <select 
+                value={formData.gender}
+                onChange={(e) => setFormData({...formData, gender: e.target.value as any})}
+                className="w-full bg-transparent font-bold text-slate-800 outline-none appearance-none cursor-pointer"
+              >
+                <option value="Laki-laki">Laki-laki</option>
+                <option value="Perempuan">Perempuan</option>
+              </select>
+            </div>
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
             <div className="rounded-2xl bg-slate-50 px-5 py-4 ring-1 ring-slate-100 focus-within:ring-teal-500 transition-all">
               <p className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Nomor HP / WhatsApp</p>
               <input 
@@ -126,6 +157,7 @@ export default function RegisterClient() {
             </div>
           </div>
 
+<<<<<<< HEAD
           <div className="rounded-2xl bg-slate-50 px-5 py-4 ring-1 ring-slate-100 focus-within:ring-teal-500 transition-all">
             <p className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Jenis Kelamin</p>
             <select 
@@ -138,6 +170,8 @@ export default function RegisterClient() {
             </select>
           </div>
 
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
           {errorMsg && (
             <div className="p-4 rounded-xl bg-rose-50 text-rose-500 text-xs font-bold ring-1 ring-rose-100 italic">
               {errorMsg}

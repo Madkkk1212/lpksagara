@@ -13,8 +13,11 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
   const [loading, setLoading] = useState(false);
   const [fields, setFields] = useState<ProfileField[]>([]);
   const [formData, setFormData] = useState({
+<<<<<<< HEAD
     nickname: user.nickname || "",
     gender: user.gender || "Laki-laki" as "Laki-laki" | "Perempuan",
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
     birth_date: user.birth_date || "",
     address: user.address || "",
     institution: user.institution || "",
@@ -90,12 +93,15 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
     if (!avatarPreview) {
       missing.push({ name: "Foto Profil", id: "pfp-container" });
     }
+<<<<<<< HEAD
     if (!formData.nickname) {
       missing.push({ name: "Nama Panggilan", id: "input-nickname" });
     }
     if (!formData.gender) {
       missing.push({ name: "Jenis Kelamin", id: "input-gender" });
     }
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
     if (!formData.birth_date) {
       missing.push({ name: "Tanggal Lahir", id: "input-birth-date" });
     }
@@ -137,7 +143,11 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
       for (const [fieldId, value] of Object.entries(dynamicValues)) {
         if (value) {
           await upsertProfileValue({
+<<<<<<< HEAD
             user_id: user.id!,
+=======
+            user_id: user.id,
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
             field_id: fieldId,
             value: value
           });
@@ -216,6 +226,10 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                     </div>
                     <div className="text-center space-y-1">
                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-800">Klik ikon kamera untuk unggah foto</p>
+<<<<<<< HEAD
+=======
+                      
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
                     </div>
                  </div>
                  {/* Section 1: Data Identitas Dasar & Data Utama */}
@@ -226,6 +240,7 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                     </div>
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-50/50 p-8 rounded-[2.5rem] border border-slate-100">
                        <div className="space-y-2 group">
+<<<<<<< HEAD
                           <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4 group-focus-within:text-indigo-600 transition-colors">Nama Panggilan <span className="text-rose-500">(Wajib)</span></label>
                           <input id="input-nickname" type="text" placeholder="Panggilan Anda" 
                             value={formData.nickname} 
@@ -245,6 +260,8 @@ function ProfileOnboarding({ user, onComplete }: { user: Profile; onComplete: (f
                           </select>
                        </div>
                        <div className="space-y-2 group">
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
                           <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4 group-focus-within:text-indigo-600 transition-colors">Tanggal Lahir <span className="text-rose-500">(Wajib)</span></label>
                           <input id="input-birth-date" type="date" 
                             value={formData.birth_date} 

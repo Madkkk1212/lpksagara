@@ -3,7 +3,11 @@ import { Profile, ProfileField, ProfileValue } from "@/lib/types";
 import { upsertProfile, getProfileFields, getProfileValuesByUserId, upsertProfileValue } from "@/lib/db";
 import { motion, AnimatePresence } from "framer-motion";
 
+<<<<<<< HEAD
 export default function ProfileView({ user, onRefreshUser }: { user: Profile, onRefreshUser?: () => void }) {
+=======
+export default function ProfileView({ user }: { user: Profile }) {
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   const [isChangingPass, setIsChangingPass] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -17,6 +21,7 @@ export default function ProfileView({ user, onRefreshUser }: { user: Profile, on
   const [uploadingFieldId, setUploadingFieldId] = useState<string | null>(null);
   const [localValues, setLocalValues] = useState<Record<string, string>>({});
 
+<<<<<<< HEAD
   const [coreData, setCoreData] = useState({
     full_name: user.full_name || "",
     nickname: user.nickname || "",
@@ -59,6 +64,8 @@ export default function ProfileView({ user, onRefreshUser }: { user: Profile, on
     }
   };
 
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   const fetchData = async () => {
     try {
       if (!user.id) return;
@@ -309,6 +316,7 @@ export default function ProfileView({ user, onRefreshUser }: { user: Profile, on
             </button>
 
             {activeSubView === "identitas" && (
+<<<<<<< HEAD
               <section className="space-y-8">
                 <div className="text-center mb-4 pt-4">
                   <div className="h-16 w-16 bg-indigo-600 text-white rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-xl shadow-indigo-100">🆔</div>
@@ -470,6 +478,72 @@ export default function ProfileView({ user, onRefreshUser }: { user: Profile, on
                     </div>
                   </div>
                 )}
+=======
+              <section className="space-y-6">
+                <div className="text-center mb-8 pt-4">
+                  <div className="h-16 w-16 bg-indigo-600 text-white rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-xl shadow-indigo-100">🆔</div>
+                  <h4 className="text-2xl font-black text-slate-800 italic uppercase">Identitas Diri</h4>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Status data kependudukan terverifikasi</p>
+                </div>
+                
+                <div className="bg-white rounded-[3rem] border border-slate-100 p-10 shadow-sm">
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                      {[
+                        { label: "Tanggal Lahir", value: user.birth_date, icon: "📅" },
+                        { label: "Institusi", value: user.institution, icon: "🏢" },
+                        { label: "Alamat KTP", value: user.address, icon: "📍" },
+                      ].map((item, idx) => (
+                        <div key={idx} className="space-y-2">
+                           <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 ml-2">{item.label}</label>
+                           <div className="bg-slate-50 border border-slate-100 rounded-[1.5rem] p-5 flex items-center gap-4 group">
+                              <span className="text-2xl group-hover:scale-110 transition-transform">{item.icon}</span>
+                              <span className="text-sm font-bold text-slate-700 truncate">{item.value || 'Belum diisi'}</span>
+                           </div>
+                        </div>
+                      ))}
+
+                      {/* Dynamic Text/Number Fields moved here */}
+                      {fields.filter(f => f.type !== 'file').sort((a,b) => (a.sort_order||0)-(b.sort_order||0)).map((field) => {
+                         const val = values.find(v => v.field_id === field.id)?.value;
+                         const isUploading = uploadingFieldId === field.id;
+                         const localVal = localValues[field.id] || "";
+
+                         return (
+                           <div key={field.id} className="space-y-2">
+                              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 ml-2">
+                                {field.name} {field.is_required && <span className="text-rose-500">*</span>}
+                              </label>
+                              <div className="relative group">
+                                <div className="flex bg-slate-50 rounded-[1.5rem] border border-slate-100 p-2 focus-within:bg-white focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-50 transition-all">
+                                  <input 
+                                    type={field.type === 'number' ? 'number' : 'text'}
+                                    className="flex-1 bg-transparent px-4 py-3 outline-none font-bold text-slate-800 text-sm placeholder:text-slate-300"
+                                    placeholder={`Masukkan ${field.name.toLowerCase()}...`}
+                                    value={localVal}
+                                    onChange={(e) => setLocalValues({ ...localValues, [field.id]: e.target.value })}
+                                  />
+                                  <button 
+                                    onClick={() => handleFieldUpdate(field.id, localVal)}
+                                    disabled={isUploading || localVal === val}
+                                    className={`px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${
+                                      localVal === val 
+                                        ? 'hidden' 
+                                        : 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 hover:bg-slate-900 active:scale-95 animate-in slide-in-from-right-2'
+                                    }`}
+                                  >
+                                    {isUploading ? '...' : 'SIMPAN'}
+                                  </button>
+                                </div>
+                                {val && localVal === val && (
+                                  <div className="absolute -right-2 -top-2 h-6 w-6 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[10px] shadow-lg border-2 border-white animate-in zoom-in-50">✓</div>
+                                )}
+                              </div>
+                           </div>
+                         );
+                      })}
+                   </div>
+                </div>
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
               </section>
             )}
 

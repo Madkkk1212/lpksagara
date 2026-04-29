@@ -8,12 +8,16 @@ import ExamManager from "./components/ExamManager";
 import ThemeManager from "./components/ThemeManager";
 import SettingsPanel from "./components/SettingsPanel";
 import UserManager from "./components/UserManager";
+<<<<<<< HEAD
 import TeacherAssignmentManager from "./components/TeacherAssignmentManager";
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
 import IconManager from "./components/IconManager";
 import ProposalManager from "./components/ProposalManager";
 import ReportManager from "./components/ReportManager";
 import BulkImporter from "./components/BulkImporter";
 import AnnouncementManager from "./components/AnnouncementManager";
+<<<<<<< HEAD
 import WeeklyReportAdmin from "./components/WeeklyReportAdmin";
 import MenuManager from "./components/MenuManager";
 import ProfileFieldManager from "./components/ProfileFieldManager";
@@ -26,6 +30,15 @@ import { getAdminMenuConfig, getProfiles, getStudyLevels } from "@/lib/db";
 import { Profile, StudyLevel } from "@/lib/types";
 
 type AdminTab = "dashboard" | "reports" | "weekly-reports" | "announcements" | "bulk-import" | "theme" | "banners" | "icons" | "materials" | "exams" | "settings" | "users" | "proposals" | "menu-manager" | "profile-config" | "batches" | "teachers" | "assessment-templates" | "all-students-assessment" | "material-recap";
+=======
+import MenuManager from "./components/MenuManager";
+import ProfileFieldManager from "./components/ProfileFieldManager";
+import { supabase } from "@/lib/supabase";
+import { getAdminMenuConfig } from "@/lib/db";
+import { Profile } from "@/lib/types";
+
+type AdminTab = "dashboard" | "reports" | "announcements" | "bulk-import" | "theme" | "banners" | "icons" | "materials" | "exams" | "settings" | "users" | "proposals" | "menu-manager" | "profile-config";
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
 
 export default function AdminClient() {
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
@@ -35,9 +48,12 @@ export default function AdminClient() {
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [numDynamicTabs, setNumDynamicTabs] = useState<number>(-1); // -1 means not loaded
   const [dynamicTabs, setDynamicTabs] = useState<{ id: AdminTab; label: string; icon: string }[]>([]);
+<<<<<<< HEAD
   const [students, setStudents] = useState<Profile[]>([]);
   const [studyLevels, setStudyLevels] = useState<StudyLevel[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(false);
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
 
   const fetchMenuConfig = async () => {
     try {
@@ -59,6 +75,7 @@ export default function AdminClient() {
 
   useEffect(() => {
     fetchMenuConfig();
+<<<<<<< HEAD
     fetchAllData();
   }, []);
 
@@ -78,6 +95,10 @@ export default function AdminClient() {
     }
   };
 
+=======
+  }, []);
+
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   useEffect(() => {
     const authStatus = localStorage.getItem("luma-auth");
     const rawProfile = localStorage.getItem("luma-user-profile");
@@ -131,6 +152,7 @@ export default function AdminClient() {
   // Fallback to hardcoded list ONLY if database is empty or hasn't loaded
   // Fallback to hardcoded list ONLY if database is empty or hasn't loaded
   const rawBaseTabs = numDynamicTabs > 0 ? dynamicTabs : [
+<<<<<<< HEAD
     { id: "dashboard", label: "Dashboard", icon: "D", is_active: true },
     { id: "reports", label: "Statistik & Analisa", icon: "📊", is_active: true },
     { id: "weekly-reports", label: "Laporan Mingguan", icon: "📋", is_active: true },
@@ -147,11 +169,28 @@ export default function AdminClient() {
     { id: "teachers", label: "Kelola Guru", icon: "G", is_active: true },
     { id: "proposals", label: "Usulan Guru", icon: "P", is_active: true },
     { id: "assessment-templates", label: "Template Penilaian", icon: "📝", is_active: false },
+=======
+    { id: "dashboard", label: "Dashboard", icon: "📊", is_active: true },
+    { id: "reports", label: "Laporan", icon: "📈", is_active: true },
+    { id: "announcements", label: "Pengumuman", icon: "📢", is_active: true },
+    { id: "bulk-import", label: "Bulk Import", icon: "🚀", is_active: true },
+    { id: "icons", label: "Icons Gallery", icon: "✨", is_active: true },
+    { id: "theme", label: "Theme", icon: "🎨", is_active: true },
+    { id: "banners", label: "Banners", icon: "🖼️", is_active: true },
+    { id: "materials", label: "Materials", icon: "📚", is_active: true },
+    { id: "exams", label: "Exams", icon: "🎯", is_active: true },
+    { id: "users", label: "Users", icon: "👥", is_active: true },
+    { id: "proposals", label: "Usulan Guru", icon: "📝", is_active: true },
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
     { id: "settings", label: "Settings", icon: "⚙️", is_active: true },
   ];
 
   // Filter out inactive tabs ONLY if NOT a super admin
+<<<<<<< HEAD
   const baseTabs = userProfile?.is_super_admin 
+=======
+  let baseTabs = userProfile?.is_super_admin 
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
     ? [...rawBaseTabs] 
     : rawBaseTabs.filter(t => (t as any).is_active !== false);
 
@@ -170,6 +209,7 @@ export default function AdminClient() {
     uniqueTabs.push({ id: "menu-manager", label: "Menu Manager", icon: "🔧" });
   }
 
+<<<<<<< HEAD
   // Ensure 'teachers' is always present
 
 
@@ -201,6 +241,8 @@ export default function AdminClient() {
     uniqueTabs.splice(insertAt, 0, { id: "material-recap", label: "Rekapan Materi", icon: "📋", is_active: true } as any);
   }
 
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
   const tabs = uniqueTabs;
 
   return (
@@ -307,7 +349,10 @@ export default function AdminClient() {
            <section className="bg-white border border-slate-200 rounded-2xl p-6 lg:p-8 shadow-sm relative text-slate-800">
                { activeTab === "dashboard" && <AdminDashboard /> }
                { activeTab === "reports" && <ReportManager /> }
+<<<<<<< HEAD
                { activeTab === "weekly-reports" && <WeeklyReportAdmin /> }
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
                { activeTab === "announcements" && <AnnouncementManager /> }
                { activeTab === "bulk-import" && <BulkImporter /> }
                { activeTab === "icons" && <IconManager /> }
@@ -316,15 +361,21 @@ export default function AdminClient() {
                { activeTab === "materials" && <StudyHierarchyManager /> }
                { activeTab === "exams" && <ExamManager /> }
                { activeTab === "users" && <UserManager user={userProfile!} /> }
+<<<<<<< HEAD
                { activeTab === "batches" && <BatchManager user={userProfile!} /> }
                { activeTab === "teachers" && <TeacherAssignmentManager user={userProfile!} /> }
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
                {activeTab === "settings" && <SettingsPanel />}
                {activeTab === "proposals" && <ProposalManager />}
                {activeTab === "profile-config" && <ProfileFieldManager />}
                {activeTab === "menu-manager" && <MenuManager onConfigChange={fetchMenuConfig} />}
+<<<<<<< HEAD
                {activeTab === "assessment-templates" && <AssessmentTemplateManager />}
                {activeTab === "all-students-assessment" && <AllStudentsAssessment students={students} levels={studyLevels} />}
                {activeTab === "material-recap" && <MaterialRecap />}
+=======
+>>>>>>> 4fdea8a5b00d8560d7175f35be4e413be575b790
            </section>
         </div>
       </main>
