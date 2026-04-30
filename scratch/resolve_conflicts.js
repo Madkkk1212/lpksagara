@@ -37,13 +37,13 @@ filesToFix.forEach(file => {
   
   // Simple regex to find conflict markers and take the HEAD version
   // This looks for:
-  // <<<<<<< HEAD
+  // HEAD
   // [OUR CONTENT]
   // =======
   // [THEIR CONTENT]
-  // >>>>>>> [HASH]
+  // [HASH]
   
-  const regex = /<<<<<<< HEAD\r?\n([\s\S]*?)\r?\n=======\r?\n([\s\S]*?)\r?\n>>>>>>> .*\r?\n/g;
+  const regex = / HEAD\r?\n([\s\S]*?)\r?\n=======\r?\n([\s\S]*?)\r?\n.*\r?\n/g;
   
   const newContent = content.replace(regex, (match, headContent, theirContent) => {
     console.log(`Resolving conflict in ${file}: favoring HEAD`);

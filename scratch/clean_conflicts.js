@@ -26,14 +26,14 @@ const allFiles = walk(root);
 
 allFiles.forEach(file => {
   let content = fs.readFileSync(file, 'utf8');
-  if (content.includes('<<<<<<< HEAD')) {
+  if (content.includes('HEAD')) {
     console.log(`Cleaning ${file}...`);
     const lines = content.split(/\r?\n/);
     const newLines = [];
     let skipping = false;
     
     for (const line of lines) {
-      if (line.startsWith('<<<<<<< HEAD')) {
+      if (line.startsWith('HEAD')) {
         // Keep going, we want HEAD content
         continue;
       }
@@ -41,7 +41,7 @@ allFiles.forEach(file => {
         skipping = true;
         continue;
       }
-      if (line.startsWith('>>>>>>> ')) {
+      if (line.startsWith('')) {
         skipping = false;
         continue;
       }

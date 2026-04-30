@@ -164,6 +164,7 @@ export interface Profile {
   batch?: string | null
   nip?: string | null
   category_id?: string | null
+  nickname?: string | null
   updated_at?: string
 }
 
@@ -192,6 +193,7 @@ export interface ProfileValue {
 export interface StudyLevel {
   id: string
   level_code: string
+  name: string
   title: string
   description: string | null
   category_id: string | null
@@ -223,6 +225,7 @@ export interface StudyMaterial {
   sort_order: number
   icon_url: string | null
   video_url: string | null
+  audio_url?: string | null
   image_url: string | null
   file_size?: number | null
   storage_provider?: string | null
@@ -291,14 +294,40 @@ export interface StudentBatch {
   id: string;
   name: string;
   description: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
   created_at: string;
 }
 
+export interface ColDef {
+  label: string;
+  col_type: 'number' | 'text' | 'date' | 'boolean' | 'grade';
+}
+
 export interface ChapterTemplate {
-  id: string;
+  id?: string;
   level_id: string;
-  title: string;
+  title?: string;
+  chapter_id?: string;
+  chapter_title?: string;
   sort_order: number;
-  created_at: string;
-  updated_at: string;
+  columns: ColDef[];
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AdditionalCol {
+  id: string;
+  level_id?: string;
+  name: string;
+  label?: string;
+  sort_order?: number;
+  position?: string;
+  type?: string;
+  calculation?: string;
+  reference?: string;
+  is_global?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }

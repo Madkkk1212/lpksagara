@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { Save, CheckCircle2, Users, Search, GraduationCap, ChevronRight, FileText, Star, TrendingUp } from "lucide-react";
 
-export default function AssessmentManager({ students, levels }: { students: Profile[], levels: StudyLevel[] }) {
+export default function AssessmentManager({ students, levels, teacher }: { students: Profile[], levels: StudyLevel[], teacher?: Profile }) {
   const [selectedBatchId, setSelectedBatchId] = useState<string>("");
   const [selectedLevelId, setSelectedLevelId] = useState<string>("");
   
