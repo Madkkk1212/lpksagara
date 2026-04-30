@@ -6,10 +6,11 @@ import { Profile, StudyLevel } from "@/lib/types";
 import WeeklyTargetManager from "./components/WeeklyTargetManager";
 import WeeklyReportManager from "./components/WeeklyReportManager";
 import AssessmentManager from "./components/AssessmentManager";
-import { User, LogOut, LayoutDashboard, Target, FileText, ClipboardCheck, MessageSquarePlus } from "lucide-react";
+import QuizAccessManager from "./components/QuizAccessManager";
+import { User, LogOut, LayoutDashboard, Target, FileText, ClipboardCheck, MessageSquarePlus, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-type TeacherTab = "students" | "targets" | "reports" | "grading" | "proposals";
+type TeacherTab = "students" | "targets" | "reports" | "grading" | "proposals" | "quizzes";
 
 export default function TeacherClient() {
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -206,6 +207,7 @@ export default function TeacherClient() {
               { id: 'students', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
               { id: 'targets', label: 'Target Mingguan', icon: <Target className="w-4 h-4" /> },
               { id: 'grading', label: 'Penilaian Siswa', icon: <ClipboardCheck className="w-4 h-4" /> },
+              { id: 'quizzes', label: 'Akses Quiz', icon: <Zap className="w-4 h-4" /> },
               { id: 'reports', label: 'Riwayat Laporan', icon: <FileText className="w-4 h-4" /> },
               { id: 'proposals', label: 'Usul Konten', icon: <MessageSquarePlus className="w-4 h-4" /> },
             ] as { id: TeacherTab; label: string; icon: React.ReactNode }[]).map(tab => (
@@ -296,6 +298,8 @@ export default function TeacherClient() {
             students={assignedStudentIds.length > 0 ? students.filter(s => assignedStudentIds.includes(s.id!)) : students} 
             levels={levels} 
           />
+        ) : activeTab === 'quizzes' ? (
+          <QuizAccessManager teacher={teacherProfile!} />
         ) : activeTab === 'reports' ? (
           <WeeklyReportManager teacher={teacherProfile!} />
         ) : (
@@ -538,7 +542,7 @@ export default function TeacherClient() {
                     </div>
                     <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
                        <span>Total Murid</span>
-                       <span className="text-slate-900">{assignedStudentIds.length} Siswa</span>
+                       <span className="text-slate-900">{filteredStudents.length} Siswa</span>
                     </div>
                     <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
                        <span>Role</span>

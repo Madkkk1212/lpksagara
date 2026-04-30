@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Profile, MaterialCategory, StudyLevel, StudyChapter, StudyMaterial, AppTheme } from "@/lib/types";
 import { getMaterialCategories, getStudyLevels, getStudyChapters, getStudyMaterials, upsertProfile, getCompletedMaterials, markMaterialCompleted } from "@/lib/db";
 import { Lock, CheckCircle2, Trophy, Star } from "lucide-react";
+import { calculateChapterXPDistribution } from "@/lib/GamificationUtils";
 
 interface MateriViewProps {
   user: Profile;
@@ -148,9 +149,26 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
     try {
         await markMaterialCompleted(user.email, selectedMaterial.id);
         
-        // Reward 50 EXP
-        const newExp = (user.exp || 0) + 50;
+        // Dynamic XP Reward based on 1000 XP/Chapter rule
+        const chapterMats = allLevelMaterials.filter(m => m.chapter_id === selectedMaterial.chapter_id);
+        const materialsOnly = chapterMats.filter(m => m.material_type !== 'quiz');
+        const quizzesOnly = chapterMats.filter(m => m.material_type === 'quiz');
+
+        const isQuiz = selectedMaterial.material_type === 'quiz';
+        const distribution = calculateChapterXPDistribution(materialsOnly.length, quizzesOnly.length);
+
+        let awardedXP = 0;
+        if (isQuiz) {
+            const idx = quizzesOnly.findIndex(m => m.id === selectedMaterial.id);
+            awardedXP = (distribution.quizzes && distribution.quizzes[idx]) || 0;
+        } else {
+            const idx = materialsOnly.findIndex(m => m.id === selectedMaterial.id);
+            awardedXP = (distribution.materials && distribution.materials[idx]) || 0;
+        }
+
+        const newExp = (user.exp || 0) + awardedXP;
         const newLevel = Math.floor(newExp / 1000) + 1;
+
         await upsertProfile({ 
             email: user.email, 
             exp: newExp, 
@@ -161,7 +179,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
         setCompletedMaterials(prev => [...prev, selectedMaterial.id]);
         if (onRefreshUser) onRefreshUser();
         
-        alert("Selamat! Materi selesai. Anda mendapatkan +50 EXP! 🏆");
+        alert(`Selamat! Materi selesai. Anda mendapatkan +${awardedXP} EXP! 🏆`);
         setSelectedMaterial(null); // Go back to chapter view
     } catch (err: any) {
         console.error("Error saving progress:", err);

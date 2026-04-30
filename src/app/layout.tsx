@@ -49,6 +49,7 @@ export const viewport = {
 };
 
 import SmoothScroll from "@/app/components/SmoothScroll";
+import PageTransition from "@/app/components/PageTransition";
 
 export default function RootLayout({
   children,
@@ -62,7 +63,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <SmoothScroll />
-        {children}
+        <PageTransition>
+          {children}
+        </PageTransition>
         <script dangerouslySetInnerHTML={{ __html: `
           if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {

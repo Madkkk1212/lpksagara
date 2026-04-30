@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import { getStudyLevels, getStudyChapters, getStudyMaterials, getMaterialCategories } from "@/lib/db";
 import { StudyLevel, StudyChapter, StudyMaterial, MaterialCategory } from "@/lib/types";
 import { 
@@ -27,24 +28,26 @@ export default function MaterialRecap() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [allLevels, allCats] = await Promise.all([
-        getStudyLevels(),
-        getMaterialCategories()
-      ]);
-      setLevels(allLevels);
-      setCategories(allCats);
+      const { data: allMaterials, error: matErr } = await supabase.from('study_materials').select('*');
+      const { data: allChapters, error: chapErr } = await supabase.from('study_chapters').select('*');
+      const { data: allLevels, error: lvlErr } = await supabase.from('study_levels').select('*');
+      const { data: allCats, error: catErr } = await supabase.from('material_categories').select('*');
+
+      if (matErr || chapErr || lvlErr || catErr) throw new Error("Gagal mengambil data rekap");
+
+      setLevels(allLevels as StudyLevel[]);
+      setCategories(allCats as MaterialCategory[]);
 
       const chapterMap: Record<string, StudyChapter[]> = {};
       const materialMap: Record<string, StudyMaterial[]> = {};
 
-      for (const level of allLevels) {
-        const chaps = await getStudyChapters(level.id);
-        chapterMap[level.id] = chaps;
-        for (const chap of chaps) {
-          const mats = await getStudyMaterials(chap.id);
-          materialMap[chap.id] = mats;
-        }
-      }
+      allLevels.forEach(lvl => {
+        chapterMap[lvl.id] = (allChapters as StudyChapter[]).filter(c => c.level_id === lvl.id);
+      });
+
+      allChapters.forEach(chap => {
+        materialMap[chap.id] = (allMaterials as StudyMaterial[]).filter(m => m.chapter_id === chap.id);
+      });
 
       setChapters(chapterMap);
       setMaterials(materialMap);
@@ -144,8 +147,8 @@ export default function MaterialRecap() {
                 <span className="w-2 h-6 bg-indigo-600 rounded-full" />
                 Distribusi Materi per Level
               </h3>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-72 min-w-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <BarChart data={statsByLevel}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontWeight: 700, fontSize: 10}} />
@@ -163,8 +166,8 @@ export default function MaterialRecap() {
                 <span className="w-2 h-6 bg-emerald-500 rounded-full" />
                 Komposisi Media
               </h3>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-72 min-w-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <PieChart>
                     <Pie
                       data={pieData}

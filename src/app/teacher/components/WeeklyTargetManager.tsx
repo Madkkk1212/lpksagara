@@ -5,17 +5,18 @@ import {
   getWeeklyTargets, 
   upsertWeeklyTarget, 
   deleteWeeklyTarget, 
-  getAllStudyMaterials,
   getStudentBatches,
   getAllStudyChapters,
-  getStudyLevels
+  getStudyLevels,
+  getBasicStudyMaterials
 } from "@/lib/db";
 import { Profile, WeeklyTarget, StudyMaterial, StudentBatch, StudyChapter, StudyLevel } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
+import { Search } from "lucide-react";
 
 export default function WeeklyTargetManager({ teacher, students }: { teacher: Profile, students: Profile[] }) {
   const [targets, setTargets] = useState<WeeklyTarget[]>([]);
-  const [materials, setMaterials] = useState<StudyMaterial[]>([]);
+  const [materials, setMaterials] = useState<Partial<StudyMaterial>[]>([]);
   const [allBatches, setAllBatches] = useState<StudentBatch[]>([]);
   const [chapters, setChapters] = useState<StudyChapter[]>([]);
   const [levels, setLevels] = useState<StudyLevel[]>([]);
@@ -36,6 +37,8 @@ export default function WeeklyTargetManager({ teacher, students }: { teacher: Pr
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
 
+  const [materialSearch, setMaterialSearch] = useState("");
+
   useEffect(() => {
     if (teacher.id) {
       fetchData();
@@ -47,13 +50,13 @@ export default function WeeklyTargetManager({ teacher, students }: { teacher: Pr
     try {
       const [targetData, materialData, batchData, chapterData, levelData] = await Promise.all([
         getWeeklyTargets(teacher.id!),
-        getAllStudyMaterials(),
+        getBasicStudyMaterials(),
         getStudentBatches(),
         getAllStudyChapters(),
         getStudyLevels()
       ]);
       setTargets(targetData);
-      setMaterials(materialData);
+      setMaterials(materialData as any);
       setAllBatches(batchData);
       setChapters(chapterData);
       setLevels(levelData);
@@ -83,8 +86,22 @@ export default function WeeklyTargetManager({ teacher, students }: { teacher: Pr
     setTargetType(target.target_type);
     setSelectedStudentIds(target.student_id ? [target.student_id] : []);
     setSelectedBatch(target.batch || "");
-    setSelectedLevelId(""); // Level/Chapter info isn't stored in target, so we reset it
-    setSelectedChapterId("");
+    
+    // Auto-restore Level and Chapter if materials exist
+    if (target.material_ids && target.material_ids.length > 0) {
+      const firstMaterial = materials.find(m => m.id === target.material_ids![0]);
+      if (firstMaterial) {
+        setSelectedChapterId(firstMaterial.chapter_id || "");
+        const chapter = chapters.find(c => c.id === firstMaterial.chapter_id);
+        if (chapter) {
+          setSelectedLevelId(chapter.level_id || "");
+        }
+      }
+    } else {
+      setSelectedLevelId("");
+      setSelectedChapterId("");
+    }
+    
     setTitle(target.title);
     setDescription(target.description || "");
     setSelectedMaterialIds(target.material_ids || []);
@@ -97,8 +114,8 @@ export default function WeeklyTargetManager({ teacher, students }: { teacher: Pr
     if (!title || !teacher.id) return;
     setIsSubmitting(true);
     try {
-      if (targetType === 'personal' && selectedStudentIds.length > 0 && !editingTarget) {
-        // Multi-create for personal targets
+      if (targetType === 'personal' && selectedStudentIds.length > 1 && !editingTarget) {
+        // Multi-create for personal targets (only on new creation)
         await Promise.all(selectedStudentIds.map(sid => {
           return upsertWeeklyTarget({
             teacher_id: teacher.id!,
@@ -188,7 +205,7 @@ export default function WeeklyTargetManager({ teacher, students }: { teacher: Pr
 
             <div className="flex items-center gap-3 mb-4">
               <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${target.target_type === 'batch' ? 'bg-indigo-50 text-indigo-600' : 'bg-teal-50 text-teal-600'}`}>
-                {target.target_type === 'batch' ? '📁 ' + target.batch : '👤 Personal'}
+                {target.target_type === 'batch' ? '📁 ' + target.batch : '👤 ' + (students.find(s => s.id === target.student_id)?.full_name || 'Personal')}
               </span>
               <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${target.status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'}`}>
                 {target.status}
@@ -207,7 +224,7 @@ export default function WeeklyTargetManager({ teacher, students }: { teacher: Pr
                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">{target.material_ids?.length || 0} Materi Terlampir</p>
                  <div className="flex flex-wrap gap-1">
                     {target.material_ids?.slice(0, 3).map(mid => {
-                       const m = materials.find(mat => mat.id === mid);
+                       const m = materials.find(mat => mat.id! === mid);
                        return <span key={mid} className="px-2 py-1 bg-slate-50 rounded-md text-[8px] font-bold text-slate-500">{m?.title || 'Material'}</span>
                     })}
                     {(target.material_ids?.length || 0) > 3 && <span className="px-2 py-1 bg-slate-50 rounded-md text-[8px] font-bold text-slate-500">+{target.material_ids.length - 3}</span>}
@@ -270,10 +287,10 @@ export default function WeeklyTargetManager({ teacher, students }: { teacher: Pr
                         <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 max-h-[150px] overflow-y-auto custom-scrollbar space-y-1">
                           {students.map(s => (
                              <button 
-                                key={s.id}
+                                key={s.id!}
                                 onClick={() => {
                                   setSelectedStudentIds(prev => 
-                                    prev.includes(s.id!) ? prev.filter(id => id !== s.id) : [...prev, s.id!]
+                                    prev.includes(s.id!) ? prev.filter(id => id !== s.id!) : [...prev, s.id!]
                                   );
                                 }}
                                 className={`w-full p-3 rounded-xl flex items-center justify-between transition-all ${selectedStudentIds.includes(s.id!) ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
@@ -389,25 +406,39 @@ export default function WeeklyTargetManager({ teacher, students }: { teacher: Pr
                       </div>
                     </div>
 
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 block">
-                      3. Pilih Materi ({selectedMaterialIds.length} Terpilih)
-                    </label>
+                    <div className="flex flex-col gap-3">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">
+                        3. Pilih Materi ({selectedMaterialIds.length} Terpilih)
+                      </label>
+                      <div className="relative">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                        <input 
+                          type="text"
+                          placeholder="Cari materi..."
+                          value={materialSearch}
+                          onChange={(e) => setMaterialSearch(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[9px] font-black uppercase outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
                     <div className="flex-1 bg-slate-50 rounded-[2rem] border border-slate-100 p-6 overflow-y-auto max-h-[300px] custom-scrollbar">
                        <div className="space-y-2">
                           {selectedChapterId ? (
-                            materials.filter(m => m.chapter_id === selectedChapterId).length > 0 ? (
-                              materials.filter(m => m.chapter_id === selectedChapterId).map(m => (
-                                <button 
-                                   key={m.id}
-                                   onClick={() => toggleMaterial(m.id)}
-                                   className={`w-full p-4 rounded-xl flex items-center justify-between transition-all ${selectedMaterialIds.includes(m.id) ? 'bg-indigo-600 text-white' : 'bg-white hover:bg-slate-100 text-slate-600'}`}
-                                >
-                                   <span className="text-[9px] font-black uppercase truncate mr-4">{m.title}</span>
-                                   {selectedMaterialIds.includes(m.id) && <span className="text-[10px]">✓</span>}
-                                </button>
-                              ))
+                            materials.filter(m => m.chapter_id === selectedChapterId && (m.title || "").toLowerCase().includes(materialSearch.toLowerCase())).length > 0 ? (
+                              materials
+                                .filter(m => m.chapter_id === selectedChapterId && (m.title || "").toLowerCase().includes(materialSearch.toLowerCase()))
+                                .map(m => (
+                                  <button 
+                                     key={m.id!}
+                                     onClick={() => toggleMaterial(m.id!)}
+                                     className={`w-full p-4 rounded-xl flex items-center justify-between transition-all ${selectedMaterialIds.includes(m.id!) ? 'bg-indigo-600 text-white' : 'bg-white hover:bg-slate-100 text-slate-600'}`}
+                                  >
+                                     <span className="text-[9px] font-black uppercase truncate mr-4">{m.title}</span>
+                                     {selectedMaterialIds.includes(m.id!) && <span className="text-[10px]">✓</span>}
+                                  </button>
+                                ))
                             ) : (
-                              <p className="text-center py-10 text-[10px] font-black uppercase text-slate-400">Tidak ada materi di bab ini</p>
+                              <p className="text-center py-10 text-[10px] font-black uppercase text-slate-400">Tidak ada materi ditemukan</p>
                             )
                           ) : (
                             <div className="flex flex-col items-center justify-center py-10 text-slate-300">

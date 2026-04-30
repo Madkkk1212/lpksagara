@@ -175,11 +175,19 @@ export default function MediaUploader({ label, mediaType, value, onChange, accep
       });
 
       setPct(100);
-      onChange(resultUrl, file.size, "cloudinary");
+      
+      // Fix: Report correct provider to onChange
+      const finalProvider = file.type.startsWith("image/") ? "cloudinary" : "r2";
+      onChange(resultUrl, file.size, finalProvider);
 
     } catch (err: any) {
       console.error("Upload error:", err);
-      alert(`❌ ${err.message}`);
+      // More helpful error if it looks like CORS
+      if (err.message.includes("Koneksi R2 terputus")) {
+        alert(`❌ Koneksi ke Cloudflare R2 Gagal (CORS)\n\nPastikan domain ini sudah ditambahkan ke "CORS Policy" di Dashboard Cloudflare R2 Bucket Anda.`);
+      } else {
+        alert(`❌ ${err.message}`);
+      }
     } finally {
       setUploading(false);
       setPhase("");
@@ -344,7 +352,7 @@ export default function MediaUploader({ label, mediaType, value, onChange, accep
             <p className="text-[10px] font-bold text-slate-500 truncate">{value}</p>
           </div>
           <button
-            onClick={() => onChange("")}
+            onClick={() => onChange(null as any)}
             className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all shrink-0"
           >✕</button>
         </div>

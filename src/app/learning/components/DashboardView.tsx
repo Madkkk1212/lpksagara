@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { Profile, AppTheme, StudyMaterial } from "@/lib/types";
-import { getLeaderboard, getUserLastProgressDetails, getStudentWeeklyTargets, getCompletedMaterials, getAllStudyMaterials } from "@/lib/db";
+import { getLeaderboard, getUserLastProgressDetails, getStudentWeeklyTargets, getCompletedMaterials, getBasicStudyMaterials } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import AISenseiChat from "./AISenseiChat";
 import { Flame, Trophy, Zap, CheckCircle2, Circle, BookOpen, Link2 } from "lucide-react";
@@ -53,13 +53,13 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
         getUserLastProgressDetails(user.email),
         getStudentWeeklyTargets(user.email, user.batch),
         getCompletedMaterials(user.email),
-        getAllStudyMaterials()
+        getBasicStudyMaterials()
       ]);
       setLeaderboard(lb.filter(p => !p.is_admin && !p.is_teacher));
       setLastProgress(lp);
       setWeeklyTargets(targets);
       setCompletedMaterials(completed);
-      setAllMaterials(mats);
+      setAllMaterials(mats as StudyMaterial[]);
     }
     loadDashboard();
   }, [user.email]);

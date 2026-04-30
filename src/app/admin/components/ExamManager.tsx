@@ -8,8 +8,10 @@ import {
   upsertExamLevel, deleteExamLevel, 
   upsertExamTest, deleteExamTest, 
   upsertQuestion, deleteQuestion,
-  getIconCategories, getIconLibrary
+  getIconCategories, getIconLibrary,
+  bulkUpdateExamLevels, bulkUpdateExamTests, bulkUpdateQuestions
 } from "@/lib/db";
+import { motion, Reorder } from "framer-motion";
 
 export default function ExamManager() {
   const [levels, setLevels] = useState<ExamLevel[]>([]);
@@ -113,6 +115,25 @@ export default function ExamManager() {
     } catch (e) { alert("Error deleting question"); }
   };
 
+  // --- REORDER HANDLERS ---
+  const handleReorderLevels = async (newOrder: ExamLevel[]) => {
+    setLevels(newOrder);
+    const updates = newOrder.map((l, idx) => ({ id: l.id, sort_order: idx + 1 }));
+    try { await bulkUpdateExamLevels(updates); } catch (e) { console.error(e); }
+  };
+
+  const handleReorderTests = async (newOrder: ExamTest[]) => {
+    setTests(newOrder);
+    const updates = newOrder.map((t, idx) => ({ id: t.id, sort_order: idx + 1 }));
+    try { await bulkUpdateExamTests(updates); } catch (e) { console.error(e); }
+  };
+
+  const handleReorderQuestions = async (newOrder: Question[]) => {
+    setQuestions(newOrder);
+    const updates = newOrder.map((q, idx) => ({ id: q.id, sort_order: idx + 1 }));
+    try { await bulkUpdateQuestions(updates); } catch (e) { console.error(e); }
+  };
+
   // Icon Picker Logic
   const openIconPicker = async () => {
     setPickerOpen(true);
@@ -146,9 +167,13 @@ export default function ExamManager() {
           <h3 className="text-xl font-black text-slate-800 italic">1. Select Level</h3>
           <button onClick={() => setEditingLevel({ level_code: "new", title: "New Level", sort_order: levels.length + 1 })} className="text-[10px] font-black uppercase bg-slate-900 text-white px-4 py-2 rounded-xl">Add Level</button>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <Reorder.Group axis="x" values={levels} onReorder={handleReorderLevels} className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {levels.map(lvl => (
-            <div key={lvl.id} className="relative group">
+            <Reorder.Item 
+              key={lvl.id} 
+              value={lvl}
+              className="relative group cursor-grab active:cursor-grabbing"
+            >
               <button 
                 onClick={() => handleSelectLevel(lvl)}
                 className={`w-full p-6 rounded-3xl text-left transition-all flex flex-col items-center gap-3 ${selectedLevel?.id === lvl.id ? 'bg-slate-900 text-white shadow-xl scale-105' : 'bg-white border border-slate-100 hover:bg-slate-50'}`}
@@ -167,9 +192,9 @@ export default function ExamManager() {
                  <button onClick={() => setEditingLevel(lvl)} className="p-2 bg-white shadow-md rounded-lg text-xs">✎</button>
                  <button onClick={() => handleDeleteLevel(lvl.id)} className="p-2 bg-rose-500 text-white shadow-md rounded-lg text-xs">✕</button>
               </div>
-            </div>
+            </Reorder.Item>
           ))}
-        </div>
+        </Reorder.Group>
       </section>
 
       {/* 2. TEST LIST (Visible if level selected) */}
@@ -184,9 +209,13 @@ export default function ExamManager() {
                 Add Test
               </button>
            </div>
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+           <Reorder.Group axis="y" values={tests} onReorder={handleReorderTests} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {tests.map(test => (
-                <div key={test.id} className="relative group">
+                <Reorder.Item 
+                  key={test.id} 
+                  value={test}
+                  className="relative group cursor-grab active:cursor-grabbing"
+                >
                   <button 
                     onClick={() => handleSelectTest(test)}
                     className={`w-full p-8 rounded-[2.5rem] text-left transition-all relative overflow-hidden ${selectedTest?.id === test.id ? 'bg-slate-900 text-white shadow-2xl ring-4 ring-teal-500/20' : 'bg-slate-50 border border-slate-200 hover:bg-white'}`}
@@ -198,19 +227,17 @@ export default function ExamManager() {
                     <div className="mt-4 flex gap-4 text-[10px] font-bold uppercase tracking-widest opacity-60">
                        <span>⏱️ {test.duration_minutes} MIN</span>
                        <span>✅ {test.pass_point}% PASS</span>
-                       {selectedTest?.id === test.id && questions.length > 0 && (
-                          <span className="text-teal-400">📝 {questions.length} Soal</span>
-                       )}
                     </div>
+                    <div className="mt-4 text-[7px] font-black uppercase opacity-20">Drag to reorder</div>
                   </button>
                   <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition">
                      <button onClick={() => setEditingTest(test)} className="p-2 bg-white rounded-lg text-xs shadow-sm">✎</button>
                      <button onClick={() => handleDeleteTest(test.id)} className="p-2 bg-rose-500 text-white rounded-lg text-xs shadow-sm">✕</button>
                   </div>
-                </div>
+                </Reorder.Item>
               ))}
               {tests.length === 0 && <p className="text-slate-400 font-medium italic">No tests found for this level.</p>}
-           </div>
+           </Reorder.Group>
         </section>
       )}
 
@@ -226,9 +253,13 @@ export default function ExamManager() {
                 Add Question
               </button>
            </div>
-           <div className="space-y-4">
+           <Reorder.Group axis="y" values={questions} onReorder={handleReorderQuestions} className="space-y-4">
               {questions.map((q, idx) => (
-                <div key={q.id} className="p-6 bg-white border border-slate-100 rounded-3xl flex gap-6 items-start group">
+                <Reorder.Item 
+                  key={q.id} 
+                  value={q}
+                  className="p-6 bg-white border border-slate-100 rounded-3xl flex gap-6 items-start group cursor-grab active:cursor-grabbing"
+                >
                    <div className="h-10 w-10 shrink-0 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black italic">{idx + 1}</div>
                    <div className="flex-1">
                       <p className="font-bold text-slate-800 leading-relaxed mb-4">{q.question_text}</p>
@@ -239,16 +270,16 @@ export default function ExamManager() {
                             </div>
                          ))}
                       </div>
-                      {q.explanation && <p className="mt-4 text-[10px] text-slate-400 font-medium uppercase tracking-widest italic">{q.explanation}</p>}
+                      <div className="mt-4 text-[7px] font-black uppercase opacity-20">Drag question to sort</div>
                    </div>
                    <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition">
                       <button onClick={() => setEditingQuestion(q)} className="p-2 bg-slate-100 rounded-xl text-xs">✎</button>
                       <button onClick={() => handleDeleteQuestion(q.id)} className="p-2 bg-rose-50 text-rose-500 rounded-xl text-xs">✕</button>
                    </div>
-                </div>
+                </Reorder.Item>
               ))}
               {questions.length === 0 && <p className="text-slate-400 font-medium italic">No questions found for this test.</p>}
-           </div>
+           </Reorder.Group>
         </section>
       )}
 
@@ -343,7 +374,7 @@ export default function ExamManager() {
                       </select>
                     </div>
                  </div>
-                 <div className="grid grid-cols-2 gap-6">
+                 <div className="grid grid-cols-3 gap-6">
                     <div>
                       <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Duration (min)</label>
                       <input type="number" value={editingTest.duration_minutes || 0} onChange={e => setEditingTest({...editingTest, duration_minutes: parseInt(e.target.value)})} className="w-full px-6 py-3 rounded-2xl bg-slate-50 font-bold" />
@@ -351,6 +382,10 @@ export default function ExamManager() {
                     <div>
                       <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Pass Point (%)</label>
                       <input type="number" value={editingTest.pass_point || 0} onChange={e => setEditingTest({...editingTest, pass_point: parseInt(e.target.value)})} className="w-full px-6 py-3 rounded-2xl bg-slate-50 font-bold" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Sort Order</label>
+                      <input type="number" value={editingTest.sort_order || 0} onChange={e => setEditingTest({...editingTest, sort_order: parseInt(e.target.value)})} className="w-full px-6 py-3 rounded-2xl bg-slate-50 font-bold" />
                     </div>
                  </div>
               </div>

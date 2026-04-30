@@ -1,0 +1,37 @@
+-- 1. Buat tabel kontrol akses kuis
+create table if not exists quiz_access_controls (
+  id uuid default gen_random_uuid() primary key,
+  batch text,
+  student_id uuid references profiles(id),
+  material_id uuid references study_materials(id) not null,
+  is_active boolean default false,
+  teacher_id uuid references profiles(id),
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
+);
+
+-- 2. Aktifkan Row Level Security (RLS)
+alter table quiz_access_controls enable row level security;
+
+-- 3. Berikan akses (Policy) agar guru & murid bisa membaca/menulis data
+create policy "Allow all access for now" on quiz_access_controls
+  for all using (true) with check (true);
+
+-- 4. Tambahkan batasan agar tidak ada data duplikat per batch/siswa
+create unique index if not exists quiz_access_batch_idx on quiz_access_controls (batch, material_id) where batch is not null;
+create unique index if not exists quiz_access_student_idx on quiz_access_controls (student_id, material_id) where student_id is not null;
+
+
+-- jika eror
+
+-- 1. Hapus index lama jika ada
+drop index if exists quiz_access_batch_idx;
+drop index if exists quiz_access_student_idx;
+
+-- 2. Tambahkan UNIQUE CONSTRAINT resmi
+-- Ini memungkinkan sistem melakukan 'upsert' (update jika sudah ada, insert jika belum)
+alter table quiz_access_controls 
+add constraint quiz_access_batch_unique unique (batch, material_id);
+
+alter table quiz_access_controls 
+add constraint quiz_access_student_unique unique (student_id, material_id);

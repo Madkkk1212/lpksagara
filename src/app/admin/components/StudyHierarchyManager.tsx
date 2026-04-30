@@ -7,10 +7,12 @@ import {
   upsertStudyChapter, deleteStudyChapter, 
   upsertStudyMaterial, deleteStudyMaterial,
   getIconCategories, getIconLibrary,
-  getMaterialCategories, upsertMaterialCategory, deleteMaterialCategory
+  getMaterialCategories, upsertMaterialCategory, deleteMaterialCategory,
+  bulkUpdateMaterialCategories, bulkUpdateStudyLevels, bulkUpdateStudyChapters, bulkUpdateStudyMaterials
 } from "@/lib/db";
 import { StudyLevel, StudyChapter, StudyMaterial, IconCategory, IconLibraryItem, MaterialCategory } from "@/lib/types";
 import MediaUploader from "@/app/components/MediaUploader";
+import { motion } from "framer-motion";
 
 export default function StudyHierarchyManager() {
   const [levels, setLevels] = useState<StudyLevel[]>([]);
@@ -77,6 +79,68 @@ export default function StudyHierarchyManager() {
   const handleSelectChapter = (chap: StudyChapter) => {
     setSelectedChapter(chap);
     loadMaterials(chap.id);
+  };
+
+  const moveCategory = async (idx: number, direction: 'up' | 'down') => {
+    let list = [...appCategories].sort((a,b) => {
+      if ((a.sort_order||0) !== (b.sort_order||0)) return (a.sort_order||0) - (b.sort_order||0);
+      return a.id.localeCompare(b.id);
+    });
+
+    // Normalize
+    list = list.map((c, i) => ({ ...c, sort_order: i + 1 }));
+
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
+
+    const temp = list[idx].sort_order;
+    list[idx].sort_order = list[targetIdx].sort_order;
+    list[targetIdx].sort_order = temp;
+
+    const finalOrder = [...list].sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
+    setAppCategories(finalOrder);
+
+    try {
+      const updates = finalOrder.map(c => ({ id: c.id, sort_order: c.sort_order }));
+      await bulkUpdateMaterialCategories(updates);
+    } catch (e) {
+      console.error("Move Category Error:", e);
+      loadLevels();
+    }
+  };
+
+  const moveMaterial = async (idx: number, direction: 'up' | 'down') => {
+    if (!selectedChapter) return;
+    
+    // 1. Get current list and sort them
+    let list = [...materials].sort((a,b) => {
+      if ((a.sort_order||0) !== (b.sort_order||0)) return (a.sort_order||0) - (b.sort_order||0);
+      return a.id.localeCompare(b.id); // Tie-breaker
+    });
+
+    // 2. Normalize orders to 1, 2, 3... to fix any duplicates/gaps
+    list = list.map((m, i) => ({ ...m, sort_order: i + 1 }));
+
+    // 3. Swap with neighbor
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
+
+    const temp = list[idx].sort_order;
+    list[idx].sort_order = list[targetIdx].sort_order;
+    list[targetIdx].sort_order = temp;
+
+    // 4. Sort again after swap to maintain visual consistency in state
+    const finalOrder = [...list].sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
+    setMaterials(finalOrder);
+
+    // 5. Update ALL in DB to ensure total consistency
+    try {
+      const updates = finalOrder.map(m => ({ id: m.id, sort_order: m.sort_order }));
+      await bulkUpdateStudyMaterials(updates as any);
+    } catch (e) {
+      console.error("Move Material Sync Error:", e);
+      loadMaterials(selectedChapter.id);
+    }
   };
 
   // --- CRUD ACTIONS ---
@@ -338,22 +402,50 @@ export default function StudyHierarchyManager() {
                 + Add Category
              </button>
           </div>
-         <div className="flex flex-wrap gap-4">
-            {appCategories.map(cat => (
-               <div key={cat.id} className="relative group">
-                 <button 
-                    onClick={() => { setSelectedCategoryFilter(cat.id); setSelectedLevel(null); setChapters([]); setMaterials([]); }}
-                    className={`px-8 py-4 rounded-2xl font-black flex items-center gap-4 cursor-pointer shadow-lg transition-all border border-white/10 ${selectedCategoryFilter === cat.id ? 'bg-teal-500 scale-105 ring-4 ring-teal-500/20' : 'bg-white/5 hover:bg-white/10'}`}
-                 >
-                    {cat.icon_url ? (
-                      <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center p-1.5 shadow-sm">
-                        <img src={cat.icon_url || undefined} alt="icon" className="w-full h-full object-contain" />
-                      </div>
-                    ) : (
-                      <span className="text-xl">🌟</span>
-                    )}
-                    {cat.name}
-                 </button>
+          <div className="flex flex-wrap gap-4">
+            {[...appCategories].sort((a,b) => (a.sort_order||0) - (b.sort_order||0)).map((cat, idx, arr) => (
+               <div 
+                 key={cat.id} 
+                 className="relative group"
+               >
+                 <div className="flex flex-col gap-2">
+                    <button 
+                       onClick={() => { setSelectedCategoryFilter(cat.id); setSelectedLevel(null); setChapters([]); setMaterials([]); }}
+                       className={`px-8 py-4 rounded-2xl font-black flex items-center gap-4 cursor-pointer shadow-lg transition-all border border-white/10 ${selectedCategoryFilter === cat.id ? 'bg-teal-500 scale-105 ring-4 ring-teal-500/20' : 'bg-white/5 hover:bg-white/10'}`}
+                    >
+                       <div className="h-8 w-8 shrink-0 bg-white/20 rounded-lg flex items-center justify-center text-[10px] text-white">
+                          {idx + 1}
+                       </div>
+                       {cat.icon_url ? (
+                         <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center p-1.5 shadow-sm">
+                           <img src={cat.icon_url || undefined} alt="icon" className="w-full h-full object-contain" />
+                         </div>
+                       ) : (
+                         <span className="text-xl">🌟</span>
+                       )}
+                       <span className="flex flex-col items-start">
+                         <span className="text-[8px] opacity-40 font-bold">Order: {cat.sort_order}</span>
+                         {cat.name}
+                       </span>
+                    </button>
+                    
+                    <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                       <button 
+                         disabled={idx === 0}
+                         onClick={() => moveCategory(idx, 'up')}
+                         className="h-6 w-10 bg-white/10 hover:bg-teal-500 rounded-lg text-[10px] text-white flex items-center justify-center disabled:opacity-20"
+                       >
+                         ▲
+                       </button>
+                       <button 
+                         disabled={idx === arr.length - 1}
+                         onClick={() => moveCategory(idx, 'down')}
+                         className="h-6 w-10 bg-white/10 hover:bg-teal-500 rounded-lg text-[10px] text-white flex items-center justify-center disabled:opacity-20"
+                       >
+                         ▼
+                       </button>
+                    </div>
+                 </div>
                   <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all z-20">
                     <button 
                       onClick={(e) => { e.stopPropagation(); openIconPicker('category', cat); }}
@@ -379,7 +471,7 @@ export default function StudyHierarchyManager() {
                   </div>
                </div>
             ))}
-         </div>
+          </div>
       </section>
 
       {/* 1. LEVELS */}
@@ -390,24 +482,27 @@ export default function StudyHierarchyManager() {
               <button onClick={() => setEditingLevel({ level_code: "nX", title: "New Level", badge_color: "#14b8a6", sort_order: levels.length + 1, category_id: selectedCategoryFilter })} className="text-[10px] font-black uppercase tracking-widest bg-slate-900 text-white px-4 py-2 rounded-xl">Add Level</button>
            </div>
            <div className="flex gap-4 overflow-x-auto pb-4">
-              {levels.filter(l => l.category_id === selectedCategoryFilter).map(lvl => (
-                 <div key={lvl.id} className="relative group">
-                   <button 
-                      onClick={() => handleSelectLevel(lvl)}
-                      className={`px-8 py-4 flex flex-col items-center gap-2 rounded-2xl font-black transition-all ${selectedLevel?.id === lvl.id ? 'bg-slate-900 text-white shadow-xl scale-105' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
-                   >
-                      {lvl.icon_url && (
-                        <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center p-1.5 shadow-sm">
-                          <img src={lvl.icon_url || undefined} alt="icon" className="w-full h-full object-contain" />
-                        </div>
-                      )}
-                      <span className="text-sm">{lvl.level_code.toUpperCase()}</span>
-                      <span className="text-[10px] font-medium opacity-50">{lvl.title}</span>
-                   </button>
-                   <div className="absolute -top-3 -right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition z-10">
-                      <button onClick={() => setEditingLevel(lvl)} className="p-1.5 bg-slate-100 rounded-lg text-[10px] shadow-sm hover:scale-110 transition">✎</button>
-                      <button onClick={() => handleDeleteLevel(lvl.id)} className="p-1.5 bg-rose-500 text-white rounded-lg text-[10px] shadow-sm hover:scale-110 transition">✕</button>
-                   </div>
+              {levels.filter(l => l.category_id === selectedCategoryFilter).sort((a,b) => a.sort_order - b.sort_order).map(lvl => (
+                 <div 
+                    key={lvl.id} 
+                    className="relative group"
+                 >
+                    <button 
+                       onClick={() => handleSelectLevel(lvl)}
+                       className={`px-8 py-4 flex flex-col items-center gap-2 rounded-2xl font-black transition-all ${selectedLevel?.id === lvl.id ? 'bg-slate-900 text-white shadow-xl scale-105' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+                    >
+                       {lvl.icon_url && (
+                         <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center p-1.5 shadow-sm">
+                           <img src={lvl.icon_url || undefined} alt="icon" className="w-full h-full object-contain" />
+                         </div>
+                       )}
+                       <span className="text-sm">{lvl.level_code.toUpperCase()}</span>
+                       <span className="text-[10px] font-medium opacity-50">{lvl.title}</span>
+                    </button>
+                    <div className="absolute -top-3 -right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition z-10">
+                       <button onClick={() => setEditingLevel(lvl)} className="p-1.5 bg-slate-100 rounded-lg text-[10px] shadow-sm hover:scale-110 transition">✎</button>
+                       <button onClick={() => handleDeleteLevel(lvl.id)} className="p-1.5 bg-rose-500 text-white rounded-lg text-[10px] shadow-sm hover:scale-110 transition">✕</button>
+                    </div>
                  </div>
               ))}
               {levels.filter(l => l.category_id === selectedCategoryFilter).length === 0 && (
@@ -425,24 +520,29 @@ export default function StudyHierarchyManager() {
              <button onClick={() => setEditingChapter({ title: "New Bab", is_locked: false, sort_order: chapters.length + 1 })} className="text-[10px] font-black uppercase tracking-widest bg-slate-900 text-white px-4 py-2 rounded-xl">Add Chapter</button>
            </div>
            <div className="flex flex-wrap gap-3">
-              {chapters.map(chap => (
-                 <div key={chap.id} className="relative group">
-                   <button 
-                      onClick={() => handleSelectChapter(chap)}
-                      className={`px-5 py-3 flex items-center gap-3 rounded-xl text-sm font-bold transition-all ${selectedChapter?.id === chap.id ? 'bg-teal-500 text-white shadow-lg' : 'bg-white ring-1 ring-slate-200 text-slate-600 hover:ring-teal-500'}`}
-                   >
-                      {chap.icon_url && (
-                        <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center p-1.5 shadow-sm">
-                          <img src={chap.icon_url || undefined} alt="icon" className="w-full h-full object-contain" />
-                        </div>
-                      )}
-                      {chap.is_locked && <span className="text-xs">🔒</span>}
-                      {chap.title}
-                   </button>
-                   <div className="absolute -top-3 -right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition z-10">
-                      <button onClick={() => setEditingChapter(chap)} className="p-1.5 bg-slate-100 shadow-sm ring-1 ring-black/5 rounded-lg text-[10px]">✎</button>
-                      <button onClick={() => handleDeleteChapter(chap.id)} className="p-1.5 bg-rose-500 shadow-sm text-white rounded-lg text-[10px]">✕</button>
-                   </div>
+              {chapters.sort((a,b) => a.sort_order - b.sort_order).map(chap => (
+                 <div 
+                    key={chap.id} 
+                    className="relative group"
+                 >
+                    <button 
+                       onClick={() => handleSelectChapter(chap)}
+                       className={`px-5 py-3 flex items-center gap-3 rounded-xl text-sm font-bold transition-all ${selectedChapter?.id === chap.id ? 'bg-teal-500 text-white shadow-lg' : 'bg-white ring-1 ring-slate-200 text-slate-600 hover:ring-teal-500'}`}
+                    >
+                       {chap.icon_url && (
+                         <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center p-1.5 shadow-sm">
+                           <img src={chap.icon_url || undefined} alt="icon" className="w-full h-full object-contain" />
+                         </div>
+                       )}
+                       {chap.is_locked && <span className="text-xs">🔒</span>}
+                       <span className="flex flex-col items-start">
+                         {chap.title}
+                       </span>
+                    </button>
+                    <div className="absolute -top-3 -right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition z-10">
+                       <button onClick={() => setEditingChapter(chap)} className="p-1.5 bg-slate-100 shadow-sm ring-1 ring-black/5 rounded-lg text-[10px]">✎</button>
+                       <button onClick={() => handleDeleteChapter(chap.id)} className="p-1.5 bg-rose-500 shadow-sm text-white rounded-lg text-[10px]">✕</button>
+                    </div>
                  </div>
               ))}
               {chapters.length === 0 && <p className="text-slate-400 font-medium text-sm">No chapters found.</p>}
@@ -463,9 +563,13 @@ export default function StudyHierarchyManager() {
               </button>
            </div>
            <div className="grid md:grid-cols-2 gap-4">
-              {materials.map(mat => (
-                <div key={mat.id} className="p-6 bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 relative group flex items-center justify-between">
+              {[...materials].sort((a,b) => (a.sort_order||0) - (b.sort_order||0)).map((mat, idx, arr) => (
+                <div 
+                  key={mat.id} 
+                  className="p-6 bg-white rounded-2xl shadow-sm ring-1 ring-slate-100 relative group flex items-center justify-between"
+                >
                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 shrink-0 bg-slate-900 text-white rounded-xl flex items-center justify-center font-black italic text-xs shadow-lg">{idx + 1}</div>
                       {mat.icon_url && (
                         <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center p-1.5 shadow-sm">
                           <img src={mat.icon_url || undefined} alt="icon" className="w-full h-full object-contain" />
@@ -474,10 +578,30 @@ export default function StudyHierarchyManager() {
                       <div>
                         <p className={`text-[10px] font-black uppercase tracking-widest ${mat.material_type === 'quiz' ? 'text-rose-500' : 'text-teal-600'}`}>{mat.material_type}</p>
                         <h4 className="font-bold text-slate-800 mt-1">{mat.title}</h4>
+                        <span className="text-[8px] text-slate-400 font-bold">Order: {mat.sort_order}</span>
                       </div>
                    </div>
-                   <div className="flex gap-2">
-                       <button onClick={() => openMaterialModal(mat)} className="px-4 py-2 bg-slate-90 rounded-lg text-xs font-bold ring-1 ring-slate-200 hover:bg-slate-50">
+                   <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-1 mr-2">
+                           <button 
+                             disabled={idx === 0}
+                             onClick={() => moveMaterial(idx, 'up')}
+                             className="p-1.5 bg-slate-100 rounded-lg text-[10px] hover:bg-teal-500 hover:text-white disabled:opacity-30 transition-all"
+                             title="Move Up"
+                           >
+                             ▲
+                           </button>
+                           <button 
+                             disabled={idx === arr.length - 1}
+                             onClick={() => moveMaterial(idx, 'down')}
+                             className="p-1.5 bg-slate-100 rounded-lg text-[10px] hover:bg-teal-500 hover:text-white disabled:opacity-30 transition-all"
+                             title="Move Down"
+                           >
+                             ▼
+                           </button>
+                        </div>
+
+                       <button onClick={() => openMaterialModal(mat)} className="px-4 py-2 bg-slate-50 rounded-lg text-xs font-bold ring-1 ring-slate-200 hover:bg-slate-100">
                           EDIT
                        </button>
                        <button onClick={() => handleDeleteMaterial(mat.id)} className="px-3 py-2 bg-rose-50 text-rose-500 rounded-lg text-xs font-bold hover:bg-rose-100">✕</button>
@@ -505,9 +629,15 @@ export default function StudyHierarchyManager() {
                     <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Description</label>
                     <textarea value={editingCategory.description || ""} onChange={e => setEditingCategory({...editingCategory, description: e.target.value})} className="w-full h-24 px-6 py-3 rounded-2xl bg-slate-50 font-bold" />
                  </div>
-                 <div>
-                    <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Badge Color</label>
-                    <input type="color" value={editingCategory.badge_color || "#14b8a6"} onChange={e => setEditingCategory({...editingCategory, badge_color: e.target.value})} className="w-full h-12 p-0 rounded-2xl overflow-hidden cursor-pointer" />
+                 <div className="grid grid-cols-2 gap-4">
+                   <div>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Badge Color</label>
+                      <input type="color" value={editingCategory.badge_color || "#14b8a6"} onChange={e => setEditingCategory({...editingCategory, badge_color: e.target.value})} className="w-full h-12 p-0 rounded-2xl overflow-hidden cursor-pointer" />
+                   </div>
+                   <div>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Sort Order</label>
+                      <input type="number" value={editingCategory.sort_order || 0} onChange={e => setEditingCategory({...editingCategory, sort_order: parseInt(e.target.value)})} className="w-full px-6 py-3 rounded-2xl bg-slate-50 font-bold" />
+                   </div>
                  </div>
                  <div className="pt-4 border-t">
                     <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Category Icon</label>
@@ -556,9 +686,15 @@ export default function StudyHierarchyManager() {
                     <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Title</label>
                     <input value={editingLevel.title || ""} onChange={e => setEditingLevel({...editingLevel, title: e.target.value})} className="w-full px-6 py-3 rounded-2xl bg-slate-50 font-bold" />
                  </div>
-                 <div>
-                    <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Badge Color</label>
-                    <input type="color" value={editingLevel.badge_color || "#14b8a6"} onChange={e => setEditingLevel({...editingLevel, badge_color: e.target.value})} className="w-full h-12 p-0 rounded-2xl overflow-hidden cursor-pointer" />
+                 <div className="grid grid-cols-2 gap-4">
+                    <div>
+                       <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Badge Color</label>
+                       <input type="color" value={editingLevel.badge_color || "#14b8a6"} onChange={e => setEditingLevel({...editingLevel, badge_color: e.target.value})} className="w-full h-12 p-0 rounded-2xl overflow-hidden cursor-pointer" />
+                    </div>
+                    <div>
+                       <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Sort Order</label>
+                       <input type="number" value={editingLevel.sort_order || 0} onChange={e => setEditingLevel({...editingLevel, sort_order: parseInt(e.target.value)})} className="w-full px-6 py-3 rounded-2xl bg-slate-50 font-bold" />
+                    </div>
                  </div>
                  <div className="pt-4 border-t">
                     <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Level Icon</label>
@@ -679,10 +815,16 @@ export default function StudyHierarchyManager() {
                         />
                      </div>
                     <div className="col-span-2 pt-4 border-t mt-2">
-                       <label className="flex items-center gap-3 cursor-pointer">
-                          <input type="checkbox" checked={editingMaterial.is_locked || false} onChange={e => setEditingMaterial({...editingMaterial, is_locked: e.target.checked})} className="w-5 h-5 accent-rose-500" />
-                          <span className="text-sm font-bold text-rose-600 flex items-center gap-2">Premium Locked 🔒</span>
-                       </label>
+                        <div className="flex gap-6">
+                           <div className="flex-1">
+                              <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Sort Order</label>
+                              <input type="number" value={editingMaterial.sort_order || 0} onChange={e => setEditingMaterial({...editingMaterial, sort_order: parseInt(e.target.value)})} className="w-full px-4 py-3 rounded-xl bg-slate-50 border font-bold" />
+                           </div>
+                           <label className="flex items-center gap-3 cursor-pointer pb-2">
+                              <input type="checkbox" checked={editingMaterial.is_locked || false} onChange={e => setEditingMaterial({...editingMaterial, is_locked: e.target.checked})} className="w-5 h-5 accent-rose-500" />
+                              <span className="text-sm font-bold text-rose-600 flex items-center gap-2">Premium Locked 🔒</span>
+                           </label>
+                        </div>
                     </div>
                  </div>
 

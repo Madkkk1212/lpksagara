@@ -98,6 +98,20 @@ export async function deleteMaterialCategory(id: string) {
   if (error) throw error
 }
 
+export async function bulkUpdateMaterialCategories(categories: any[]) {
+  // Use individual updates to avoid NOT NULL constraints on other columns during upsert
+  const results = [];
+  for (const c of categories) {
+    const { data, error } = await supabase.from('material_categories').update({ sort_order: c.sort_order }).eq('id', c.id).select();
+    if (error) {
+      console.error(`Failed to update category ${c.id}:`, error.message);
+    } else {
+      results.push(data[0]);
+    }
+  }
+  return results;
+}
+
 export async function upsertMaterial(material: Partial<Material>) {
   const { data, error } = await supabase.from('materials').upsert(material).select()
   if (error) throw error
@@ -120,6 +134,12 @@ export async function deleteExamLevel(id: string) {
   if (error) throw error
 }
 
+export async function bulkUpdateExamLevels(levels: Partial<ExamLevel>[]) {
+  const { data, error } = await supabase.from('exam_levels').upsert(levels).select()
+  if (error) throw error
+  return data
+}
+
 export async function upsertExamTest(test: Partial<ExamTest>) {
   const { data, error } = await supabase.from('exam_tests').upsert(test).select()
   if (error) throw error
@@ -131,6 +151,12 @@ export async function deleteExamTest(id: string) {
   if (error) throw error
 }
 
+export async function bulkUpdateExamTests(tests: Partial<ExamTest>[]) {
+  const { data, error } = await supabase.from('exam_tests').upsert(tests).select()
+  if (error) throw error
+  return data
+}
+
 export async function upsertQuestion(question: Partial<Question>) {
   const { data, error } = await supabase.from('questions').upsert(question).select()
   if (error) throw error
@@ -140,6 +166,12 @@ export async function upsertQuestion(question: Partial<Question>) {
 export async function deleteQuestion(id: string) {
   const { error } = await supabase.from('questions').delete().eq('id', id)
   if (error) throw error
+}
+
+export async function bulkUpdateQuestions(questions: Partial<Question>[]) {
+  const { data, error } = await supabase.from('questions').upsert(questions).select()
+  if (error) throw error
+  return data
 }
 
 // --- PROFILES ---
@@ -210,6 +242,16 @@ export async function deleteStudyLevel(id: string) {
   if (error) throw error
 }
 
+export async function bulkUpdateStudyLevels(levels: any[]) {
+  const results = [];
+  for (const l of levels) {
+    const { data, error } = await supabase.from('study_levels').update({ sort_order: l.sort_order }).eq('id', l.id).select();
+    if (error) console.error(`Failed to update level ${l.id}:`, error.message);
+    else results.push(data[0]);
+  }
+  return results;
+}
+
 export async function getStudyChapters(levelId: string): Promise<StudyChapter[]> {
   const { data, error } = await supabase.from('study_chapters').select('*').eq('level_id', levelId).order('sort_order', { ascending: true })
   if (error) return []
@@ -233,6 +275,16 @@ export async function deleteStudyChapter(id: string) {
   if (error) throw error
 }
 
+export async function bulkUpdateStudyChapters(chapters: any[]) {
+  const results = [];
+  for (const c of chapters) {
+    const { data, error } = await supabase.from('study_chapters').update({ sort_order: c.sort_order }).eq('id', c.id).select();
+    if (error) console.error(`Failed to update chapter ${c.id}:`, error.message);
+    else results.push(data[0]);
+  }
+  return results;
+}
+
 export async function getStudyMaterials(chapterId: string): Promise<StudyMaterial[]> {
   const { data, error } = await supabase.from('study_materials').select('*').eq('chapter_id', chapterId).order('sort_order', { ascending: true })
   if (error) return []
@@ -240,9 +292,27 @@ export async function getStudyMaterials(chapterId: string): Promise<StudyMateria
 }
 
 export async function getAllStudyMaterials(): Promise<StudyMaterial[]> {
-  const { data, error } = await supabase.from('study_materials').select('*').order('created_at', { ascending: false });
+  const { data, error } = await supabase.from('study_materials').select('*').order('sort_order', { ascending: true });
   if (error) return [];
   return data;
+}
+
+export async function getMaterialsWithVideos(): Promise<Partial<StudyMaterial>[]> {
+  const { data, error } = await supabase
+    .from('study_materials')
+    .select('id, title, chapter_id, material_type, video_url, image_url, file_size, storage_provider, created_at')
+    .not('video_url', 'is', null)
+    .order('created_at', { ascending: false });
+  if (error) return [];
+  return data;
+}
+
+export async function getBasicStudyMaterials(chapterId?: string): Promise<Partial<StudyMaterial>[]> {
+  let query = supabase.from('study_materials').select('id, title, chapter_id, material_type, is_locked, sort_order, icon_url');
+  if (chapterId) query = query.eq('chapter_id', chapterId);
+  const { data, error } = await query.order('sort_order', { ascending: true });
+  if (error) return []
+  return data
 }
 
 export async function getStudyMaterialById(id: string): Promise<StudyMaterial | null> {
@@ -260,6 +330,19 @@ export async function upsertStudyMaterial(material: Partial<StudyMaterial>) {
 export async function deleteStudyMaterial(id: string) {
   const { error } = await supabase.from('study_materials').delete().eq('id', id)
   if (error) throw error
+}
+
+export async function bulkUpdateStudyMaterials(materials: any[]) {
+  const results = [];
+  for (const m of materials) {
+    const { data, error } = await supabase.from('study_materials').update({ sort_order: m.sort_order }).eq('id', m.id).select();
+    if (error) {
+      console.error(`Failed to update material ${m.id}:`, error.message);
+    } else {
+      results.push(data[0]);
+    }
+  }
+  return results;
 }
 
 // ==========================================

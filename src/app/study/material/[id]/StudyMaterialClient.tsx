@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { StudyMaterial } from "@/lib/types";
-import { markMaterialCompleted } from "@/lib/db";
+import { markMaterialCompleted, getBasicStudyMaterials, getProfileByEmail, upsertProfile } from "@/lib/db";
+import { calculateChapterXPDistribution } from "@/lib/GamificationUtils";
 import KioskBarrier from "@/app/components/KioskBarrier";
 
 export default function StudyMaterialClient({ materialData }: { materialData: StudyMaterial }) {
@@ -49,6 +50,39 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
     setIsFinishing(true);
     try {
       await markMaterialCompleted(userEmail, materialData.id);
+
+      // Award XP - Optimized fetch
+      const chapterMats = await getBasicStudyMaterials(materialData.chapter_id);
+      const materialsOnly = chapterMats.filter(m => m.material_type !== 'quiz');
+      const quizzesOnly = chapterMats.filter(m => m.material_type === 'quiz');
+
+      const isQuiz = materialData.material_type === 'quiz';
+      const distribution = calculateChapterXPDistribution(materialsOnly.length, quizzesOnly.length);
+
+      let awardedXP = 0;
+      if (isQuiz) {
+        const idx = quizzesOnly.findIndex(m => m.id === materialData.id);
+        awardedXP = (distribution.quizzes && distribution.quizzes[idx]) || 0;
+      } else {
+        const idx = materialsOnly.findIndex(m => m.id === materialData.id);
+        awardedXP = (distribution.materials && distribution.materials[idx]) || 0;
+      }
+
+      const prof = await getProfileByEmail(userEmail);
+      if (prof) {
+        const newExp = (prof.exp || 0) + awardedXP;
+        const newLevel = Math.floor(newExp / 1000) + 1;
+        await upsertProfile({
+          email: userEmail,
+          exp: newExp,
+          level: newLevel
+        });
+        
+        // Update local profile storage to reflect change immediately
+        const updatedProf = { ...prof, exp: newExp, level: newLevel };
+        localStorage.setItem('luma-user-profile', JSON.stringify(updatedProf));
+      }
+
       router.back();
     } catch(e) {
       setAlertData({ title: "Error", message: "Gagal menyimpan progres belajar.", type: 'error' });

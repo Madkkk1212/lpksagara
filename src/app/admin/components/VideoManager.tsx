@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { getAllStudyMaterials, getStudyLevels, getStudyChapters } from "@/lib/db";
+import { getMaterialsWithVideos, getStudyLevels, getStudyChapters } from "@/lib/db";
 import { StudyMaterial, StudyLevel, StudyChapter } from "@/lib/types";
 
 export default function VideoManager() {
-  const [materials, setMaterials] = useState<StudyMaterial[]>([]);
+  const [materials, setMaterials] = useState<Partial<StudyMaterial>[]>([]);
   const [levels, setLevels] = useState<StudyLevel[]>([]);
   const [chapters, setChapters] = useState<StudyChapter[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,14 +19,12 @@ export default function VideoManager() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [allMats, allLevels] = await Promise.all([
-        getAllStudyMaterials(),
+      const [videoMats, allLevels] = await Promise.all([
+        getMaterialsWithVideos(),
         getStudyLevels()
       ]);
       
-      // Filter only materials with videos
-      const videoMats = allMats.filter(m => m.video_url);
-      setMaterials(videoMats);
+      setMaterials(videoMats as StudyMaterial[]);
       setLevels(allLevels);
 
       // Optionally load chapters if needed for filtering
@@ -40,8 +38,9 @@ export default function VideoManager() {
 
   const filteredVideos = useMemo(() => {
     return materials.filter(video => {
-      const matchesSearch = video.title.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesSearch;
+      const hasVideo = video.video_url && video.video_url.trim() !== "";
+      const matchesSearch = (video.title || "").toLowerCase().includes(searchTerm.toLowerCase());
+      return hasVideo && matchesSearch;
     });
   }, [materials, searchTerm]);
 

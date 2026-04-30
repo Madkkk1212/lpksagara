@@ -8,12 +8,13 @@ export const maxDuration = 300;
 // ── Cloudflare R2 client (S3-compatible) ──────────────────────────────────
 function getR2Client() {
   return new S3Client({
-    region: "auto",
+    region: "us-east-1",
     endpoint: `https://${process.env.CLOUDFLARE_R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
     credentials: {
       accessKeyId:     process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
       secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
     },
+    forcePathStyle: true,
   });
 }
 

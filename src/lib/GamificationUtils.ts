@@ -58,6 +58,53 @@ export const updateUserStreak = async (userEmail: string) => {
 };
 
 /**
+ * Calculates XP distribution for a chapter (Fixed 1000 XP total)
+ * Based on rule: Quiz XP = Material XP * 1.3
+ */
+export const calculateChapterXPDistribution = (materiCount: number, quizCount: number) => {
+  const TOTAL_XP = 1000;
+  const MATERIAL_WEIGHT = 1.0;
+  const QUIZ_WEIGHT = 1.3;
+
+  if (materiCount + quizCount === 0) return { materialXP: 0, quizXP: 0 };
+
+  // 1. Calculate base unit XP
+  const totalWeight = (materiCount * MATERIAL_WEIGHT) + (quizCount * QUIZ_WEIGHT);
+  const unitXP = TOTAL_XP / totalWeight;
+
+  // 2. Initial decimal values
+  let materialXP = Math.floor(unitXP * MATERIAL_WEIGHT);
+  let quizXP = Math.floor(unitXP * QUIZ_WEIGHT);
+
+  // 3. Calculate remainder
+  let currentTotal = (materiCount * materialXP) + (quizCount * quizXP);
+  let remainder = TOTAL_XP - currentTotal;
+
+  // 4. Distribute remainder (Priority 1: Quizzes)
+  const distributedQuizzes = new Array(quizCount).fill(quizXP);
+  const distributedMaterials = new Array(materiCount).fill(materialXP);
+
+  for (let i = 0; i < quizCount && remainder > 0; i++) {
+    distributedQuizzes[i] += 1;
+    remainder -= 1;
+  }
+
+  // 5. Distribute remainder (Priority 2: Materials)
+  for (let i = 0; i < materiCount && remainder > 0; i++) {
+    distributedMaterials[i] += 1;
+    remainder -= 1;
+  }
+
+  // Note: This returns individual arrays if specific items need different XP, 
+  // but usually we can just return the average or the first one if they are uniform.
+  return {
+    materials: distributedMaterials,
+    quizzes: distributedQuizzes,
+    totalXP: distributedMaterials.reduce((a, b) => a + b, 0) + distributedQuizzes.reduce((a, b) => a + b, 0)
+  };
+};
+
+/**
  * Checks if a user has met any achievement criteria.
  */
 export const checkAchievements = async (userEmail: string, criteriaType: string, value: number) => {
