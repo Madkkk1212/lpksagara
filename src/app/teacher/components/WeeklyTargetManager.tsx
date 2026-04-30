@@ -133,8 +133,9 @@ export default function WeeklyTargetManager({ teacher, students }: { teacher: Pr
       await fetchData();
       setIsModalOpen(false);
       resetForm();
-    } catch (err) {
-      alert("Gagal menyimpan laporan mingguan.");
+    } catch (err: any) {
+      console.error("Weekly Target Error:", err);
+      alert("Gagal menyimpan: " + (err?.message || JSON.stringify(err)));
     } finally {
       setIsSubmitting(false);
     }

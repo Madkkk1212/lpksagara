@@ -301,8 +301,8 @@ export default function ReportManager() {
                 </button>
             </div>
         </div>       </div>
-               <div className="h-72 relative">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+               <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={userGrowthData}>
                       <defs>
                         <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
@@ -326,8 +326,8 @@ export default function ReportManager() {
                   <Target className="w-32 h-32 text-indigo-400" />
                </div>
                <h4 className="text-lg font-black italic text-white tracking-tight mb-8">Passing Rate by JLPT Level</h4>
-               <div className="h-64 relative">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+               <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={examPerformanceData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
                       <XAxis dataKey="name" fontSize={10} axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />

@@ -1,20 +1,38 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { getProfiles, getAdminMenuConfig } from "@/lib/db";
+import React, { useState, useEffect } from "react";
+import { getProfiles, getAdminMenuConfig, getTeacherStudents, getStudyLevels } from "@/lib/db";
 import { Profile, StudyLevel } from "@/lib/types";
 import WeeklyTargetManager from "./components/WeeklyTargetManager";
-import AssessmentManager from "./components/AssessmentManager";
 import WeeklyReportManager from "./components/WeeklyReportManager";
+import AssessmentManager from "./components/AssessmentManager";
+import { User, LogOut, LayoutDashboard, Target, FileText, ClipboardCheck, MessageSquarePlus } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
-type TeacherTab = "students" | "proposals" | "weekly" | "target-mingguan" | "weekly-targets" | "laporan-mingguan" | "grading" | "laporan-penilaian" | "weekly-report";
+type TeacherTab = "students" | "targets" | "reports" | "grading" | "proposals";
 
 export default function TeacherClient() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [teacherProfile, setTeacherProfile] = useState<Profile | null>(null);
-  const [studyLevels, setStudyLevels] = useState<StudyLevel[]>([]);
+  const [activeTab, setActiveTab] = useState<TeacherTab>('students');
+  const [numDynamicTabs, setNumDynamicTabs] = useState<number>(-1);
+  const [dynamicTabs, setDynamicTabs] = useState<{ id: TeacherTab; label: string; is_active?: boolean }[]>([]);
+  const [students, setStudents] = useState<Profile[]>([]);
+  const [levels, setLevels] = useState<StudyLevel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState<Profile | null>(null);
+  const [assignedStudentIds, setAssignedStudentIds] = useState<string[]>([]);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  // Proposals
+  const [proposals, setProposals] = useState<any[]>([]);
+  const [proposalForm, setProposalForm] = useState(false);
+  const [propType, setPropType] = useState<'question' | 'material'>('question');
+  const [propTitle, setPropTitle] = useState('');
+  const [propContent, setPropContent] = useState('');
+  const [propSubmitting, setPropSubmitting] = useState(false);
 
   useEffect(() => {
     const authStatus = localStorage.getItem("luma-auth");
@@ -36,7 +54,7 @@ export default function TeacherClient() {
       }
       setTeacherProfile(profile);
       setIsAuthorized(true);
-      fetchData(profile);
+      fetchData(profile.id!);
       fetchProposals(profile.email);
       fetchMenuConfig();
     } catch {
@@ -63,29 +81,21 @@ export default function TeacherClient() {
     }
   };
 
-  const fetchData = async (profile: Profile) => {
-    if (!profile?.id) {
-       setLoading(false);
-       return;
-    }
+  const fetchData = async (teacherId: string) => {
     setLoading(true);
-    
     try {
-      const { getTeacherStudents, getProfiles, getStudyLevels } = await import('@/lib/db');
-      const [assignedIds, allProfiles, levels] = await Promise.all([
-        getTeacherStudents(profile.id),
+      const [allProfiles, assignedIds, allLevels] = await Promise.all([
         getProfiles(),
+        getTeacherStudents(teacherId),
         getStudyLevels()
       ]);
       
-      const myStudents = allProfiles.filter(p => 
-        p.id && assignedIds.includes(p.id)
-      );
-      
-      setStudents(myStudents);
-      setStudyLevels(levels);
+      const onlyStudents = allProfiles.filter(p => !p.is_teacher && !p.is_admin);
+      setStudents(onlyStudents);
+      setAssignedStudentIds(assignedIds);
+      setLevels(allLevels);
     } catch (err) {
-      console.error("Error fetching teacher students:", err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -137,38 +147,54 @@ export default function TeacherClient() {
     window.location.href = "/?logout=1";
   };
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !teacherProfile?.email) return;
+  if (isCheckingAuth) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-500 font-medium text-sm">Verifying Access...</div>;
+  }
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      try {
-        const { upsertProfile } = await import('@/lib/db');
-        await upsertProfile({ email: teacherProfile.email, avatar_url: base64 });
-        
-        const updatedProfile = { ...teacherProfile, avatar_url: base64 };
-        setTeacherProfile(updatedProfile);
-        localStorage.setItem("luma-user-profile", JSON.stringify(updatedProfile));
-        
-        // Also update students list if needed (not needed for current teacher avatar)
-      } catch (err) {
-        console.error("Failed to upload avatar", err);
-        alert("Gagal mengunggah foto profil.");
-      }
-    };
-    reader.readAsDataURL(file);
-  };
+  if (!isAuthorized) return null;
 
+  const filteredStudents = students.filter(s =>
+    s.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalExp = students.reduce((sum, s) => sum + (s.exp || 0), 0);
+  const avgExp = students.length > 0 ? Math.round(totalExp / students.length) : 0;
+  const pendingCount = proposals.filter((p: any) => p.status === 'pending').length;
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 selection:bg-indigo-100">
+      {/* Header */}
+      <header className="px-6 lg:px-10 py-5 border-b border-slate-200 bg-white sticky top-0 z-20 flex justify-between items-center shadow-sm">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Teacher Hub</h1>
+          <p className="text-xs text-slate-500 font-medium mt-0.5">Student Performance Telemetry</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => window.open('/', '_blank')} className="px-5 py-2 border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 rounded-xl transition-all text-xs font-bold shadow-sm">
-            Preview App
-          </button>
-          <button onClick={handleLogout} className="px-5 py-2 bg-slate-900 text-white hover:bg-slate-800 rounded-xl transition-all text-xs font-bold shadow-sm">
-            Logout
-          </button>
+        <div className="flex items-center gap-6">
+           <button 
+             onClick={() => setIsProfileModalOpen(true)}
+             className="hidden md:flex items-center gap-3 pr-6 border-r border-slate-100 hover:opacity-80 transition-all cursor-pointer group"
+           >
+              <div className="h-10 w-10 rounded-full bg-slate-900 flex items-center justify-center text-white ring-4 ring-slate-50 overflow-hidden group-hover:ring-indigo-100 transition-all">
+                 {teacherProfile?.avatar_url ? (
+                   <img src={teacherProfile.avatar_url} className="w-full h-full object-cover" />
+                 ) : (
+                   <User className="w-5 h-5" />
+                 )}
+              </div>
+              <div className="text-left">
+                 <p className="text-xs font-black text-slate-900 leading-none group-hover:text-indigo-600 transition-colors">{teacherProfile?.full_name}</p>
+                 <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{teacherProfile?.nip || 'Teacher Account'}</p>
+              </div>
+           </button>
+           <div className="flex items-center gap-3">
+             <button onClick={() => window.open('/', '_blank')} className="px-5 py-2 border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 rounded-xl transition-all text-xs font-bold shadow-sm">
+               Preview App
+             </button>
+             <button onClick={handleLogout} className="p-2.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl transition-all shadow-sm group" title="Logout">
+               <LogOut className="w-5 h-5" />
+             </button>
+           </div>
         </div>
       </header>
 
@@ -176,18 +202,23 @@ export default function TeacherClient() {
       <div className="border-b border-slate-200 bg-white sticky top-[73px] z-10">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex gap-1">
-            {(numDynamicTabs > 0 ? (
-               teacherProfile?.is_super_admin 
-                 ? dynamicTabs 
-                 : dynamicTabs.filter(t => t.is_active !== false)
-            ) : [
-              { id: 'students', label: '👥 Data Siswa' },
-              { id: 'weekly', label: '📊 Target Mingguan' },
-              { id: 'weekly-report', label: '📋 Riwayat Laporan' },
-              { id: 'grading', label: '📝 Laporan Penilaian' },
-                    : 'text-slate-500 hover:text-slate-700'
+            {([
+              { id: 'students', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
+              { id: 'targets', label: 'Target Mingguan', icon: <Target className="w-4 h-4" /> },
+              { id: 'grading', label: 'Penilaian Siswa', icon: <ClipboardCheck className="w-4 h-4" /> },
+              { id: 'reports', label: 'Riwayat Laporan', icon: <FileText className="w-4 h-4" /> },
+              { id: 'proposals', label: 'Usul Konten', icon: <MessageSquarePlus className="w-4 h-4" /> },
+            ] as { id: TeacherTab; label: string; icon: React.ReactNode }[]).map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`relative px-6 py-5 text-sm font-bold transition-all flex items-center gap-2 ${
+                  activeTab === tab.id
+                    ? 'text-indigo-600 border-b-2 border-indigo-600'
+                    : 'text-slate-400 hover:text-slate-700'
                 }`}
               >
+                {tab.icon && <span>{tab.icon}</span>}
                 {tab.label}
                 {tab.id === 'proposals' && pendingCount > 0 && (
                   <span className="ml-2 px-1.5 py-0.5 bg-amber-500 text-white text-[9px] font-black rounded-full">{pendingCount}</span>
@@ -200,13 +231,7 @@ export default function TeacherClient() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 mt-10">
-        {(activeTab === 'weekly' || activeTab === 'target-mingguan' || activeTab === 'weekly-targets' || activeTab === 'laporan-mingguan') ? (
-           <WeeklyTargetManager teacher={teacherProfile!} students={students} />
-        ) : activeTab === 'weekly-report' ? (
-           <WeeklyReportManager teacher={teacherProfile!} />
-        ) : (activeTab === 'grading' || activeTab === 'laporan-penilaian') ? (
-           <AssessmentManager students={students} levels={studyLevels} />
-        ) : activeTab === 'proposals' ? (
+        {activeTab === 'proposals' ? (
           /* ── PROPOSALS TAB ── */
           <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -260,8 +285,21 @@ export default function TeacherClient() {
               ))}
             </div>
           </div>
+        ) : activeTab === 'targets' ? (
+          <WeeklyTargetManager 
+            teacher={teacherProfile!} 
+            students={assignedStudentIds.length > 0 ? students.filter(s => assignedStudentIds.includes(s.id!)) : students} 
+          />
+        ) : activeTab === 'grading' ? (
+          <AssessmentManager 
+            teacher={teacherProfile!} 
+            students={assignedStudentIds.length > 0 ? students.filter(s => assignedStudentIds.includes(s.id!)) : students} 
+            levels={levels} 
+          />
+        ) : activeTab === 'reports' ? (
+          <WeeklyReportManager teacher={teacherProfile!} />
         ) : (
-          /* ── STUDENTS TAB ── */
+          /* ── STUDENTS DASHBOARD ── */
           <div>
             {/* Stat Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -320,10 +358,7 @@ export default function TeacherClient() {
                       <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-6 py-4">
                           <p className="font-bold text-slate-800">{s.full_name}</p>
-                          <div className="flex items-center gap-2">
-                             <p className="text-xs text-slate-400">{s.email}</p>
-                             {s.nip && <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded italic">ID: {s.nip}</span>}
-                          </div>
+                          <p className="text-xs text-slate-400">{s.email}</p>
                         </td>
                         <td className="px-6 py-4">
                           <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold">Lv. {s.level || 1}</span>
@@ -372,9 +407,7 @@ export default function TeacherClient() {
             <div className="flex-1 overflow-y-auto p-6 lg:p-8 bg-slate-50/50">
               <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm mb-6">
                 <h3 className="text-lg font-bold text-slate-900 mb-1">{selectedStudent.full_name}</h3>
-                <p className="text-xs text-slate-400 mb-4 font-mono uppercase tracking-tighter font-black">
-                   ID SISWA: <span className="text-indigo-600">{selectedStudent.nip || selectedStudent.id?.substring(0, 16)}</span>
-                </p>
+                <p className="text-xs text-slate-400 mb-4 font-mono">UID: {selectedStudent.id?.substring(0, 16)}...</p>
                 <div className="flex gap-3 flex-wrap">
                   <span className="text-xs font-semibold bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg">Level {selectedStudent.level || 1}</span>
                   <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg">{(selectedStudent.exp || 0).toLocaleString()} XP</span>
@@ -476,79 +509,49 @@ export default function TeacherClient() {
 
       {/* Teacher Profile Modal */}
       <AnimatePresence>
-        {showProfile && (
+        {isProfileModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowProfile(false)}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsProfileModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
             />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative bg-white rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl border border-slate-100"
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-[3rem] shadow-2xl overflow-hidden"
             >
-              {/* Profile Header */}
-              <div className="h-32 bg-gradient-to-br from-indigo-600 to-indigo-800 relative">
-                <div className="absolute -bottom-10 left-1/2 -translate-x-1/2">
-                  <div className="w-24 h-24 bg-white rounded-[2rem] p-1.5 shadow-xl relative group">
-                    <div className="w-full h-full bg-slate-900 rounded-[1.7rem] flex items-center justify-center text-3xl font-black text-white italic overflow-hidden">
-                      {teacherProfile?.avatar_url ? (
-                        <img src={teacherProfile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                      ) : (
-                        teacherProfile?.full_name?.charAt(0)
-                      )}
+              <div className="p-10 text-center">
+                 <div className="h-24 w-24 rounded-full bg-slate-900 mx-auto mb-6 flex items-center justify-center text-white ring-8 ring-slate-50 overflow-hidden shadow-xl">
+                    {teacherProfile?.avatar_url ? (
+                      <img src={teacherProfile.avatar_url} className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-10 h-10" />
+                    )}
+                 </div>
+                 <h3 className="text-xl font-black text-slate-900 mb-1">{teacherProfile?.full_name}</h3>
+                 <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-6">{teacherProfile?.nip || 'Teacher Account'}</p>
+                 
+                 <div className="bg-slate-50 rounded-2xl p-6 text-left space-y-4 mb-8">
+                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
+                       <span>Email</span>
+                       <span className="text-slate-900 lowercase">{teacherProfile?.email}</span>
                     </div>
-                    {/* Upload Overlay */}
-                    <label className="absolute inset-1.5 rounded-[1.7rem] bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                      <span className="text-[18px]">📷</span>
-                      <span className="text-[8px] font-black text-white uppercase tracking-tighter mt-1">Ganti Foto</span>
-                      <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Profile Body */}
-              <div className="pt-16 pb-10 px-8 text-center">
-                <h3 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">{teacherProfile?.full_name}</h3>
-                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mt-1">Guru Pengajar — {teacherProfile?.batch || "Semua Angkatan"}</p>
-                
-                <div className="mt-8 space-y-3">
-                  <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 transition-colors hover:bg-slate-100/50">
-                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-lg">📧</div>
-                    <div className="text-left">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Email Address</p>
-                      <p className="text-xs font-bold text-slate-700">{teacherProfile?.email}</p>
+                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
+                       <span>Total Murid</span>
+                       <span className="text-slate-900">{assignedStudentIds.length} Siswa</span>
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 transition-colors hover:bg-slate-100/50">
-                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-lg">📱</div>
-                    <div className="text-left">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Phone Number</p>
-                      <p className="text-xs font-bold text-slate-700">{teacherProfile?.phone || "-"}</p>
+                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
+                       <span>Role</span>
+                       <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-md">TEACHER</span>
                     </div>
-                  </div>
+                 </div>
 
-                  <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 transition-colors hover:bg-slate-100/50">
-                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-lg">👤</div>
-                    <div className="text-left">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Gender</p>
-                      <p className="text-xs font-bold text-slate-700">{teacherProfile?.gender || "-"}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setShowProfile(false)}
-                  className="w-full mt-8 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-[0.2em] hover:bg-slate-800 transition-all shadow-lg active:scale-95"
-                >
-                  Tutup Profil
-                </button>
+                 <button 
+                   onClick={() => setIsProfileModalOpen(false)}
+                   className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all"
+                 >
+                   Tutup
+                 </button>
               </div>
             </motion.div>
           </div>

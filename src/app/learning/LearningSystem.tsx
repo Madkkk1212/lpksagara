@@ -206,7 +206,7 @@ export default function LearningSystem({ user, onLogout, theme, onRefreshUser }:
              {activeTab === "dashboard" && <DashboardView user={user} theme={theme} onUpgrade={setUpgradeMessage} onSwitchTab={setActiveTab} />}
              {activeTab === "materi" && <MateriView user={user} theme={theme} onUpgrade={setUpgradeMessage} onRefreshUser={onRefreshUser} />}
              {activeTab === "latihan" && <LatihanView user={user} theme={theme} onUpgrade={setUpgradeMessage} />}
-             {activeTab === "profile" && <ProfileView user={user} onRefreshUser={onRefreshUser} />}
+             {activeTab === "profile" && <ProfileView user={user} />}
              {activeTab === "flashcards" && <FlashcardSRS userEmail={user.email} />}
            </div>
         </div>

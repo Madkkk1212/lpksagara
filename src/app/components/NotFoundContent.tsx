@@ -24,14 +24,21 @@ export default function NotFoundContent({ theme }: NotFoundContentProps) {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          router.push("/");
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
+    // Redirect after countdown ends (5 seconds)
+    const redirect = setTimeout(() => {
+      router.push("/");
+    }, 5000);
+
+    return () => {
+      clearInterval(timer);
+      clearTimeout(redirect);
+    };
   }, [router]);
 
   if (!mounted) return null;

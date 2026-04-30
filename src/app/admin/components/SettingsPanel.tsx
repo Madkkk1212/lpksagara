@@ -2,46 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { getTheme, updateTheme } from "@/lib/db";
-import { AppTheme } from "@/lib/types";
 
 export default function SettingsPanel() {
-  const [theme, setTheme] = useState<AppTheme | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  const [config] = useState({
+  const [config, setConfig] = useState({
     url: process.env.NEXT_PUBLIC_SUPABASE_URL,
     key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 10) + "...",
   });
 
-  useEffect(() => {
-    loadTheme();
-  }, []);
-
-  const loadTheme = async () => {
-    const data = await getTheme();
-    if (data) setTheme(data);
-    setLoading(false);
-  };
-
-  const handleSaveCloudinary = async () => {
-    if (!theme) return;
-    setSaving(true);
-    try {
-      await updateTheme({
-        id: theme.id,
-        cloudinary_cloud_name: theme.cloudinary_cloud_name,
-        cloudinary_upload_preset: theme.cloudinary_upload_preset,
-      });
-      alert("Settings saved!");
-    } catch (e) {
-      alert("Error saving settings");
-    } finally {
-      setSaving(false);
+  const handleResetLocalStorage = () => {
+    if (confirm("Reset local auth data? You will be logged out of admin.")) {
+      localStorage.removeItem("luma-admin-auth");
+      window.location.reload();
     }
   };
 
+  return (
+    <div className="space-y-6 font-sans">
       <section className="bg-white border border-slate-200 rounded-2xl p-6 lg:p-8 shadow-sm">
         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-6 border-b border-slate-100 pb-4">Supabase Connection Parameters</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

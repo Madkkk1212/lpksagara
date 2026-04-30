@@ -3,7 +3,7 @@ import { Profile, ProfileField, ProfileValue } from "@/lib/types";
 import { upsertProfile, getProfileFields, getProfileValuesByUserId, upsertProfileValue } from "@/lib/db";
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function ProfileView({ user, onRefreshUser }: { user: Profile, onRefreshUser?: () => void }) {
+export default function ProfileView({ user }: { user: Profile }) {
   const [isChangingPass, setIsChangingPass] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -17,48 +17,320 @@ export default function ProfileView({ user, onRefreshUser }: { user: Profile, on
   const [uploadingFieldId, setUploadingFieldId] = useState<string | null>(null);
   const [localValues, setLocalValues] = useState<Record<string, string>>({});
 
-  const [coreData, setCoreData] = useState({
-    full_name: user.full_name || "",
-    nickname: user.nickname || "",
-    gender: user.gender || "Laki-laki",
-    phone: user.phone || "",
-    birth_date: user.birth_date || "",
-    institution: user.institution || "",
-    address: user.address || "",
-    target_level: user.target_level || "",
-  });
+  const fetchData = async () => {
+    try {
+      if (!user.id) return;
+      const role = user.is_student ? 'student' : user.is_alumni ? 'alumni' : 'all';
+      const [f, v] = await Promise.all([
+        getProfileFields(role),
+        getProfileValuesByUserId(user.id!)
+      ]);
+      setFields(f);
+      setValues(v);
+      
+      const lMap: Record<string, string> = {};
+      v.forEach(val => { lMap[val.field_id] = val.value; });
+      setLocalValues(lMap);
+    } catch (err) {
+      console.error("ProfileView: Fetch Error:", err);
+    } finally {
+      setLoadingData(false);
+    }
+  };
 
   useEffect(() => {
-    setCoreData({
-      full_name: user.full_name || "",
-      nickname: user.nickname || "",
-      gender: user.gender || "Laki-laki",
-      phone: user.phone || "",
-      birth_date: user.birth_date || "",
-      institution: user.institution || "",
-      address: user.address || "",
-      target_level: user.target_level || "",
-    });
-  }, [user]);
+    fetchData();
+  }, [user.id]);
 
-  const handleCoreUpdate = async () => {
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+       alert("Hanya file gambar yang diperbolehkan.");
+       return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("File foto profil maksimal 2MB.");
+      return;
+    }
+
+    setUploadingAvatar(true);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+       try {
+          const base64 = reader.result as string;
+          await upsertProfile({ ...user, avatar_url: base64 });
+          alert("Foto profil berhasil diperbarui!");
+          window.location.reload(); 
+       } catch (err) {
+          console.error("Avatar Upload Error:", err);
+          alert("Gagal memperbarui foto profil.");
+       } finally {
+          setUploadingAvatar(false);
+       }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFieldUpdate = async (fieldId: string, value: string) => {
+    if (!user.id) return;
+    try {
+      setUploadingFieldId(fieldId);
+      await upsertProfileValue({
+        user_id: user.id,
+        field_id: fieldId,
+        value: value
+      });
+      fetchData();
+    } catch (err) {
+      alert("Gagal memperbarui data.");
+    } finally {
+      setUploadingFieldId(null);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: ProfileField) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (field.allowed_file_types && field.allowed_file_types.length > 0) {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      if (!ext || !field.allowed_file_types.includes(ext)) {
+        alert(`Tipe file tidak valid. Diperbolehkan: ${field.allowed_file_types.join(', ')}`);
+        return;
+      }
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("File terlalu besar. Maksimal 2MB.");
+      return;
+    }
+
+    setUploadingFieldId(field.id);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
+        const base64 = reader.result as string;
+        await upsertProfileValue({
+          user_id: user.id!,
+          field_id: field.id,
+          value: base64
+        });
+        alert(`${field.name} berhasil diunggah!`);
+        await fetchData();
+      } catch (err) {
+        console.error("Upload Error:", err);
+        alert("Gagal mengunggah berkas.");
+      } finally {
+        setUploadingFieldId(null);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      alert("Konfirmasi password tidak cocok.");
+      return;
+    }
+    if (newPassword.length < 4) {
+      alert("Password minimal 4 karakter.");
+      return;
+    }
+
     setLoading(true);
     try {
-      await upsertProfile({ 
-        ...user, 
-        ...coreData, 
-        profile_completed: true 
-      });
-      alert("Profil berhasil diperbarui!");
-      if (onRefreshUser) onRefreshUser();
+      await upsertProfile({ ...user, password: newPassword });
+      alert("Password berhasil diubah!");
+      setIsChangingPass(false);
+      setNewPassword("");
+      setConfirmPassword("");
     } catch (err) {
-      console.error(err);
-      alert("Gagal memperbarui profil.");
+      alert("Gagal mengubah password.");
     } finally {
       setLoading(false);
     }
   };
 
+  const [activeSubView, setActiveSubView] = useState<"menu" | "identitas" | "berkas">("menu");
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <AnimatePresence mode="wait">
+        {activeSubView === "menu" ? (
+          <motion.div 
+            key="menu"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-10"
+          >
+            <h3 className="text-2xl font-black italic text-slate-800 text-center uppercase tracking-tighter">Pengelolaan Akun</h3>
+
+            {/* Profile Header Card */}
+            <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-sm flex flex-col items-center gap-6 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/50 -mr-16 -mt-16 rounded-full opacity-50 blur-2xl" />
+              <div className="relative">
+                <div className={`h-32 w-32 rounded-[2.5rem] bg-slate-100 border-4 border-white shadow-xl flex items-center justify-center font-black text-4xl text-slate-300 overflow-hidden ring-4 ring-slate-50 transition-all ${uploadingAvatar ? 'opacity-50 grayscale' : ''}`}>
+                   {user.avatar_url ? (
+                      <img src={user.avatar_url} className="w-full h-full object-cover" alt="avatar"/>
+                   ) : (
+                      user.full_name.charAt(0)
+                   )}
+                   {uploadingAvatar && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                         <div className="h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                   )}
+                </div>
+                <input 
+                  type="file" 
+                  id="avatar-upload" 
+                  className="hidden" 
+                  accept="image/*" 
+                  onChange={handleAvatarUpload}
+                />
+                <label 
+                  htmlFor="avatar-upload"
+                  className="absolute -bottom-2 -right-2 h-10 w-10 bg-slate-900 text-white rounded-xl shadow-lg flex items-center justify-center text-sm border-2 border-white hover:scale-110 cursor-pointer transition active:scale-95"
+                >
+                   📷
+                </label>
+              </div>
+
+              <div className="text-center">
+                  <h4 className="text-2xl font-black text-slate-800 italic uppercase tracking-tight">{user.full_name}</h4>
+                  <div className="flex items-center gap-2 justify-center mt-1">
+                     <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                     <p className="text-sm font-bold text-slate-400 font-mono tracking-tighter">{user.email}</p>
+                  </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              {/* Menu items as buttons */}
+              {[
+                { id: "identitas", label: "Identitas Diri", desc: "Data kependudukan & Institusi", icon: "🆔", color: "bg-indigo-50", text: "text-indigo-600" },
+                { id: "berkas", label: "Berkas Pendukung", desc: "KTP, Foto, & Dokumen lainnya", icon: "📂", color: "bg-emerald-50", text: "text-emerald-600" },
+              ].map((item) => (
+                <button 
+                  key={item.id}
+                  onClick={() => setActiveSubView(item.id as any)}
+                  className="w-full bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:translate-y-[-4px] transition-all flex items-center justify-between group overflow-hidden relative"
+                >
+                  <div className="absolute top-0 left-0 w-1 h-full bg-slate-200 group-hover:bg-indigo-500 transition-colors" />
+                  <div className="flex items-center gap-6">
+                    <div className={`h-14 w-14 rounded-2xl ${item.color} flex items-center justify-center text-2xl shadow-inner group-hover:scale-110 transition-transform`}>
+                      {item.icon}
+                    </div>
+                    <div className="text-left">
+                      <h5 className="font-black text-slate-800 text-sm tracking-tight italic uppercase">{item.label}</h5>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{item.desc}</p>
+                    </div>
+                  </div>
+                  <span className="text-slate-200 text-2xl font-bold group-hover:text-slate-500 transition-colors">→</span>
+                </button>
+              ))}
+
+              <button 
+                onClick={() => setIsChangingPass(true)}
+                className="w-full bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:translate-y-[-4px] transition-all flex items-center justify-between group overflow-hidden relative"
+              >
+                 <div className="absolute top-0 left-0 w-1 h-full bg-slate-200 group-hover:bg-rose-500 transition-colors" />
+                 <div className="flex items-center gap-6">
+                    <div className="h-14 w-14 rounded-2xl bg-slate-50 flex items-center justify-center text-2xl shadow-inner group-hover:scale-110 transition-transform text-slate-400">🔑</div>
+                    <div className="text-left">
+                       <h5 className="font-black text-slate-800 text-sm tracking-tight italic uppercase">Keamanan Password</h5>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Ubah kata sandi akun Anda secara berkala</p>
+                    </div>
+                 </div>
+                 <span className="text-slate-200 text-2xl font-bold group-hover:text-slate-500 transition-colors">→</span>
+              </button>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div 
+            key="details"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-8"
+          >
+            <button 
+              onClick={() => setActiveSubView("menu")}
+              className="flex items-center gap-3 text-slate-400 font-black text-[10px] uppercase tracking-[0.3em] hover:text-slate-800 transition-colors ml-4"
+            >
+              ← KEMBALI KE MENU PROFIL
+            </button>
+
+            {activeSubView === "identitas" && (
+              <section className="space-y-6">
+                <div className="text-center mb-8 pt-4">
+                  <div className="h-16 w-16 bg-indigo-600 text-white rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-xl shadow-indigo-100">🆔</div>
+                  <h4 className="text-2xl font-black text-slate-800 italic uppercase">Identitas Diri</h4>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Status data kependudukan terverifikasi</p>
+                </div>
+                
+                <div className="bg-white rounded-[3rem] border border-slate-100 p-10 shadow-sm">
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                      {[
+                        { label: "Tanggal Lahir", value: user.birth_date, icon: "📅" },
+                        { label: "Institusi", value: user.institution, icon: "🏢" },
+                        { label: "Alamat KTP", value: user.address, icon: "📍" },
+                      ].map((item, idx) => (
+                        <div key={idx} className="space-y-2">
+                           <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 ml-2">{item.label}</label>
+                           <div className="bg-slate-50 border border-slate-100 rounded-[1.5rem] p-5 flex items-center gap-4 group">
+                              <span className="text-2xl group-hover:scale-110 transition-transform">{item.icon}</span>
+                              <span className="text-sm font-bold text-slate-700 truncate">{item.value || 'Belum diisi'}</span>
+                           </div>
+                        </div>
+                      ))}
+
+                      {/* Dynamic Text/Number Fields moved here */}
+                      {fields.filter(f => f.type !== 'file').sort((a,b) => (a.sort_order||0)-(b.sort_order||0)).map((field) => {
+                         const val = values.find(v => v.field_id === field.id)?.value;
+                         const isUploading = uploadingFieldId === field.id;
+                         const localVal = localValues[field.id] || "";
+
+                         return (
+                           <div key={field.id} className="space-y-2">
+                              <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 ml-2">
+                                {field.name} {field.is_required && <span className="text-rose-500">*</span>}
+                              </label>
+                              <div className="relative group">
+                                <div className="flex bg-slate-50 rounded-[1.5rem] border border-slate-100 p-2 focus-within:bg-white focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-50 transition-all">
+                                  <input 
+                                    type={field.type === 'number' ? 'number' : 'text'}
+                                    className="flex-1 bg-transparent px-4 py-3 outline-none font-bold text-slate-800 text-sm placeholder:text-slate-300"
+                                    placeholder={`Masukkan ${field.name.toLowerCase()}...`}
+                                    value={localVal}
+                                    onChange={(e) => setLocalValues({ ...localValues, [field.id]: e.target.value })}
+                                  />
+                                  <button 
+                                    onClick={() => handleFieldUpdate(field.id, localVal)}
+                                    disabled={isUploading || localVal === val}
+                                    className={`px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${
+                                      localVal === val 
+                                        ? 'hidden' 
+                                        : 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 hover:bg-slate-900 active:scale-95 animate-in slide-in-from-right-2'
+                                    }`}
+                                  >
+                                    {isUploading ? '...' : 'SIMPAN'}
+                                  </button>
+                                </div>
+                                {val && localVal === val && (
+                                  <div className="absolute -right-2 -top-2 h-6 w-6 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[10px] shadow-lg border-2 border-white animate-in zoom-in-50">✓</div>
+                                )}
+                              </div>
+                           </div>
+                         );
+                      })}
+                   </div>
+                </div>
               </section>
             )}
 

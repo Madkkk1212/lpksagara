@@ -1,21 +1,65 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Profile, AppTheme, WeeklyTarget } from "@/lib/types";
-import { getLeaderboard, getUserLastProgressDetails, getStudentWeeklyTargets } from "@/lib/db";
+import { Profile, AppTheme, StudyMaterial } from "@/lib/types";
+import { getLeaderboard, getUserLastProgressDetails, getStudentWeeklyTargets, getCompletedMaterials, getAllStudyMaterials } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import AISenseiChat from "./AISenseiChat";
-import { Flame, Trophy, Calendar, Bell, ChevronRight, Zap } from "lucide-react";
+import { Flame, Trophy, Zap, CheckCircle2, Circle, BookOpen, Link2 } from "lucide-react";
+import { WeeklyTarget } from "@/lib/types";
 
 export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: { user: Profile, theme: AppTheme | null, onUpgrade?: (msg: string) => void, onSwitchTab?: (tab: any) => void }) {
   const [leaderboard, setLeaderboard] = useState<Profile[]>([]);
   const [lastProgress, setLastProgress] = useState<any[]>([]);
   const [achievements, setAchievements] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [weeklyTargets, setWeeklyTargets] = useState<WeeklyTarget[]>([]);
+  const [completedMaterials, setCompletedMaterials] = useState<string[]>([]);
+  const [allMaterials, setAllMaterials] = useState<StudyMaterial[]>([]);
   const [isLeaderboardOpen, setLeaderboardOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAnnouncement, setShowAnnouncement] = useState(false);
-  const [weeklyTargets, setWeeklyTargets] = useState<WeeklyTarget[]>([]);
+  
+  const currentExp = user.exp || 0;
+  // Progress formula: assuming levels are 1000 exp each
+  const levelProgress = currentExp % 1000;
+  const progressPercent = Math.min(levelProgress / 10, 100);
+
+  useEffect(() => {
+    async function loadDashboard() {
+      // 1. Fetch active announcements
+      const { data: ann } = await supabase
+        .from('announcements')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (ann && ann.length > 0) {
+        setAnnouncements(ann);
+        setShowAnnouncement(true);
+      }
+
+      // 2. Fetch earned achievements
+      const { data: ach } = await supabase
+        .from('user_achievements')
+        .select('achievement_id, achievements(*)')
+        .eq('user_email', user.email);
+      setAchievements(ach || []);
+
+      // 3. Fetch Leaderboard, Progress, Weekly Targets & All Materials
+      const [lb, lp, targets, completed, mats] = await Promise.all([
+        getLeaderboard(),
+        getUserLastProgressDetails(user.email),
+        getStudentWeeklyTargets(user.email, user.batch),
+        getCompletedMaterials(user.email),
+        getAllStudyMaterials()
+      ]);
+      setLeaderboard(lb.filter(p => !p.is_admin && !p.is_teacher));
+      setLastProgress(lp);
+      setWeeklyTargets(targets);
+      setCompletedMaterials(completed);
+      setAllMaterials(mats);
     }
     loadDashboard();
   }, [user.email]);
@@ -156,35 +200,101 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
            </div>
         </div>
 
-        {/* Weekly Quest */}
+        {/* Weekly Mission Section - Always visible */}
         <div className="space-y-6">
            <h3 className="text-xl font-black text-slate-800 italic uppercase tracking-wider flex items-center gap-3 px-2">
              <span className="p-2 bg-white rounded-xl shadow-sm border border-slate-100">📅</span>
-             Quest Mingguan
+             Misi Mingguan
            </h3>
-           <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[3rem] p-8 space-y-4 min-h-[160px] flex flex-col justify-center">
-              {weeklyTargets.length === 0 ? (
-                 <div className="text-center">
-                    <span className="text-4xl opacity-50 mb-2 block">🏖️</span>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Belum ada tugas mingguan</p>
-                 </div>
-              ) : (
-                weeklyTargets.map((target, idx) => {
-                  const isCompleted = target.status === 'completed';
+
+           {weeklyTargets.length === 0 ? (
+             <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[3rem] p-12 flex flex-col items-center justify-center text-center gap-4">
+               <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center">
+                 <span className="text-2xl">📭</span>
+               </div>
+               <div>
+                 <p className="text-sm font-black text-slate-600 uppercase tracking-widest">Belum Ada Misi Mingguan</p>
+                 <p className="text-xs text-slate-400 font-medium mt-1">Guru kamu belum memberikan tugas untuk minggu ini. Pantau terus!</p>
+               </div>
+             </div>
+           ) : (
+             <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[3rem] p-8 space-y-5">
+                {weeklyTargets.map((target) => {
+                  const matIds = target.material_ids || [];
+                  const totalMaterials = matIds.length;
+                  const doneCount = matIds.filter(id => completedMaterials.includes(id)).length;
+                  const isDone = totalMaterials > 0 && doneCount === totalMaterials;
+                  const pct = totalMaterials > 0 ? Math.round((doneCount / totalMaterials) * 100) : 0;
+
                   return (
-                    <div key={target.id || idx} className={`p-5 rounded-3xl border flex items-center justify-between transition-all duration-500 ${isCompleted ? 'bg-white/20 border-teal-100 opacity-60' : 'bg-white border-white/80 shadow-sm hover:shadow-lg'}`}>
-                       <div className="flex items-center gap-4">
-                          <div className={`h-8 w-8 rounded-full flex items-center justify-center border-2 transition-all shrink-0 ${isCompleted ? 'bg-teal-500 border-teal-500 text-white' : 'bg-slate-50 border-slate-100 text-slate-200'}`}>
-                            {isCompleted && '✓'}
+                    <div key={target.id} className={`rounded-[2rem] border flex flex-col transition-all duration-500 overflow-hidden ${isDone ? 'bg-white/20 border-teal-100 opacity-70' : 'bg-white border-white/80 shadow-sm hover:shadow-xl'}`}>
+                       {/* Header misi */}
+                       <div className="p-5 flex flex-col gap-3">
+                          <div className="flex items-center justify-between">
+                             <div className="flex items-center gap-2.5">
+                                {isDone ? <CheckCircle2 className="w-5 h-5 text-teal-500 shrink-0" /> : <Circle className="w-5 h-5 text-slate-300 shrink-0" />}
+                                <span className={`text-xs font-black uppercase tracking-tight leading-snug ${isDone ? 'text-slate-400 line-through italic' : 'text-slate-800'}`}>{target.title}</span>
+                             </div>
+                             <span className={`text-[9px] font-black px-2 py-1 rounded-md shrink-0 ${isDone ? 'bg-teal-50 text-teal-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                                {pct}% ({doneCount}/{totalMaterials})
+                             </span>
                           </div>
-                          <span className={`text-xs font-black truncate ${isCompleted ? 'text-slate-400 line-through italic' : 'text-slate-700'}`}>{target.title}</span>
+
+                          {/* Progress bar */}
+                          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                             <div
+                               className={`h-full rounded-full transition-all duration-1000 ${isDone ? 'bg-teal-500' : 'bg-gradient-to-r from-indigo-500 to-teal-400'}`}
+                               style={{ width: `${pct}%` }}
+                             />
+                          </div>
+
+                          {/* Catatan guru */}
+                          {target.description && (
+                            <p className="text-[9px] text-slate-400 font-medium italic leading-relaxed border-t border-slate-100 pt-2">
+                               📝 {target.description}
+                            </p>
+                          )}
                        </div>
-                       {!isCompleted && <span className="text-[9px] shrink-0 font-black text-teal-600 bg-teal-50 px-2 py-1 rounded-md">Sedang Berjalan</span>}
+
+                       {/* Daftar materi */}
+                       {matIds.length > 0 && (
+                         <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-3 flex flex-col gap-2">
+                           <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-1">
+                             <BookOpen className="w-3 h-3" /> Materi yang harus diselesaikan
+                           </p>
+                           {matIds.map((mid) => {
+                             const mat = allMaterials.find(m => m.id === mid);
+                             const done = completedMaterials.includes(mid);
+                             return (
+                               <div key={mid} className={`flex items-center gap-2.5 p-2 rounded-xl transition-all ${done ? 'opacity-50' : ''}`}>
+                                 {done
+                                   ? <CheckCircle2 className="w-4 h-4 text-teal-500 shrink-0" />
+                                   : <Circle className="w-4 h-4 text-slate-300 shrink-0" />
+                                 }
+                                 <span className={`text-[10px] font-bold flex-1 ${done ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+                                   {mat?.title || 'Materi'}
+                                 </span>
+                                 {mat && (
+                                   <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md ${
+                                     mat.material_type === 'moji_goi' ? 'bg-purple-50 text-purple-500' :
+                                     mat.material_type === 'bunpou' ? 'bg-blue-50 text-blue-500' :
+                                     mat.material_type === 'dokkai' ? 'bg-amber-50 text-amber-500' :
+                                     mat.material_type === 'choukai' ? 'bg-rose-50 text-rose-500' :
+                                     'bg-slate-100 text-slate-400'
+                                   }`}>
+                                     {mat.material_type}
+                                   </span>
+                                 )}
+                               </div>
+                             );
+                           })}
+                         </div>
+                       )}
                     </div>
-                  )
-                })
-              )}
-           </div>
+                  );
+                })}
+             </div>
+           )}
         </div>
       </div>
 

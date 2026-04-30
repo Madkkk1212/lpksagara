@@ -1,10 +1,5 @@
 import { supabase } from './supabase'
-import { 
-  AppTheme, BannerSlide, MaterialCategory, Material, ExamLevel, ExamTest, 
-  Question, Profile, StudyLevel, StudyChapter, StudyMaterial, AdminMenuConfig, 
-  ProfileField, ProfileValue, IconCategory, IconLibraryItem, StudentBatch,
-  WeeklyTarget, WeeklyReport 
-} from './types'
+import { AppTheme, BannerSlide, MaterialCategory, Material, ExamLevel, ExamTest, Question, Profile, StudyLevel, StudyChapter, StudyMaterial, AdminMenuConfig, ProfileField, ProfileValue, WeeklyTarget, WeeklyReport, StudentBatch, ChapterTemplate } from './types'
 
 // Theme
 export async function getTheme(): Promise<AppTheme | null> {
@@ -152,7 +147,7 @@ export async function deleteQuestion(id: string) {
 export async function getProfiles(): Promise<Profile[]> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, email, full_name, nickname, phone, nip, batch, is_admin, is_teacher, is_student, is_alumni, is_premium, profile_completed, created_at, password, avatar_url, level, exp, target_level, unlocked_levels, unlocked_materials, institution, address, gender, birth_date, certificate_url')
+    .select('id, email, full_name, phone, nip, batch, is_admin, is_teacher, is_student, is_alumni, is_premium, profile_completed, created_at, password, avatar_url')
     .order('created_at', { ascending: false })
   if (error) return []
   return data as Profile[]
@@ -224,9 +219,53 @@ export async function getStudyChapters(levelId: string): Promise<StudyChapter[]>
 export async function getAllStudyChapters(): Promise<StudyChapter[]> {
   const { data, error } = await supabase.from('study_chapters').select('*').order('sort_order', { ascending: true })
   if (error) return []
-  return data as StudyChapter[]
+  return data
 }
 
+export async function upsertStudyChapter(chapter: Partial<StudyChapter>) {
+  const { data, error } = await supabase.from('study_chapters').upsert(chapter).select()
+  if (error) throw error
+  return data
+}
+
+export async function deleteStudyChapter(id: string) {
+  const { error } = await supabase.from('study_chapters').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function getStudyMaterials(chapterId: string): Promise<StudyMaterial[]> {
+  const { data, error } = await supabase.from('study_materials').select('*').eq('chapter_id', chapterId).order('sort_order', { ascending: true })
+  if (error) return []
+  return data
+}
+
+export async function getAllStudyMaterials(): Promise<StudyMaterial[]> {
+  const { data, error } = await supabase.from('study_materials').select('*').order('created_at', { ascending: false });
+  if (error) return [];
+  return data;
+}
+
+export async function getStudyMaterialById(id: string): Promise<StudyMaterial | null> {
+  const { data, error } = await supabase.from('study_materials').select('*').eq('id', id).single()
+  if (error) return null
+  return data
+}
+
+export async function upsertStudyMaterial(material: Partial<StudyMaterial>) {
+  const { data, error } = await supabase.from('study_materials').upsert(material).select()
+  if (error) throw error
+  return data
+}
+
+export async function deleteStudyMaterial(id: string) {
+  const { error } = await supabase.from('study_materials').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ==========================================
+// ICON GALLERY MANAGER
+// ==========================================
+import { IconCategory, IconLibraryItem } from './types';
 
 export async function getIconCategories(): Promise<IconCategory[]> {
   const { data, error } = await supabase.from('icon_categories').select('*').order('created_at', { ascending: true })
@@ -329,29 +368,13 @@ export async function getAdminMenuConfig(scope?: 'admin' | 'teacher'): Promise<A
 }
 
 export async function updateAdminMenuConfig(config: Partial<AdminMenuConfig>) {
-  // Try to find if it exists first since tab_id might not have a unique constraint
-  const { data: existing } = await supabase
+  const { data, error } = await supabase
     .from('admin_menu_config')
-    .select('id')
+    .update(config)
     .eq('tab_id', config.tab_id)
-    .maybeSingle();
-
-  if (existing) {
-    const { data, error } = await supabase
-      .from('admin_menu_config')
-      .update(config)
-      .eq('id', existing.id)
-      .select();
-    if (error) throw error;
-    return data;
-  } else {
-    const { data, error } = await supabase
-      .from('admin_menu_config')
-      .insert(config)
-      .select();
-    if (error) throw error;
-    return data;
-  }
+    .select();
+  if (error) throw error;
+  return data;
 }
 
 // ==========================================
@@ -359,7 +382,7 @@ export async function updateAdminMenuConfig(config: Partial<AdminMenuConfig>) {
 // ==========================================
 
 export async function getProfileFields(role: string = 'all'): Promise<ProfileField[]> {
-  const query = supabase
+  let query = supabase
     .from('user_profile_fields')
     .select('*')
     .or(`target_role.eq.all,target_role.eq.${role}`);
@@ -414,124 +437,108 @@ export async function deleteStudentBatch(id: string) {
 }
 
 // ==========================================
-// TEACHER STUDENTS
+// TEACHER-STUDENT ASSIGNMENTS
 // ==========================================
 
 export async function getTeacherStudents(teacherId: string): Promise<string[]> {
-  const { data, error } = await supabase.from('teacher_students').select('student_id').eq('teacher_id', teacherId)
-  if (error) return []
-  return data.map(d => d.student_id)
+  const { data, error } = await supabase.from('teacher_student_assignments').select('student_id').eq('teacher_id', teacherId);
+  if (error) return [];
+  return data.map(d => d.student_id);
 }
 
 export async function assignStudentToTeacher(teacherId: string, studentId: string) {
-  const { error } = await supabase.from('teacher_students').upsert({ teacher_id: teacherId, student_id: studentId })
-  if (error) throw error
+  const { error } = await supabase.from('teacher_student_assignments').upsert({ teacher_id: teacherId, student_id: studentId });
+  if (error) throw error;
 }
 
 export async function removeStudentFromTeacher(teacherId: string, studentId: string) {
-  const { error } = await supabase
-    .from('teacher_students')
-    .delete()
-    .eq('teacher_id', teacherId)
-    .eq('student_id', studentId)
-  if (error) throw error
+  const { error } = await supabase.from('teacher_student_assignments').delete().eq('teacher_id', teacherId).eq('student_id', studentId);
+  if (error) throw error;
 }
 
-// WEEKLY TARGETS
-export async function getWeeklyTargets(teacherId: string): Promise<WeeklyTarget[]> {
+// ==========================================
+// ASSESSMENT TEMPLATES
+// ==========================================
+
+export async function getChapterTemplates(levelId?: string): Promise<ChapterTemplate[]> {
+  let query = supabase.from('assessment_chapter_templates').select('*').order('sort_order', { ascending: true });
+  if (levelId) {
+    query = query.eq('level_id', levelId);
+  }
+  const { data, error } = await query;
+  if (error) return [];
+  return data;
+}
+
+export async function upsertChapterTemplate(template: Partial<ChapterTemplate>) {
+  const { data, error } = await supabase.from('assessment_chapter_templates').upsert(template).select();
+  if (error) throw error;
+  return data;
+}
+
+// ==========================================
+// WEEKLY TARGETS (MISSIONS)
+// ==========================================
+
+export async function getWeeklyTargets(teacherId?: string): Promise<WeeklyTarget[]> {
+  let query = supabase.from('weekly_targets').select('*').order('created_at', { ascending: false });
+  if (teacherId) {
+    query = query.eq('teacher_id', teacherId);
+  }
+  const { data, error } = await query;
+  if (error) return [];
+  return data;
+}
+
+export async function getStudentWeeklyTargets(studentEmail: string, batch?: string | null): Promise<WeeklyTarget[]> {
+  // Fetch the student's profile ID
+  const { data: profile } = await supabase.from('profiles').select('id').eq('email', studentEmail).single();
+
+  // Build an OR filter: personal assignment OR their batch OR the 'Semua' (everyone) batch
+  const orParts: string[] = [`batch.eq.Semua`];
+  if (profile?.id) orParts.push(`student_id.eq.${profile.id}`);
+  if (batch) orParts.push(`batch.eq.${batch}`);
+
   const { data, error } = await supabase
     .from('weekly_targets')
     .select('*')
-    .eq('teacher_id', teacherId)
+    .eq('status', 'active')
+    .or(orParts.join(','))
     .order('created_at', { ascending: false });
-  if (error) return [];
-  return data as WeeklyTarget[];
-}
 
-export async function getStudentWeeklyTargets(studentId: string, batchName?: string): Promise<WeeklyTarget[]> {
-  let query = supabase
-    .from('weekly_targets')
-    .select('*')
-    .eq('status', 'active');
-  
-  if (batchName) {
-    query = query.or(`student_id.eq.${studentId},batch.eq.${batchName},batch.eq.Semua`);
-  } else {
-    query = query.or(`student_id.eq.${studentId},batch.eq.Semua`);
-  }
-
-  const { data, error } = await query.order('end_date', { ascending: true });
   if (error) return [];
-  return data as WeeklyTarget[];
+  return data || [];
 }
 
 export async function upsertWeeklyTarget(target: Partial<WeeklyTarget>) {
-  const { data, error } = await supabase
-    .from('weekly_targets')
-    .upsert(target)
-    .select()
-    .single();
+  const { data, error } = await supabase.from('weekly_targets').upsert(target).select();
   if (error) throw error;
-  return data as WeeklyTarget;
+  return data;
 }
 
 export async function deleteWeeklyTarget(id: string) {
-  const { error } = await supabase
-    .from('weekly_targets')
-    .delete()
-    .eq('id', id);
+  const { error } = await supabase.from('weekly_targets').delete().eq('id', id);
   if (error) throw error;
 }
 
-export async function getAllStudyMaterials(): Promise<StudyMaterial[]> {
-  const { data, error } = await supabase
-    .from('study_materials')
-    .select('*')
-    .order('title', { ascending: true });
-  if (error) return [];
-  return data as StudyMaterial[];
-}
-
-// MANUAL ASSESSMENTS
-export async function getUserAssessments(userEmail: string, levelId?: string) {
-  let query = supabase.from('user_manual_assessments').select('*').eq('user_email', userEmail);
-  if (levelId) query = query.eq('level_id', levelId);
-  
-  const { data, error } = await query;
-  if (error) return [];
-  return data;
-}
-
-export async function upsertUserAssessment(assessment: {
-  user_email: string;
-  level_id: string;
-  section_label: string;
-  column_label: string;
-  value: string;
-}) {
-  const { data, error } = await supabase
-    .from('user_manual_assessments')
-    .upsert(assessment, { onConflict: 'user_email,level_id,section_label,column_label' })
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
+// ==========================================
 // WEEKLY REPORTS
+// ==========================================
+
 export async function getWeeklyReports(teacherId?: string): Promise<WeeklyReport[]> {
-  let query = supabase.from('weekly_reports').select('*, profiles(full_name)').order('report_date', { ascending: false });
-  if (teacherId) query = query.eq('teacher_id', teacherId);
-  
+  let query = supabase.from('weekly_reports').select('*, profiles:teacher_id(full_name)').order('report_date', { ascending: false });
+  if (teacherId) {
+    query = query.eq('teacher_id', teacherId);
+  }
   const { data, error } = await query;
   if (error) return [];
-  return data as any[];
+  return data;
 }
 
 export async function upsertWeeklyReport(report: Partial<WeeklyReport>) {
-  const { data, error } = await supabase.from('weekly_reports').upsert(report).select().single();
+  const { data, error } = await supabase.from('weekly_reports').upsert(report).select();
   if (error) throw error;
-  return data as WeeklyReport;
+  return data;
 }
 
 export async function deleteWeeklyReport(id: string) {

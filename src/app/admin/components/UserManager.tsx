@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Profile, ProfileField, StudyLevel } from "@/lib/types";
 import { 
   getProfiles, 
   deleteProfile, 
@@ -8,22 +9,15 @@ import {
   getProfileFields, 
   getProfileValuesByUserId, 
   upsertProfileValue,
-  getStudyLevels,
-  getStudentBatches,
-  getTeacherStudents,
-  assignStudentToTeacher,
-  removeStudentFromTeacher
+  getStudyLevels
 } from "@/lib/db";
-import { Profile, ProfileField, StudyLevel, StudentBatch } from "@/lib/types";
-import { exportToExcel, exportToPDF } from "@/lib/ExportUtils";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, FileText } from "lucide-react";
 
-export default function UserManager({ user: userProfile, initialRole = "all" }: { user: Profile, initialRole?: "all" | "admin" | "teacher" | "student" | "alumni" }) {
+export default function UserManager({ user: userProfile }: { user: Profile }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filterRole, setFilterRole] = useState<"all" | "admin" | "teacher" | "student" | "alumni">(initialRole);
+  const [filterRole, setFilterRole] = useState<"all" | "admin" | "teacher" | "student" | "alumni">("all");
   
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -31,21 +25,112 @@ export default function UserManager({ user: userProfile, initialRole = "all" }: 
   const [dynamicFields, setDynamicFields] = useState<ProfileField[]>([]);
   const [dynamicValues, setDynamicValues] = useState<Record<string, string>>({});
   const [levels, setLevels] = useState<StudyLevel[]>([]);
-  const [batches, setBatches] = useState<StudentBatch[]>([]);
-  const [filterBatch, setFilterBatch] = useState<string>("all");
-  const [filterLevel, setFilterLevel] = useState<string>("all");
 
   const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
-  
-  const [managingTeacherStudents, setManagingTeacherStudents] = useState<Profile | null>(null);
-  const [assignedStudentIds, setAssignedStudentIds] = useState<string[]>([]);
 
   useEffect(() => {
     fetchProfiles();
     getProfileFields('all').then(setDynamicFields);
     getStudyLevels().then(setLevels);
-    getStudentBatches().then(setBatches);
+  }, []);
+
+  const fetchProfiles = async () => {
+    setLoading(true);
+    try {
+      const data = await getProfiles();
+      setProfiles(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string, email: string) => {
+    if (email === userProfile.email) {
+      alert("Anda tidak bisa menghapus akun Anda sendiri.");
+      return;
+    }
+    if (!confirm("Hapus pengguna ini secara permanen?")) return;
+    try {
+      await deleteProfile(id);
+      fetchProfiles();
+    } catch (err) {
+      alert("Gagal menghapus.");
+    }
+  };
+
+  const handleEdit = async (p: Profile) => {
+    setEditingProfile(p);
+    setIsModalOpen(true);
+    if (p.id) {
+       const vals = await getProfileValuesByUserId(p.id);
+       const valMap: Record<string, string> = {};
+       vals.forEach(v => { valMap[v.field_id] = v.value; });
+       setDynamicValues(valMap);
+    }
+  };
+
+  const handleAdminAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingProfile) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+       setEditingProfile({ ...editingProfile, avatar_url: reader.result as string });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDynamicFileChange = (e: React.ChangeEvent<HTMLInputElement>, fieldId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+       setDynamicValues(prev => ({ ...prev, [fieldId]: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAdminUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProfile) return;
+    try {
+      await upsertProfile(editingProfile);
+      for (const [fieldId, value] of Object.entries(dynamicValues)) {
+        if (value) {
+            await upsertProfileValue({
+                user_id: editingProfile.id!,
+                field_id: fieldId,
+                value: value
+            });
+        }
+      }
+      setIsModalOpen(false);
+      fetchProfiles();
+      alert("Profil berhasil diperbarui.");
+    } catch (err) {
+      alert("Gagal memperbarui profil.");
+    }
+  };
+
+  const handleViewDetails = async (p: Profile) => {
+     setViewingProfile(p);
+     setIsDetailLoading(true);
+     try {
+        if (p.id) {
+           const vals = await getProfileValuesByUserId(p.id);
+           const valMap: Record<string, string> = {};
+           vals.forEach(v => { valMap[v.field_id] = v.value; });
+           setDynamicValues(valMap);
+        }
+     } catch (err) {
+        console.error(err);
+     } finally {
+        setIsDetailLoading(false);
+     }
+  };
+
   const filtered = profiles.filter(p => {
     if (!userProfile.is_super_admin && (p.is_admin || p.is_super_admin)) {
       if (p.email !== userProfile.email) return false;
@@ -56,45 +141,13 @@ export default function UserManager({ user: userProfile, initialRole = "all" }: 
       p.email.toLowerCase().includes(search.toLowerCase()) || 
       p.nip?.toLowerCase().includes(search.toLowerCase());
     
-    const matchesBatch = filterBatch === "all" || p.batch === filterBatch;
-    const matchesLevel = filterLevel === "all" || p.target_level === filterLevel;
-    
-    if (filterRole === "all") return matchesSearch && matchesBatch && matchesLevel;
-    if (filterRole === "admin") return matchesSearch && p.is_admin && matchesBatch && matchesLevel;
-    if (filterRole === "teacher") return matchesSearch && p.is_teacher && matchesBatch && matchesLevel;
-    if (filterRole === "alumni") return matchesSearch && p.is_alumni && matchesBatch && matchesLevel;
-    if (filterRole === "student") return matchesSearch && p.is_student && matchesBatch && matchesLevel;
-    return matchesSearch && matchesBatch && matchesLevel;
+    if (filterRole === "all") return matchesSearch;
+    if (filterRole === "admin") return matchesSearch && p.is_admin;
+    if (filterRole === "teacher") return matchesSearch && p.is_teacher;
+    if (filterRole === "alumni") return matchesSearch && p.is_alumni;
+    if (filterRole === "student") return matchesSearch && p.is_student;
+    return matchesSearch;
   });
-
-  const handleExportExcel = () => {
-    const data = filtered.map(p => ({
-      'NIP': p.nip || '-',
-      'Nama Lengkap': p.full_name,
-      'Email': p.email,
-      'Telepon': p.phone || '-',
-      'Batch': p.batch || '-',
-      'Target Level': p.target_level || '-',
-      'Admin': p.is_admin ? 'Ya' : 'Tidak',
-      'Guru': p.is_teacher ? 'Ya' : 'Tidak',
-      'Murid': p.is_student ? 'Ya' : 'Tidak',
-      'Alumni': p.is_alumni ? 'Ya' : 'Tidak',
-      'Premium': p.is_premium ? 'Ya' : 'Tidak'
-    }));
-    exportToExcel(data, `Data_User_${new Date().toISOString().split('T')[0]}`, 'User Data');
-  };
-
-  const handleExportPDF = () => {
-    const columns = ['NIP', 'Nama Lengkap', 'Email', 'Telepon', 'Batch'];
-    const rows = filtered.map(p => [
-      p.nip || '-',
-      p.full_name,
-      p.email,
-      p.phone || '-',
-      p.batch || '-'
-    ]);
-    exportToPDF('Data User LPK Sagara', columns, rows, `Data_User_${new Date().toISOString().split('T')[0]}`);
-  };
 
   return (
     <div className="space-y-10">
@@ -125,32 +178,8 @@ export default function UserManager({ user: userProfile, initialRole = "all" }: 
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
-              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              </span>
+              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors">🔍</span>
            </div>
-
-           <select 
-             value={filterBatch}
-             onChange={e => setFilterBatch(e.target.value)}
-             className="px-6 py-4 bg-white border border-slate-100 rounded-2xl text-sm font-bold shadow-sm focus:border-indigo-500 outline-none transition-all"
-           >
-              <option value="all">Semua Batch</option>
-              {Array.from(new Set([...batches.map(b => b.name), ...profiles.map(p => p.batch).filter(Boolean) as string[]])).sort().map(name => (
-                 <option key={name} value={name}>{name}</option>
-              ))}
-           </select>
-
-           <select 
-             value={filterLevel}
-             onChange={e => setFilterLevel(e.target.value)}
-             className="px-6 py-4 bg-white border border-slate-100 rounded-2xl text-sm font-bold shadow-sm focus:border-indigo-500 outline-none transition-all"
-           >
-              <option value="all">Semua Level</option>
-              {levels.map(l => (
-                 <option key={l.id} value={l.level_code}>{l.level_code}</option>
-              ))}
-           </select>
            
            <button 
              onClick={() => {
@@ -186,15 +215,75 @@ export default function UserManager({ user: userProfile, initialRole = "all" }: 
            >
               + Tambah User
            </button>
-            
-            <div className="flex gap-2">
-               <button onClick={handleExportExcel} className="px-4 py-4 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center justify-center" title="Export Excel">
-                  <Download className="w-4 h-4" />
-               </button>
-               <button onClick={handleExportPDF} className="px-4 py-4 bg-rose-50 text-rose-600 border border-rose-100 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all shadow-sm flex items-center justify-center" title="Export PDF">
-                  <FileText className="w-4 h-4" />
-               </button>
-            </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-[3rem] shadow-sm border border-black/[0.03] overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-slate-50">
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Identity</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Roles / Stats</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Status</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 text-right">Settings</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filtered.map(p => (
+                <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-5">
+                      <div className="h-14 w-14 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center font-black text-slate-300 relative group-hover:scale-105 transition-transform duration-500 shadow-sm">
+                        {p.avatar_url ? (
+                          <img src={p.avatar_url} className="w-full h-full object-cover" alt="avatar" />
+                        ) : (
+                          p.full_name.charAt(0)
+                        )}
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="font-black text-slate-900 italic uppercase text-sm tracking-tight">{p.full_name}</p>
+                        <p className="text-[10px] font-bold text-slate-400 tracking-tighter font-mono">{p.email}</p>
+                        {p.nip && <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-1">ID: {p.nip}</p>}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <div className="flex flex-wrap gap-2">
+                       {p.is_admin && <span className="px-3 py-1 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-rose-100">Admin</span>}
+                       {p.is_teacher && <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-indigo-100">Guru</span>}
+                       {p.is_student && <span className="px-3 py-1 bg-teal-50 text-teal-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-teal-100">Murid</span>}
+                       {p.is_alumni && <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-slate-200">Alumni</span>}
+                       {p.is_premium && <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-amber-100 italic">Premium</span>}
+                    </div>
+                  </td>
+                  <td className="px-8 py-6">
+                     <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-2 w-fit ${p.profile_completed ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${p.profile_completed ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+                        {p.profile_completed ? 'Lengkap' : 'Menunggu'}
+                     </span>
+                  </td>
+                  <td className="px-8 py-6">
+                    <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => handleViewDetails(p)}
+                        className="h-10 px-5 bg-white border border-slate-200 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm"
+                      >
+                         View Info
+                      </button>
+                      <button 
+                        onClick={() => handleEdit(p)}
+                        className="h-10 w-10 bg-white border border-slate-200 text-slate-400 rounded-xl flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                        title="Edit User"
+                      >
+                         ✍️
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(p.id!, p.email)}
+                        className="h-10 w-10 bg-white border border-slate-200 text-rose-300 rounded-xl flex items-center justify-center hover:bg-rose-600 hover:text-white transition-all shadow-sm"
+                        title="Delete User"
+                      >
+                         🗑️
                       </button>
                     </div>
                   </td>
@@ -234,7 +323,7 @@ export default function UserManager({ user: userProfile, initialRole = "all" }: 
                              {editingProfile.avatar_url ? (
                                 <img src={editingProfile.avatar_url} className="w-full h-full object-cover" alt="avatar" />
                              ) : (
-                                <span className="text-sm">{editingProfile.full_name?.charAt(0) || "U"}</span>
+                                <span className="text-4xl grayscale opacity-20">👤</span>
                              )}
                           </div>
                           <input type="file" id="admin-pfp" className="hidden" accept="image/*" onChange={handleAdminAvatarChange} />
@@ -260,16 +349,12 @@ export default function UserManager({ user: userProfile, initialRole = "all" }: 
                         </div>
                         <div className="space-y-2">
                            <p className="text-[9px] font-black uppercase text-slate-400 ml-4 tracking-tighter">Batch / Angkatan</p>
-                           <select 
+                           <input 
                               className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-indigo-600 outline-none transition font-bold shadow-sm"
+                              placeholder="Contoh: Batch 12"
                               value={editingProfile.batch || ""}
                               onChange={e => setEditingProfile({...editingProfile, batch: e.target.value})}
-                           >
-                              <option value="">Pilih Batch</option>
-                              {Array.from(new Set([...batches.map(b => b.name), ...profiles.map(p => p.batch).filter(Boolean) as string[]])).sort().map(name => (
-                                 <option key={name} value={name}>{name}</option>
-                              ))}
-                           </select>
+                           />
                         </div>
                      </div>
                   </div>
@@ -669,93 +754,6 @@ export default function UserManager({ user: userProfile, initialRole = "all" }: 
             </div>
           </div>
         </div>
-      )}
-
-      {/* TEACHER-STUDENT RELATIONSHIP MODAL */}
-      {managingTeacherStudents && (
-         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setManagingTeacherStudents(null)} />
-            <div className="relative w-full max-w-4xl bg-white rounded-[3.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-               <div className="p-10 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                  <div className="flex items-center gap-5">
-                     <div className="h-16 w-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-lg">T</div>
-                     <div>
-                        <h3 className="text-xl font-black text-slate-900 italic uppercase">Kelola Murid: {managingTeacherStudents.full_name}</h3>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tentukan murid mana saja yang boleh diajar oleh guru ini</p>
-                     </div>
-                  </div>
-                  <button onClick={() => setManagingTeacherStudents(null)} className="h-10 w-10 border border-slate-200 rounded-xl flex items-center justify-center hover:bg-white transition shadow-sm font-bold">X</button>
-               </div>
-               
-               <div className="p-8 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-4 items-center">
-                  <div className="relative flex-1">
-                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">🔍</span>
-                     <input 
-                        type="text" 
-                        placeholder="Cari Murid..." 
-                        className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:border-indigo-500 outline-none transition-all"
-                        onChange={(e) => {
-                           const val = e.target.value.toLowerCase();
-                           const items = document.querySelectorAll('.student-item');
-                           items.forEach((item: any) => {
-                              const text = item.innerText.toLowerCase();
-                              item.style.display = text.includes(val) ? 'flex' : 'none';
-                           });
-                        }}
-                     />
-                  </div>
-                  <select 
-                     className="px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:border-indigo-500 outline-none"
-                     onChange={(e) => {
-                        const val = e.target.value;
-                        const items = document.querySelectorAll('.student-item');
-                        items.forEach((item: any) => {
-                           const batch = item.getAttribute('data-batch');
-                           if (val === 'all') {
-                              item.style.display = 'flex';
-                           } else {
-                              item.style.display = batch === val ? 'flex' : 'none';
-                           }
-                        });
-                     }}
-                  >
-                     <option value="all">Semua Batch</option>
-                     {batches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
-                  </select>
-               </div>
-               
-               <div className="p-10 flex-1 overflow-y-auto custom-scrollbar">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                     {profiles.filter(p => p.is_student).map(student => {
-                        const isAssigned = assignedStudentIds.includes(student.id!);
-                        return (
-                           <div 
-                              key={student.id} 
-                              onClick={() => toggleStudentAssignment(student.id!)}
-                              data-batch={student.batch || ""}
-                              className={`student-item p-5 rounded-[2rem] border-2 cursor-pointer transition-all flex items-center gap-4 group ${isAssigned ? 'bg-indigo-50 border-indigo-500 shadow-md' : 'bg-white border-slate-50 hover:border-slate-200'}`}
-                           >
-                              <div className="h-12 w-12 rounded-xl bg-slate-100 overflow-hidden flex items-center justify-center shrink-0 border border-slate-200">
-                                 {student.avatar_url ? <img src={student.avatar_url} className="w-full h-full object-cover" /> : <span className="font-black text-slate-300">{student.full_name.charAt(0)}</span>}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                 <p className={`font-black text-[11px] uppercase italic truncate ${isAssigned ? 'text-indigo-900' : 'text-slate-600'}`}>{student.full_name}</p>
-                                 <p className="text-[9px] text-slate-400 font-mono truncate">{student.email}</p>
-                                 {student.batch && <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest mt-1">{student.batch}</p>}
-                              </div>
-                              <div className={`h-6 w-6 rounded-lg flex items-center justify-center transition-all ${isAssigned ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-200 group-hover:bg-slate-100'}`}>
-                                 {isAssigned ? 'OK' : '+'}
-                              </div>
-                           </div>
-                        );
-                     })}
-                  </div>
-               </div>
-               <div className="p-8 border-t border-slate-100 bg-slate-50/50 flex justify-end">
-                  <button onClick={() => setManagingTeacherStudents(null)} className="px-10 py-4 bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl hover:bg-indigo-600 transition-all italic">Selesai Konfigurasi</button>
-               </div>
-            </div>
-         </div>
       )}
 
       <style jsx global>{`
