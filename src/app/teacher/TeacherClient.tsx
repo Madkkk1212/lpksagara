@@ -1,16 +1,18 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { getProfiles, getAdminMenuConfig, getTeacherStudents, getStudyLevels } from "@/lib/db";
+import { getProfiles, getTeacherStudents, getStudyLevels, getCompletedMaterialsWithDetails, getAdminMenuConfig } from "@/lib/db";
 import { Profile, StudyLevel } from "@/lib/types";
+
+type TeacherTab = 'students' | 'targets' | 'grading' | 'reports' | 'profile' | string;
+
 import WeeklyTargetManager from "./components/WeeklyTargetManager";
 import WeeklyReportManager from "./components/WeeklyReportManager";
 import AssessmentManager from "./components/AssessmentManager";
 import QuizAccessManager from "./components/QuizAccessManager";
-import { User, LogOut, LayoutDashboard, Target, FileText, ClipboardCheck, MessageSquarePlus, Zap } from "lucide-react";
+import { User, LogOut, LayoutDashboard, Target, FileText, ClipboardCheck, MessageSquarePlus, Zap, ChevronRight, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-type TeacherTab = "students" | "targets" | "reports" | "grading" | "proposals" | "quizzes";
 
 export default function TeacherClient() {
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -24,8 +26,10 @@ export default function TeacherClient() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Profile | null>(null);
+  const [studentProgress, setStudentProgress] = useState<any[]>([]);
+  const [loadingProgress, setLoadingProgress] = useState(false);
   const [assignedStudentIds, setAssignedStudentIds] = useState<string[]>([]);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [totalMaterialsCount, setTotalMaterialsCount] = useState<number>(0);
 
   // Proposals
   const [proposals, setProposals] = useState<any[]>([]);
@@ -82,19 +86,68 @@ export default function TeacherClient() {
     }
   };
 
+  const handleStudentSelect = async (student: Profile) => {
+    setSelectedStudent(student);
+    setStudentProgress([]);
+    setLoadingProgress(true);
+    try {
+      // Use server-side API route to bypass Supabase RLS
+      const res = await fetch(`/api/student-progress?email=${encodeURIComponent(student.email)}`);
+      const json = await res.json();
+      const progress: any[] = json.data || [];
+      console.log('[Teacher] Progress via API for', student.email, ':', progress.length, 'items');
+
+      // Merge with legacy unlocked_materials from profile for maximum integrity
+      const legacyIds = student.unlocked_materials || [];
+      const currentIds = progress.map(p => p.material_id);
+      const missingIds = legacyIds.filter((id: string) => !currentIds.includes(id));
+
+      if (missingIds.length > 0) {
+        const { supabase: sb } = await import('@/lib/supabase');
+        const { data: missingData } = await sb
+          .from('study_materials')
+          .select(`
+            id, title, material_type, chapter_id,
+            study_chapters(id, title, study_levels(id, title, level_code))
+          `)
+          .in('id', missingIds);
+
+        if (missingData && missingData.length > 0) {
+          const legacyItems = missingData.map(m => ({
+            material_id: m.id,
+            completed_at: student.created_at,
+            study_materials: m
+          }));
+          setStudentProgress([...progress, ...legacyItems]);
+        } else {
+          setStudentProgress(progress);
+        }
+      } else {
+        setStudentProgress(progress);
+      }
+    } catch (err) {
+      console.error('Failed to fetch student progress', err);
+    } finally {
+      setLoadingProgress(false);
+    }
+  };
+
   const fetchData = async (teacherId: string) => {
     setLoading(true);
     try {
-      const [allProfiles, assignedIds, allLevels] = await Promise.all([
+      const { getTotalStudyMaterialsCount } = await import('@/lib/db');
+      const [allProfiles, assignedIds, allLevels, totalCount] = await Promise.all([
         getProfiles(),
         getTeacherStudents(teacherId),
-        getStudyLevels()
+        getStudyLevels(),
+        getTotalStudyMaterialsCount()
       ]);
       
       const onlyStudents = allProfiles.filter(p => !p.is_teacher && !p.is_admin);
       setStudents(onlyStudents);
       setAssignedStudentIds(assignedIds);
       setLevels(allLevels);
+      setTotalMaterialsCount(totalCount);
     } catch (err) {
       console.error(err);
     } finally {
@@ -164,30 +217,14 @@ export default function TeacherClient() {
   const pendingCount = proposals.filter((p: any) => p.status === 'pending').length;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 selection:bg-indigo-100">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-40 md:pb-20 selection:bg-indigo-100">
       {/* Header */}
-      <header className="px-6 lg:px-10 py-5 border-b border-slate-200 bg-white sticky top-0 z-20 flex justify-between items-center shadow-sm">
+      <header className="hidden md:flex px-6 lg:px-10 py-5 border-b border-slate-200 bg-white sticky top-0 z-20 justify-between items-center shadow-sm">
         <div>
           <h1 className="text-xl font-bold text-slate-900">Teacher Hub</h1>
           <p className="text-xs text-slate-500 font-medium mt-0.5">Student Performance Telemetry</p>
         </div>
         <div className="flex items-center gap-6">
-           <button 
-             onClick={() => setIsProfileModalOpen(true)}
-             className="hidden md:flex items-center gap-3 pr-6 border-r border-slate-100 hover:opacity-80 transition-all cursor-pointer group"
-           >
-              <div className="h-10 w-10 rounded-full bg-slate-900 flex items-center justify-center text-white ring-4 ring-slate-50 overflow-hidden group-hover:ring-indigo-100 transition-all">
-                 {teacherProfile?.avatar_url ? (
-                   <img src={teacherProfile.avatar_url} className="w-full h-full object-cover" />
-                 ) : (
-                   <User className="w-5 h-5" />
-                 )}
-              </div>
-              <div className="text-left">
-                 <p className="text-xs font-black text-slate-900 leading-none group-hover:text-indigo-600 transition-colors">{teacherProfile?.full_name}</p>
-                 <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{teacherProfile?.nip || 'Teacher Account'}</p>
-              </div>
-           </button>
            <div className="flex items-center gap-3">
              <button onClick={() => window.open('/', '_blank')} className="px-5 py-2 border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 rounded-xl transition-all text-xs font-bold shadow-sm">
                Preview App
@@ -200,7 +237,7 @@ export default function TeacherClient() {
       </header>
 
       {/* Tab Navigation */}
-      <div className="border-b border-slate-200 bg-white sticky top-[73px] z-10">
+      <div className="hidden md:block border-b border-slate-200 bg-white sticky top-[73px] z-10">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex gap-1">
             {([
@@ -302,6 +339,43 @@ export default function TeacherClient() {
           <QuizAccessManager teacher={teacherProfile!} />
         ) : activeTab === 'reports' ? (
           <WeeklyReportManager teacher={teacherProfile!} />
+        ) : activeTab === 'profile' ? (
+          /* ── PROFILE TAB ── */
+          <div className="max-w-md mx-auto">
+             <div className="p-10 text-center bg-white rounded-[3rem] shadow-sm border border-slate-100">
+                <div className="h-24 w-24 rounded-full bg-slate-900 mx-auto mb-6 flex items-center justify-center text-white ring-8 ring-slate-50 overflow-hidden shadow-xl">
+                   {teacherProfile?.avatar_url ? (
+                     <img src={teacherProfile.avatar_url} className="w-full h-full object-cover" />
+                   ) : (
+                     <User className="w-10 h-10" />
+                   )}
+                </div>
+                <h3 className="text-xl font-black text-slate-900 mb-1">{teacherProfile?.full_name}</h3>
+                <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-6">{teacherProfile?.nip || 'Teacher Account'}</p>
+                
+                <div className="bg-slate-50 rounded-2xl p-6 text-left space-y-4 mb-8">
+                   <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      <span>Email</span>
+                      <span className="text-slate-900 lowercase">{teacherProfile?.email}</span>
+                   </div>
+                   <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      <span>Total Murid</span>
+                      <span className="text-slate-900">{filteredStudents.length} Siswa</span>
+                   </div>
+                   <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      <span>Role</span>
+                      <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-md">TEACHER</span>
+                   </div>
+                </div>
+
+                <button 
+                  onClick={handleLogout}
+                  className="w-full py-4 bg-rose-50 text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all"
+                >
+                  Keluar Akun (Logout)
+                </button>
+             </div>
+          </div>
         ) : (
           /* ── STUDENTS DASHBOARD ── */
           <div>
@@ -370,7 +444,7 @@ export default function TeacherClient() {
                         <td className="px-6 py-4 font-mono font-bold text-slate-700">{(s.exp || 0).toLocaleString()}</td>
                         <td className="px-6 py-4 text-right">
                           <button
-                            onClick={() => setSelectedStudent(s)}
+                            onClick={() => handleStudentSelect(s)}
                             className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all"
                           >
                             Detail →
@@ -410,8 +484,7 @@ export default function TeacherClient() {
             </div>
             <div className="flex-1 overflow-y-auto p-6 lg:p-8 bg-slate-50/50">
               <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm mb-6">
-                <h3 className="text-lg font-bold text-slate-900 mb-1">{selectedStudent.full_name}</h3>
-                <p className="text-xs text-slate-400 mb-4 font-mono">UID: {selectedStudent.id?.substring(0, 16)}...</p>
+                <h3 className="text-lg font-bold text-slate-900 mb-4">{selectedStudent.full_name}</h3>
                 <div className="flex gap-3 flex-wrap">
                   <span className="text-xs font-semibold bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg">Level {selectedStudent.level || 1}</span>
                   <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg">{(selectedStudent.exp || 0).toLocaleString()} XP</span>
@@ -419,26 +492,78 @@ export default function TeacherClient() {
                     <span className="text-xs font-semibold bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg">Target: {selectedStudent.target_level}</span>
                   )}
                 </div>
+
+                <div className="mt-6 pt-6 border-t border-slate-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Progres Belajar</span>
+                    <span className="text-[10px] font-black text-indigo-600">
+                      {totalMaterialsCount > 0 ? Math.round((studentProgress.length / totalMaterialsCount) * 100) : 0}%
+                    </span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-indigo-600 rounded-full transition-all duration-1000"
+                      style={{ width: `${totalMaterialsCount > 0 ? Math.min(100, Math.round((studentProgress.length / totalMaterialsCount) * 100)) : 0}%` }}
+                    />
+                  </div>
+                  <p className="text-[9px] text-slate-400 mt-2 italic">
+                    Siswa telah menyelesaikan {studentProgress.length} dari {totalMaterialsCount} materi tersedia.
+                  </p>
+                </div>
               </div>
 
               <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm">
-                <h5 className="font-bold text-slate-800 text-sm mb-4">Materi Selesai</h5>
-                <ul className="space-y-2">
-                  {(selectedStudent.unlocked_materials && selectedStudent.unlocked_materials.length > 0) ? (
-                    selectedStudent.unlocked_materials.map((matId) => (
-                      <li key={matId} className="flex items-center gap-3 text-sm p-2 bg-slate-50 rounded-xl">
-                        <div className="h-5 w-5 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                          <span className="text-[9px] text-emerald-600 font-bold">✓</span>
+                <div className="flex items-center justify-between mb-4">
+                  <h5 className="font-bold text-slate-800 text-sm">Materi Selesai</h5>
+                  <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">{studentProgress.length} SELESAI</span>
+                </div>
+                <div className="space-y-2">
+                  {loadingProgress ? (
+                    <div className="py-10 text-center">
+                      <div className="h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Loading Progress...</p>
+                    </div>
+                  ) : studentProgress.length > 0 ? (
+                    studentProgress.map((item: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100/50 group hover:border-indigo-200 transition-all">
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className="h-12 w-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center shadow-sm text-xl shrink-0">
+                            {item.study_materials?.material_type === 'quiz' ? '🎯' : 
+                             item.study_materials?.material_type === 'choukai' ? '🎧' :
+                             item.study_materials?.material_type === 'bunpou' ? '⛩️' : '📄'}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[8px] font-black uppercase px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md whitespace-nowrap">
+                                {item.study_materials?.study_chapters?.study_levels?.title || item.study_materials?.study_chapters?.study_levels?.level_code || 'N/A'}
+                              </span>
+                              <span className="text-[8px] font-black uppercase px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md truncate">
+                                {item.study_materials?.study_chapters?.title || 'Umum'}
+                              </span>
+                              <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap ${
+                                item.study_materials?.material_type === 'quiz' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                              }`}>
+                                {item.study_materials?.material_type || 'Materi'}
+                              </span>
+                            </div>
+                            <p className="text-xs font-bold text-slate-800 uppercase tracking-tight truncate">
+                              {item.study_materials?.title || item.material_id}
+                            </p>
+                            <p className="text-[9px] font-medium text-slate-400 mt-1 italic">
+                              Selesai: {new Date(item.completed_at || item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </p>
+                          </div>
                         </div>
-                        <span className="text-slate-500 font-mono text-xs truncate">{matId}</span>
-                      </li>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      </div>
                     ))
                   ) : (
-                    <li className="text-sm text-slate-400 py-6 text-center border border-dashed border-slate-200 rounded-xl">
-                      Belum ada materi yang diselesaikan.
-                    </li>
+                    <div className="text-sm text-slate-400 py-10 text-center border border-dashed border-slate-200 rounded-2xl">
+                      <p className="mb-1 italic">Belum ada materi yang diselesaikan.</p>
+                      <p className="text-[9px] font-black uppercase tracking-widest opacity-50">Progres 0%</p>
+                    </div>
                   )}
-                </ul>
+                </div>
               </div>
             </div>
           </div>
@@ -511,56 +636,32 @@ export default function TeacherClient() {
         </div>
       )}
 
-      {/* Teacher Profile Modal */}
-      <AnimatePresence>
-        {isProfileModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setIsProfileModalOpen(false)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-[3rem] shadow-2xl overflow-hidden"
-            >
-              <div className="p-10 text-center">
-                 <div className="h-24 w-24 rounded-full bg-slate-900 mx-auto mb-6 flex items-center justify-center text-white ring-8 ring-slate-50 overflow-hidden shadow-xl">
-                    {teacherProfile?.avatar_url ? (
-                      <img src={teacherProfile.avatar_url} className="w-full h-full object-cover" />
-                    ) : (
-                      <User className="w-10 h-10" />
-                    )}
-                 </div>
-                 <h3 className="text-xl font-black text-slate-900 mb-1">{teacherProfile?.full_name}</h3>
-                 <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest mb-6">{teacherProfile?.nip || 'Teacher Account'}</p>
-                 
-                 <div className="bg-slate-50 rounded-2xl p-6 text-left space-y-4 mb-8">
-                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
-                       <span>Email</span>
-                       <span className="text-slate-900 lowercase">{teacherProfile?.email}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
-                       <span>Total Murid</span>
-                       <span className="text-slate-900">{filteredStudents.length} Siswa</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
-                       <span>Role</span>
-                       <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-md">TEACHER</span>
-                    </div>
-                 </div>
 
-                 <button 
-                   onClick={() => setIsProfileModalOpen(false)}
-                   className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all"
-                 >
-                   Tutup
-                 </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      {/* Bottom Navigation for Mobile */}
+      <nav className="fixed inset-x-0 bottom-[calc(1.2rem+env(safe-area-inset-bottom))] z-50 px-8 md:hidden">
+        <div className="mx-auto max-w-[360px] bg-slate-900 rounded-full p-1.5 flex items-center justify-around shadow-2xl ring-1 ring-white/10 outline outline-4 outline-black/5">
+          {([
+            { id: 'students', label: 'Home', icon: <LayoutDashboard className="w-5 h-5" /> },
+            { id: 'targets', label: 'Target', icon: <Target className="w-5 h-5" /> },
+            { id: 'grading', label: 'Nilai', icon: <ClipboardCheck className="w-5 h-5" /> },
+            { id: 'reports', label: 'Laporan', icon: <FileText className="w-5 h-5" /> },
+            { id: 'profile', label: 'Profil', icon: <User className="w-5 h-5" /> },
+          ] as { id: TeacherTab; label: string; icon: React.ReactNode }[]).map(tab => {
+            const active = activeTab === tab.id;
+            return (
+              <button 
+                key={tab.id} 
+                onClick={() => setActiveTab(tab.id)} 
+                className={`relative flex h-14 w-14 flex-col items-center justify-center rounded-full transition-all duration-500 ${active ? 'text-indigo-400 bg-white/10' : 'text-slate-400'}`}
+              >
+                <span className={`transition-all duration-500 ${active ? 'scale-110 -translate-y-0.5' : 'scale-100'}`}> {tab.icon} </span>
+                <span className={`text-[7px] font-black uppercase tracking-widest mt-1 transition-all duration-500 ${active ? 'opacity-100' : 'opacity-0 scale-50'}`}> {tab.label} </span>
+                {active && <div className="absolute top-1 right-2 h-1.5 w-1.5 rounded-full bg-indigo-400" />}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

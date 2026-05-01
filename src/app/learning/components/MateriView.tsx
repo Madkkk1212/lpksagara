@@ -145,6 +145,12 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
   const handleMarkCompleted = async () => {
     if (!selectedMaterial || !user.email || completing) return;
     
+    // Guard: skip XP if already completed
+    if (isMaterialCompleted(selectedMaterial.id)) {
+      setSelectedMaterial(null);
+      return;
+    }
+    
     setCompleting(true);
     try {
         await markMaterialCompleted(user.email, selectedMaterial.id);
@@ -180,7 +186,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
         if (onRefreshUser) onRefreshUser();
         
         alert(`Selamat! Materi selesai. Anda mendapatkan +${awardedXP} EXP! 🏆`);
-        setSelectedMaterial(null); // Go back to chapter view
+        setSelectedMaterial(null);
     } catch (err: any) {
         console.error("Error saving progress:", err);
         alert(`Gagal menyimpan progres: ${err.message || "Terjadi kesalahan database"}`);

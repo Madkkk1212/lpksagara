@@ -179,10 +179,10 @@ export async function bulkUpdateQuestions(questions: Partial<Question>[]) {
 export async function getProfiles(): Promise<Profile[]> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, email, full_name, phone, nip, batch, is_admin, is_teacher, is_student, is_alumni, is_premium, profile_completed, created_at, password, avatar_url')
-    .order('created_at', { ascending: false })
-  if (error) return []
-  return data as Profile[]
+    .select('*')
+    .order('full_name');
+  if (error) return [];
+  return data as Profile[];
 }
 
 export async function getProfileById(id: string): Promise<Profile | null> {
@@ -192,9 +192,11 @@ export async function getProfileById(id: string): Promise<Profile | null> {
 }
 
 export async function getProfileByEmail(email: string): Promise<Profile | null> {
-  const { data, error } = await supabase.from('profiles').select('*').eq('email', email).single()
-  if (error) return null
-  return data
+  const normalizedEmail = email?.trim().toLowerCase();
+  if (!normalizedEmail) return null;
+  const { data, error } = await supabase.from('profiles').select('*').eq('email', normalizedEmail).maybeSingle();
+  if (error) return null;
+  return data as Profile;
 }
 
 export async function getProfileByIdentifier(identifier: string): Promise<Profile | null> {
@@ -390,18 +392,102 @@ export async function deleteIconFromLibrary(id: string) {
 // ==========================================
 
 export async function getCompletedMaterials(userEmail: string): Promise<string[]> {
-  const { data, error } = await supabase.from('user_material_progress').select('material_id').eq('user_email', userEmail);
+  const normalizedEmail = userEmail.trim().toLowerCase();
+  const { data, error } = await supabase.from('user_material_progress').select('material_id').eq('user_email', normalizedEmail);
   if (error || !data) return [];
   return data.map(row => row.material_id);
 }
 
+export async function getCompletedMaterialsWithDetails(userEmail: string): Promise<any[]> {
+  // Try both the original and normalized email to maximize match chance
+  const normalizedEmail = userEmail.trim().toLowerCase();
+
+  // Step 1: Get all progress rows for this user (try ilike for case-insensitive)
+  const { data: progressRows, error: progressError } = await supabase
+    .from('user_material_progress')
+    .select('material_id, created_at, completed_at')
+    .ilike('user_email', normalizedEmail)
+    .order('completed_at', { ascending: false });
+
+  if (progressError) {
+    console.error('getCompletedMaterialsWithDetails - progress error:', progressError);
+    return [];
+  }
+
+  if (!progressRows || progressRows.length === 0) {
+    console.log('getCompletedMaterialsWithDetails - no progress rows for:', normalizedEmail);
+    return [];
+  }
+
+  const materialIds = progressRows.map(r => r.material_id).filter(Boolean);
+  if (materialIds.length === 0) return [];
+
+  // Step 2: Fetch material details with chapter & level hierarchy in a separate query
+  const { data: materialDetails, error: matError } = await supabase
+    .from('study_materials')
+    .select(`
+      id,
+      title,
+      material_type,
+      chapter_id,
+      study_chapters (
+        id,
+        title,
+        level_id,
+        study_levels (
+          id,
+          title,
+          level_code
+        )
+      )
+    `)
+    .in('id', materialIds);
+
+  if (matError) {
+    console.error('getCompletedMaterialsWithDetails - material detail error:', matError);
+    // Return progress without details rather than nothing
+    return progressRows.map(r => ({ ...r, study_materials: null }));
+  }
+
+  const matMap = new Map((materialDetails || []).map(m => [m.id, m]));
+
+  // Step 3: Combine progress with material details
+  return progressRows.map(row => ({
+    material_id: row.material_id,
+    created_at: row.created_at,
+    completed_at: row.completed_at,
+    study_materials: matMap.get(row.material_id) || null
+  }));
+}
+
 export async function markMaterialCompleted(userEmail: string, materialId: string) {
-  const { data, error } = await supabase.from('user_material_progress').upsert(
-    { user_email: userEmail, material_id: materialId, completed_at: new Date().toISOString() },
+  const normalizedEmail = userEmail.trim().toLowerCase();
+  
+  // 1. Update modern progress table
+  const { error: progressError } = await supabase.from('user_material_progress').upsert(
+    { user_email: normalizedEmail, material_id: materialId, completed_at: new Date().toISOString() },
     { onConflict: 'user_email,material_id' }
   );
-  if (error) throw error;
-  return data;
+
+  // 2. Also update legacy array in profiles for redundant backup and teacher visibility
+  const { data: profile } = await supabase.from('profiles')
+    .select('unlocked_materials')
+    .eq('email', normalizedEmail)
+    .maybeSingle();
+
+  if (profile) {
+    const current = profile.unlocked_materials || [];
+    if (!current.includes(materialId)) {
+      await supabase.from('profiles').update({
+        unlocked_materials: [...current, materialId]
+      }).eq('email', normalizedEmail);
+    }
+  }
+
+  if (progressError) {
+    console.error("markMaterialCompleted error:", progressError);
+    throw progressError;
+  }
 }
 
 export async function getTotalStudyMaterialsCount(): Promise<number> {

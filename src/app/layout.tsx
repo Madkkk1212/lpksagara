@@ -36,7 +36,7 @@ export async function generateMetadata() {
       apple: favicon,
       shortcut: favicon,
     } : {
-      icon: "/favicon.ico",
+      icon: "/next.svg",
     },
   };
 }

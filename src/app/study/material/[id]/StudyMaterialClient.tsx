@@ -15,6 +15,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
   const [isFinishing, setIsFinishing] = useState(false);
   
   const [userEmail, setUserEmail] = useState("");
+  const [isAlreadyCompleted, setIsAlreadyCompleted] = useState(false);
   const [alertData, setAlertData] = useState<{ title: string; message: string; type?: 'warning' | 'error' | 'success' } | null>(null);
 
   useEffect(() => {
@@ -23,9 +24,12 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
       try {
         const u = JSON.parse(sessionStr);
         if (u.email) setUserEmail(u.email);
+        // Check if this material was already completed
+        const unlocked: string[] = u.unlocked_materials || [];
+        setIsAlreadyCompleted(unlocked.includes(materialData.id));
       } catch(e){}
     }
-  }, []);
+  }, [materialData.id]);
 
   const handleFinish = async () => {
     if (!userEmail) { 
@@ -49,38 +53,38 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
 
     setIsFinishing(true);
     try {
+      // Check if already completed — skip XP award if so
+      const alreadyDone = isAlreadyCompleted;
       await markMaterialCompleted(userEmail, materialData.id);
 
-      // Award XP - Optimized fetch
-      const chapterMats = await getBasicStudyMaterials(materialData.chapter_id);
-      const materialsOnly = chapterMats.filter(m => m.material_type !== 'quiz');
-      const quizzesOnly = chapterMats.filter(m => m.material_type === 'quiz');
+      if (!alreadyDone) {
+        // Award XP only for first-time completion
+        const chapterMats = await getBasicStudyMaterials(materialData.chapter_id);
+        const materialsOnly = chapterMats.filter(m => m.material_type !== 'quiz');
+        const quizzesOnly = chapterMats.filter(m => m.material_type === 'quiz');
 
-      const isQuiz = materialData.material_type === 'quiz';
-      const distribution = calculateChapterXPDistribution(materialsOnly.length, quizzesOnly.length);
+        const isQuiz = materialData.material_type === 'quiz';
+        const distribution = calculateChapterXPDistribution(materialsOnly.length, quizzesOnly.length);
 
-      let awardedXP = 0;
-      if (isQuiz) {
-        const idx = quizzesOnly.findIndex(m => m.id === materialData.id);
-        awardedXP = (distribution.quizzes && distribution.quizzes[idx]) || 0;
-      } else {
-        const idx = materialsOnly.findIndex(m => m.id === materialData.id);
-        awardedXP = (distribution.materials && distribution.materials[idx]) || 0;
-      }
+        let awardedXP = 0;
+        if (isQuiz) {
+          const idx = quizzesOnly.findIndex(m => m.id === materialData.id);
+          awardedXP = (distribution.quizzes && distribution.quizzes[idx]) || 0;
+        } else {
+          const idx = materialsOnly.findIndex(m => m.id === materialData.id);
+          awardedXP = (distribution.materials && distribution.materials[idx]) || 0;
+        }
 
-      const prof = await getProfileByEmail(userEmail);
-      if (prof) {
-        const newExp = (prof.exp || 0) + awardedXP;
-        const newLevel = Math.floor(newExp / 1000) + 1;
-        await upsertProfile({
-          email: userEmail,
-          exp: newExp,
-          level: newLevel
-        });
-        
-        // Update local profile storage to reflect change immediately
-        const updatedProf = { ...prof, exp: newExp, level: newLevel };
-        localStorage.setItem('luma-user-profile', JSON.stringify(updatedProf));
+        const prof = await getProfileByEmail(userEmail);
+        if (prof && awardedXP > 0) {
+          const newExp = (prof.exp || 0) + awardedXP;
+          const newLevel = Math.floor(newExp / 1000) + 1;
+          await upsertProfile({ email: userEmail, exp: newExp, level: newLevel });
+          const updatedProf = { ...prof, exp: newExp, level: newLevel,
+            unlocked_materials: [...(prof.unlocked_materials || []), materialData.id]
+          };
+          localStorage.setItem('luma-user-profile', JSON.stringify(updatedProf));
+        }
       }
 
       router.back();
@@ -331,9 +335,11 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                 <button 
                   onClick={handleFinish} 
                   disabled={isFinishing}
-                  className="flex-1 h-14 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all text-sm disabled:opacity-50"
+                  className={`flex-1 h-14 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all text-sm disabled:opacity-50 ${
+                    isAlreadyCompleted ? 'bg-emerald-600' : 'bg-slate-900'
+                  }`}
                 >
-                  {isFinishing ? 'Menyimpan...' : '🎯 Selesaikan Quiz'}
+                  {isFinishing ? 'Menyimpan...' : isAlreadyCompleted ? '✅ Sudah Selesai' : '🎯 Selesaikan Quiz'}
                 </button>
               )}
             </>
@@ -343,9 +349,13 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
             <button 
                onClick={handleFinish} 
                disabled={isFinishing}
-               className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black tracking-widest uppercase hover:bg-slate-800 active:scale-95 transition-all shadow-xl disabled:opacity-50"
+               className={`w-full py-5 text-white rounded-2xl font-black tracking-widest uppercase active:scale-95 transition-all shadow-xl disabled:opacity-50 ${
+                 isAlreadyCompleted 
+                   ? 'bg-emerald-600 hover:bg-emerald-700 cursor-default' 
+                   : 'bg-slate-900 hover:bg-slate-800'
+               }`}
             >
-               {isFinishing ? 'Menyimpan...' : '✓ Tandai Selesai & Lanjut'}
+               {isFinishing ? 'Menyimpan...' : isAlreadyCompleted ? '✅ Sudah Selesai (Kembali)' : '✓ Tandai Selesai & Lanjut'}
             </button>
           )}
         </div>

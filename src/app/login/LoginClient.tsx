@@ -49,12 +49,6 @@ export default function LoginClient() {
       const profile = await getProfileByIdentifier(identifier);
       
       if (profile) {
-        if (profile.is_admin || profile.is_teacher) {
-           setErrorMsg("Staff & Admin access restricted here. Please use management portal.");
-           setLoading(false);
-           return;
-        }
-
         if (profile.password !== passwordInput) {
            setErrorMsg("Password Invalid. Please double check.");
            setLoading(false);
@@ -64,7 +58,11 @@ export default function LoginClient() {
         window.localStorage.setItem("luma-auth", "true");
         window.localStorage.setItem("luma-user-profile", JSON.stringify(profile));
         
-        if (profile.is_student || profile.is_alumni) {
+        if (profile.is_admin) {
+          router.push("/admin");
+        } else if (profile.is_teacher) {
+          router.push("/teacher");
+        } else if (profile.is_student || profile.is_alumni) {
           router.push("/learning");
         } else if (!profile.profile_completed) {
           router.push("/learning");

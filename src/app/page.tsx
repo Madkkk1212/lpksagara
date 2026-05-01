@@ -194,7 +194,7 @@ export default function Home() {
             setIsFetching(false);
             return;
           }
-          if (finalProfile.profile_completed === false) setActiveTab("profile");
+          if (finalProfile.profile_completed === false && isStudentOrAlumni) setActiveTab("profile");
 
           // Background fetch for targets (doesn't block main render)
           getStudentWeeklyTargets(finalProfile.email, finalProfile.batch).then(targets => {
@@ -428,12 +428,14 @@ export default function Home() {
                                   </div>
                                   <h4 className="text-2xl font-black italic leading-tight mb-2 truncate">{userProfile?.full_name?.split(' ')[0]}</h4>
                                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/90">
-                                    {userProfile?.is_premium ? 'Premium Member' : 'Siswa Sagara'}
+                                    {userProfile?.is_admin ? 'Administrator' : userProfile?.is_teacher ? 'Guru Sagara' : (userProfile?.is_premium ? 'Premium Member' : 'Siswa Sagara')}
                                   </p>
                                </div>
 
                                <div className="mt-10 relative z-10 pt-6 border-t border-white/20">
-                                  <p className="text-[8px] font-black uppercase tracking-[0.3em] text-white/60 mb-2">ID PESERTA</p>
+                                  <p className="text-[8px] font-black uppercase tracking-[0.3em] text-white/60 mb-2">
+                                    {userProfile?.is_admin || userProfile?.is_teacher ? 'ID STAFF' : 'ID PESERTA'}
+                                  </p>
                                   <p className="text-lg font-black italic text-white tracking-wider">
                                     {userProfile?.nip || '---'}
                                   </p>
@@ -446,32 +448,21 @@ export default function Home() {
                                   <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em] mb-6 ml-2">Akses Cepat</p>
                                   <div className="grid grid-cols-1 gap-3">
                                      <button 
-                                        onClick={() => { router.push('/learning'); setShowProfileMenu(false); }}
-                                        className="w-full text-left px-5 py-4 bg-teal-50/50 hover:bg-teal-50 text-teal-700 rounded-2xl transition-all flex items-center gap-4 group"
+                                        onClick={() => { 
+                                          if (userProfile?.is_admin) router.push('/admin');
+                                          else if (userProfile?.is_teacher) router.push('/teacher');
+                                          else router.push('/learning');
+                                          setShowProfileMenu(false); 
+                                        }}
+                                        className="w-full text-left px-5 py-4 bg-indigo-50/50 hover:bg-indigo-50 text-indigo-700 rounded-2xl transition-all flex items-center gap-4 group"
                                      >
-                                        <span className="h-10 w-10 rounded-xl bg-white shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform text-xl">📊</span>
-                                        <span className="text-xs font-black uppercase tracking-[0.2em]">Dashboard</span>
+                                        <span className="h-10 w-10 rounded-xl bg-white shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform text-xl">
+                                          {userProfile?.is_admin ? '⚙️' : userProfile?.is_teacher ? '👩‍🏫' : '📊'}
+                                        </span>
+                                        <span className="text-xs font-black uppercase tracking-[0.2em]">
+                                          {userProfile?.is_admin ? 'Admin Dashboard' : userProfile?.is_teacher ? 'Guru Dashboard' : 'Learning Dashboard'}
+                                        </span>
                                      </button>
-
-                                     {userProfile?.is_admin && (
-                                       <button 
-                                          onClick={() => { router.push('/admin'); setShowProfileMenu(false); }}
-                                          className="w-full text-left px-5 py-4 bg-indigo-50/50 hover:bg-indigo-50 text-indigo-700 rounded-2xl transition-all flex items-center gap-4 group"
-                                       >
-                                          <span className="h-10 w-10 rounded-xl bg-white shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform text-xl">⚙️</span>
-                                          <span className="text-xs font-black uppercase tracking-[0.2em]">Admin Portal</span>
-                                       </button>
-                                     )}
-
-                                     {userProfile?.is_teacher && (
-                                       <button 
-                                          onClick={() => { router.push('/teacher'); setShowProfileMenu(false); }}
-                                          className="w-full text-left px-5 py-4 bg-violet-50/50 hover:bg-violet-50 text-violet-700 rounded-2xl transition-all flex items-center gap-4 group"
-                                       >
-                                          <span className="h-10 w-10 rounded-xl bg-white shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform text-xl">👩‍🏫</span>
-                                          <span className="text-xs font-black uppercase tracking-[0.2em]">Guru Portal</span>
-                                       </button>
-                                     )}
                                   </div>
                                </div>
 
@@ -700,7 +691,7 @@ export default function Home() {
                      <div className="rounded-[3rem] bg-slate-900 p-12 text-center text-white shadow-2xl">
                         <div className="mx-auto h-32 w-32 rounded-[2.8rem] bg-white/10 flex items-center justify-center text-5xl font-black mb-8 ring-4 ring-white/5"> {userProfile?.full_name?.charAt(0)} </div>
                         <h3 className="text-3xl font-black italic mb-2">{userProfile?.full_name}</h3>
-                        <p className="text-teal-400 text-[10px] font-black uppercase tracking-[0.4em] mb-10"> {userProfile?.is_premium ? 'Premium Access' : 'Member Access'} </p>
+                        <p className="text-teal-400 text-[10px] font-black uppercase tracking-[0.4em] mb-10"> {userProfile?.is_admin ? 'Administrator' : userProfile?.is_teacher ? 'Guru Sagara' : (userProfile?.is_premium ? 'Premium Access' : 'Member Access')} </p>
                         <div className="grid grid-cols-2 gap-4">
                            <div className="p-6 bg-white/5 rounded-[2rem] ring-1 ring-white/10"> <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">XP Points</p> <p className="text-3xl font-black italic">12.4K</p> </div>
                            <div className="p-6 bg-white/5 rounded-[2rem] ring-1 ring-white/10"> <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">Badges</p> <p className="text-3xl font-black italic text-amber-400">18</p> </div>
@@ -712,9 +703,9 @@ export default function Home() {
                            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 mb-4 flex items-center justify-between">
                               <div>
                                  <p className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Status Keanggotaan</p>
-                                 <span className={`text-base font-black ${userProfile?.is_premium ? 'text-amber-500' : 'text-slate-400'}`}> {userProfile?.is_premium ? 'PREMIUM ACCESS' : 'FREE MEMBER'} </span>
+                                 <span className={`text-base font-black ${userProfile?.is_premium || userProfile?.is_admin || userProfile?.is_teacher ? 'text-amber-500' : 'text-slate-400'}`}> {userProfile?.is_admin ? 'ADMINISTRATOR' : userProfile?.is_teacher ? 'GURU SAGARA' : (userProfile?.is_premium ? 'PREMIUM ACCESS' : 'FREE MEMBER')} </span>
                               </div>
-                              <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${userProfile?.is_premium ? 'bg-amber-100 text-amber-600' : 'bg-slate-200 text-slate-400'}`}> {userProfile?.is_premium ? '👑' : '👤'} </div>
+                              <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${userProfile?.is_premium || userProfile?.is_admin || userProfile?.is_teacher ? 'bg-amber-100 text-amber-600' : 'bg-slate-200 text-slate-400'}`}> {userProfile?.is_admin ? '🛡️' : userProfile?.is_teacher ? '👨‍🏫' : (userProfile?.is_premium ? '👑' : '👤')} </div>
                            </div>
                            <div className="grid gap-4 font-black tracking-widest text-[10px] uppercase">
                               {userProfile?.is_admin ? ( <button onClick={() => router.push('/admin')} className="w-full py-5 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-600/20 active:scale-95 transition flex items-center justify-center gap-3"> <span className="text-lg">⚙️</span> ADMIN DASHBOARD </button>
