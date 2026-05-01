@@ -7,6 +7,8 @@ import MateriView from "./components/MateriView";
 import LatihanView from "./components/LatihanView";
 import ProfileView from "./components/ProfileView";
 import FlashcardSRS from "./components/FlashcardSRS";
+import { motion } from "framer-motion";
+import NewsView from "./components/NewsView";
 
 interface LearningSystemProps {
   user: Profile;
@@ -15,7 +17,7 @@ interface LearningSystemProps {
   onRefreshUser?: () => void;
 }
 
-export type LearningTab = "dashboard" | "materi" | "latihan" | "profile" | "flashcards";
+export type LearningTab = "dashboard" | "materi" | "latihan" | "profile" | "flashcards" | "berita";
 
 export default function LearningSystem({ user, onLogout, theme, onRefreshUser }: LearningSystemProps) {
   const [activeTab, setActiveTab] = useState<LearningTab>(user.profile_completed === false ? "profile" : "dashboard");
@@ -32,6 +34,7 @@ export default function LearningSystem({ user, onLogout, theme, onRefreshUser }:
     { id: "dashboard", label: "Dashboard", icon: "🚀" },
     { id: "materi", label: "Materi", icon: "📚" },
     { id: "latihan", label: "Latihan", icon: "🎯" },
+    { id: "berita", label: "Berita", icon: "📰" },
     { id: "profile", label: "Profile", icon: "👤" },
   ] as const;
 
@@ -208,9 +211,34 @@ export default function LearningSystem({ user, onLogout, theme, onRefreshUser }:
              {activeTab === "latihan" && <LatihanView user={user} theme={theme} onUpgrade={setUpgradeMessage} />}
              {activeTab === "profile" && <ProfileView user={user} />}
              {activeTab === "flashcards" && <FlashcardSRS userEmail={user.email} />}
+             {activeTab === "berita" && <NewsView />}
            </div>
         </div>
       </main>
+
+      {/* Mobile Bottom Navigation - PREMIUM FLOATING STYLE */}
+      <nav className="fixed bottom-6 left-6 right-6 z-[100] lg:hidden">
+        <div className="bg-white/80 backdrop-blur-3xl border border-white/60 shadow-[0_20px_50px_rgba(0,0,0,0.1)] rounded-[2.5rem] px-6 py-4 flex items-center justify-between">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`flex flex-col items-center gap-1.5 transition-all duration-300 relative px-3 py-1 ${
+                activeTab === item.id ? 'text-teal-600' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              {activeTab === item.id && (
+                <motion.div 
+                  layoutId="bottomNavActive"
+                  className="absolute -top-1 w-1 h-1 rounded-full bg-teal-500"
+                />
+              )}
+              <span className={`text-xl ${activeTab === item.id ? 'scale-110' : ''}`}>{item.icon}</span>
+              <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
 
       {/* Global Upgrade Modal Overlay */}
       {upgradeMessage && (

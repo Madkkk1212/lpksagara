@@ -37,14 +37,23 @@ const ArtNavIcon = {
       <path d="M20 21V19C20 16.7909 18.2091 15 16 15H8C5.79086 15 4 16.7909 4 19V21" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   ),
+  News: () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="stroke-current">
+      <path d="M19 20H5C3.89543 20 3 19.1046 3 18V6C3 4.89543 3.89543 4 5 4H19C20.1046 4 21 4.89543 21 6V18C21 19.1046 20.1046 20 19 20Z" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M7 8H17" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M7 12H17" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M7 16H13" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
 };
 
-type TabId = "dashboard" | "materi" | "soal" | "profile";
+type TabId = "dashboard" | "materi" | "soal" | "profile" | "berita";
 const EXAM_PROGRESS_KEY = "luma-exam-progress";
 
 const tabs = [
   { id: "dashboard" as const, label: "Home", icon: ArtNavIcon.Home },
   { id: "materi" as const, label: "Materi", icon: ArtNavIcon.Study },
+  { id: "berita" as const, label: "Berita", icon: ArtNavIcon.News },
   { id: "soal" as const, label: "Latih", icon: ArtNavIcon.Exam },
   { id: "profile" as const, label: "Profil", icon: ArtNavIcon.Profile },
 ];
@@ -151,7 +160,7 @@ export default function Home() {
         };
 
         // Start ALL independent requests in parallel with progress tracking
-        const [t, b, c, m, l, sl, totalMatsCount, freshProfile, completed, lastProgress] = await Promise.all([
+        const results = await Promise.all([
           track(getTheme().catch(() => null)),
           track(getBanners().catch(() => [])),
           track(getMaterialCategories().catch(() => [])),
@@ -160,12 +169,22 @@ export default function Home() {
           track(getStudyLevels().catch(() => [])),
           track(getTotalStudyMaterialsCount().catch(() => 0)),
           track(authed && localProfile ? getProfileByEmail(localProfile.email).catch(() => null) : Promise.resolve(null)),
-          track(authed && localProfile ? getCompletedMaterials(localProfile.email).catch(() => []) : Promise.resolve([])),
-          track(authed && localProfile ? getUserLastProgressDetails(localProfile.email).catch(() => []) : Promise.resolve([]))
+          track(authed && localProfile ? 
+            fetch(`/api/student-progress?email=${encodeURIComponent(localProfile.email)}`)
+              .then(res => res.json())
+              .then(json => json.data || [])
+              .catch(() => []) 
+            : Promise.resolve([])
+          )
         ]);
+        
+        const [t, b, c, m, l, sl, totalMatsCount, freshProfile, lastProgressData] = results as any[];
+        const lastProgress = lastProgressData as any[];
+        const completed = lastProgress.map(p => p.material_id);
 
         setLoadingProgress(100);
 
+        setLoggedIn(authed);
         // Apply global data
         setTheme(t);
         setBanners(b || []);
@@ -183,7 +202,11 @@ export default function Home() {
           setDashboardMetrics({
             totalMaterials: totalMatsCount,
             completed: completed.length,
-            lastRead: lastProgress.length > 0 ? lastProgress[0].study_materials : null
+            lastRead: lastProgress.length > 0 ? {
+              ...lastProgress[0].study_materials,
+              completed_at: lastProgress[0].completed_at,
+              material_id: lastProgress[0].material_id
+            } : null
           });
 
           // Check onboarding redirect
@@ -547,13 +570,36 @@ export default function Home() {
                     <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {[
                         { label: "Progress User", value: dashboardMetrics.totalMaterials > 0 ? `${Math.round((dashboardMetrics.completed / dashboardMetrics.totalMaterials) * 100)}%` : '0%', note: `${dashboardMetrics.completed} dari ${dashboardMetrics.totalMaterials} Bab` },
-                        { label: "Last Read", value: dashboardMetrics.lastRead ? dashboardMetrics.lastRead.title : "-", note: dashboardMetrics.lastRead ? new Date(dashboardMetrics.lastRead.completed_at).toLocaleDateString() : 'Belum Mulai' },
+                        { 
+                          label: "Last Read", 
+                          value: dashboardMetrics.lastRead ? dashboardMetrics.lastRead.title : "-", 
+                          note: (dashboardMetrics.lastRead && dashboardMetrics.lastRead.completed_at) 
+                            ? new Date(dashboardMetrics.lastRead.completed_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) 
+                            : (dashboardMetrics.lastRead ? 'Sedang Dipelajari' : 'Belum Mulai'),
+                          onClick: () => {
+                            const targetId = dashboardMetrics.lastRead?.material_id || dashboardMetrics.lastRead?.id;
+                            console.log("Home: Navigating to last read", targetId);
+                            if (targetId) {
+                              window.location.href = `/study/material/${targetId}`;
+                            }
+                          },
+                          isHighlight: !!dashboardMetrics.lastRead
+                        },
                         { label: "Last Soal", value: "Akan Datang", note: "Belum Ujian" },
                         { label: "Level Saat Ini", value: userProfile?.is_premium ? "Premium N2" : "Basic N5", note: "Terus Berlatih!" },
-                      ].map((item) => (
-                        <div key={item.label} className="rounded-3xl bg-white p-4 md:p-6 shadow-sm ring-1 ring-black/[0.03]">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{item.label}</p>
-                          <p className="text-xl md:text-2xl font-black text-slate-800 italic line-clamp-1">{item.value}</p>
+                      ].map((item: any) => (
+                        <div 
+                          key={item.label} 
+                          onClick={item.onClick}
+                          className={`rounded-3xl bg-white p-4 md:p-6 shadow-sm ring-1 transition-all duration-500 ${
+                            item.onClick ? 'cursor-pointer hover:ring-teal-500 hover:shadow-xl hover:-translate-y-1 active:scale-95' : 'ring-black/[0.03]'
+                          } ${item.isHighlight ? 'ring-teal-500/30 bg-teal-50/10' : ''}`}
+                        >
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center justify-between">
+                            {item.label}
+                            {item.isHighlight && <span className="h-1.5 w-1.5 rounded-full bg-teal-500 animate-pulse" />}
+                          </p>
+                          <p className={`text-xl md:text-2xl font-black text-slate-800 italic line-clamp-1 ${item.isHighlight ? 'text-teal-700' : ''}`}>{item.value}</p>
                           <p className="text-xs text-slate-400 font-medium mt-1">{item.note}</p>
                         </div>
                       ))}
@@ -648,6 +694,12 @@ export default function Home() {
                       </div>
                     </div>
                     )}
+                  </div>
+                )}
+                
+                {activeTab === "berita" && (
+                  <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-2xl mx-auto bg-white rounded-[3rem] p-8 shadow-sm ring-1 ring-black/[0.03]">
+                    <JapanNews />
                   </div>
                 )}
 
@@ -802,7 +854,7 @@ export default function Home() {
                   </div>
                 )}
             </div>
-            <JapanNews />
+            {activeTab !== "berita" && <JapanNews />}
           </aside>
         </div>
 
@@ -812,9 +864,9 @@ export default function Home() {
               const active = activeTab === tab.id;
               return (
                 <button key={tab.id} onClick={() => changeTab(tab.id)} style={{ color: active ? (theme?.nav_active_color || '#2dd4bf') : undefined, backgroundColor: active ? 'rgba(255,255,255,0.1)' : 'transparent' }} className={`relative flex h-14 w-14 flex-col items-center justify-center rounded-full transition-all duration-500`} >
-                  <span className={`transition-all duration-500 ${active ? 'scale-110 -translate-y-0.5' : 'scale-100'}`}> <tab.icon /> </span>
-                  <span className={`text-[7px] font-black uppercase tracking-widest mt-1 transition-all duration-500 ${active ? 'opacity-100' : 'opacity-0 scale-50'}`}> {tab.label} </span>
-                  {active && <div className="absolute top-1 right-2 h-1.5 w-1.5 rounded-full bg-teal-400" />}
+                  <span className={`transition-all duration-500 ${active ? 'scale-110 -translate-y-0.5' : 'scale-100 opacity-70'}`}> <tab.icon /> </span>
+                  <span className={`text-[7px] font-black uppercase tracking-widest mt-1 transition-all duration-500 ${active ? 'opacity-100 translate-y-0' : 'opacity-0 scale-50 translate-y-2'}`}> {tab.label} </span>
+                  {active && <div className="absolute top-1 right-2 h-1.5 w-1.5 rounded-full bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.8)]" />}
                 </button>
               );
             })}

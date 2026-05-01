@@ -27,17 +27,17 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
 
   useEffect(() => {
     async function loadDashboard() {
-      // 1. Fetch active announcements
-      const { data: ann } = await supabase
-        .from('announcements')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      
-      if (ann && ann.length > 0) {
-        setAnnouncements(ann);
-        setShowAnnouncement(true);
+      // 1. Fetch active announcements via API (Bypass RLS)
+      try {
+        const res = await fetch('/api/announcements');
+        const json = await res.json();
+        const ann = json.data || [];
+        if (ann.length > 0) {
+          setAnnouncements(ann);
+          setShowAnnouncement(true);
+        }
+      } catch (err) {
+        console.error("Dashboard: Failed to fetch announcements via API", err);
       }
 
       // 2. Fetch earned achievements
@@ -47,19 +47,26 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
         .eq('user_email', user.email);
       setAchievements(ach || []);
 
-      // 3. Fetch Leaderboard, Progress, Weekly Targets & All Materials
-      const [lb, lp, targets, completed, mats] = await Promise.all([
+      // 3. Fetch Leaderboard, Weekly Targets & All Materials
+      const [lb, targets, mats] = await Promise.all([
         getLeaderboard(),
-        getUserLastProgressDetails(user.email),
         getStudentWeeklyTargets(user.email, user.batch),
-        getCompletedMaterials(user.email),
         getBasicStudyMaterials()
       ]);
       setLeaderboard(lb.filter(p => !p.is_admin && !p.is_teacher));
-      setLastProgress(lp);
       setWeeklyTargets(targets);
-      setCompletedMaterials(completed);
       setAllMaterials(mats as StudyMaterial[]);
+
+      // 4. Fetch Progress via Server API (Bypass RLS)
+      try {
+        const res = await fetch(`/api/student-progress?email=${encodeURIComponent(user.email)}`);
+        const json = await res.json();
+        const progress = json.data || [];
+        setLastProgress(progress);
+        setCompletedMaterials(progress.map((p: any) => p.material_id));
+      } catch (err) {
+        console.error("Dashboard: Failed to fetch progress via API", err);
+      }
     }
     loadDashboard();
   }, [user.email]);
@@ -306,16 +313,37 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
           </h3>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="p-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:translate-y-[-8px] transition-all duration-700 group cursor-pointer relative overflow-hidden">
+            <div
+              onClick={() => {
+                const matId = lastProgress[0]?.material_id;
+                console.log("Dashboard: Navigating to material", matId);
+                if (matId) window.location.href = `/study/material/${matId}`;
+              }}
+              className={`p-8 bg-white rounded-[2.5rem] border-2 transition-all duration-700 group relative overflow-hidden ${
+                lastProgress[0]?.material_id 
+                  ? 'border-teal-400 shadow-xl shadow-teal-100 hover:shadow-2xl hover:translate-y-[-8px] cursor-pointer' 
+                  : 'border-slate-100'
+              }`}
+            >
                <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-10 transition-opacity duration-700">
                  <span className="text-6xl">🎓</span>
                </div>
                <div className="relative z-10">
-                  <span className="px-3 py-1 bg-teal-50 text-teal-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-teal-100 mb-4 inline-block">Materi Terakhir</span>
-                  <h4 className="text-2xl font-black text-slate-800 leading-tight mb-2 group-hover:text-teal-600 transition-colors">
+                  <span className="px-3 py-1 bg-teal-50 text-teal-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-teal-100 mb-4 inline-block">
+                    {lastProgress[0]?.material_id ? '▶ Lanjutkan' : 'Materi Terakhir'}
+                  </span>
+                  <h4 className="text-2xl font-black text-slate-800 leading-tight mb-1 group-hover:text-teal-600 transition-colors">
                     {lastProgress[0]?.study_materials?.title || 'Mulailah Belajar!'}
                   </h4>
-                  <p className="text-xs text-slate-400 font-medium">Klik untuk melanjutkan bagian yang tertinggal.</p>
+                  {lastProgress[0]?.study_materials && (
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
+                      {lastProgress[0]?.study_materials?.material_type || ''} 
+                      {lastProgress[0]?.study_materials?.study_chapters?.title ? ` · ${lastProgress[0]?.study_materials?.study_chapters?.title}` : ''}
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-400 font-medium">
+                    {lastProgress[0]?.material_id ? 'Klik untuk langsung melanjutkan materi ini →' : 'Mulai belajar dan pantau progres Anda di sini.'}
+                  </p>
                </div>
             </div>
 

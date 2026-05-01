@@ -497,14 +497,30 @@ export async function getTotalStudyMaterialsCount(): Promise<number> {
 }
 
 export async function getUserLastProgressDetails(userEmail: string): Promise<any[]> {
-  // Ambil history progress 5 terakhir beserta detail materialnya
+  const normalizedEmail = userEmail.trim().toLowerCase();
   const { data, error } = await supabase
     .from('user_material_progress')
-    .select('completed_at, study_materials (title, material_type, chapter_id)')
-    .eq('user_email', userEmail)
+    .select(`
+      material_id,
+      completed_at, 
+      study_materials (
+        id,
+        title, 
+        material_type, 
+        chapter_id,
+        study_chapters (
+          id,
+          title
+        )
+      )
+    `)
+    .ilike('user_email', normalizedEmail)
     .order('completed_at', { ascending: false })
     .limit(5);
-  if (error || !data) return [];
+  if (error || !data) {
+    console.error('getUserLastProgressDetails error:', error);
+    return [];
+  }
   return data as any[];
 }
 
