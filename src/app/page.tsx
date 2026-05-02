@@ -329,6 +329,7 @@ export default function Home() {
                         <motion.circle 
                           cx="40" cy="40" r="36" fill="none" stroke="white" strokeWidth="4"
                           strokeDasharray={226}
+                          initial={{ strokeDashoffset: 226 }}
                           animate={{ strokeDashoffset: 226 - (226 * loadingProgress) / 100 }}
                           transition={{ duration: 0.5 }}
                         />

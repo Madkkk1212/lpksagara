@@ -144,6 +144,7 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
             <motion.circle 
               cx="40" cy="40" r="36" fill="none" stroke="#14b8a6" strokeWidth="4"
               strokeDasharray={226}
+              initial={{ strokeDashoffset: 226 }}
               animate={{ strokeDashoffset: 226 - (226 * loadingProgress) / 100 }}
               transition={{ duration: 0.5 }}
             />
