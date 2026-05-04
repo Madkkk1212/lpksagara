@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
+import { directUpload } from "@/lib/upload";
 
 type MediaType = "image" | "audio" | "video";
 
@@ -23,8 +24,6 @@ const ICON_MAP: Record<MediaType, string> = {
   audio: "🔊",
   video: "🎬",
 };
-
-
 
 // ── Compress image client-side (fast, aggressive) ──────────────────────────
 async function compressImage(file: File, maxPx = 1600, quality = 0.82): Promise<File> {
@@ -51,74 +50,6 @@ async function compressImage(file: File, maxPx = 1600, quality = 0.82): Promise<
   });
 }
 
-// ── Direct upload (browser → Cloudinary/R2 langsung, 2x lebih cepat) ───────
-async function directUpload(
-  file: File,
-  onProgress: (pct: number, loaded: number, total: number) => void
-): Promise<string> {
-  // Step 1: Get upload params from server
-  const presignRes = await fetch("/api/upload/presign", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sizeMB: file.size / 1024 / 1024, mimeType: file.type, filename: file.name }),
-  });
-  if (!presignRes.ok) {
-    const err = await presignRes.json().catch(() => ({})) as { error?: string };
-    throw new Error(err.error || "Gagal mendapat upload params");
-  }
-  const presign = await presignRes.json() as
-    | { type: "cloudinary"; uploadUrl: string; fields: Record<string, string> }
-    | { type: "r2"; putUrl: string; publicUrl: string };
-
-  // Step 2: Upload directly to destination
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-
-    // Step 2a: Cloudinary Direct
-    if (presign.type === "cloudinary") {
-      const form = new FormData();
-      form.append("file", file);
-      Object.entries(presign.fields).forEach(([k, v]) => form.append(k, v));
-
-      xhr.open("POST", presign.uploadUrl, true);
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) onProgress(Math.min(Math.round((e.loaded / e.total) * 98), 98), e.loaded, e.total);
-      };
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const data = JSON.parse(xhr.responseText) as { secure_url?: string; error?: { message: string } };
-            if (data.error) return reject(new Error(data.error.message));
-            if (data.secure_url) return resolve(data.secure_url);
-            reject(new Error("Response Cloudinary invalid."));
-          } catch { reject(new Error("Gagal parse Cloudinary.")); }
-        } else {
-          reject(new Error(`Cloudinary error ${xhr.status}`));
-        }
-      };
-      xhr.onerror = () => reject(new Error("Koneksi Cloudinary terputus."));
-      xhr.send(form);
-    } 
-    // Step 2b: R2 Direct
-    else {
-      xhr.open("PUT", presign.putUrl, true);
-      xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) onProgress(Math.min(Math.round((e.loaded / e.total) * 98), 98), e.loaded, e.total);
-      };
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve(presign.publicUrl);
-        } else {
-          reject(new Error(`R2 upload gagal (${xhr.status})`));
-        }
-      };
-      xhr.onerror = () => reject(new Error("Koneksi R2 terputus (CORS?)."));
-      xhr.send(file);
-    }
-  });
-}
-
 // ── Component ──────────────────────────────────────────────────────────────
 export default function MediaUploader({ label, mediaType, value, onChange, accept }: MediaUploaderProps) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -135,6 +66,20 @@ export default function MediaUploader({ label, mediaType, value, onChange, accep
     let file = e.target.files?.[0];
     if (!file) return;
     if (fileRef.current) fileRef.current.value = "";
+
+    // Tipe file validation
+    if (mediaType === "video" && !file.type.startsWith("video/")) {
+      alert("⚠️ File ditolak!\n\nHanya file video (seperti mp4, webm) yang diperbolehkan.");
+      return;
+    }
+    if (mediaType === "audio" && !file.type.startsWith("audio/")) {
+      alert("⚠️ File ditolak!\n\nHanya file audio (seperti mp3, wav) yang diperbolehkan.");
+      return;
+    }
+    if (mediaType === "image" && !file.type.startsWith("image/")) {
+      alert("⚠️ File ditolak!\n\nHanya file gambar (seperti jpg, png) yang diperbolehkan.");
+      return;
+    }
 
     // Limits: Cloudinary free (image 10MB), Cloudflare R2 free (video/audio 5GB)
     const limitMB = mediaType === "image" ? 10 : 5120;

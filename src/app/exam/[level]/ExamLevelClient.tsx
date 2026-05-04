@@ -111,17 +111,45 @@ export default function ExamLevelClient({ level }: { level: string }) {
       return;
     }
     
-    const hasAccess = userProfile.is_premium || !levelConfig?.is_locked || (userProfile.unlocked_levels || []).includes(levelConfig?.id || '');
-    if (!hasAccess) {
+    // 1. Level-wide access check (Admin controlled)
+    const hasLevelAccess = userProfile.is_premium || !levelConfig?.is_locked || (userProfile.unlocked_levels || []).includes(levelConfig?.id || '');
+    if (!hasLevelAccess) {
       alert("Akses level ini premium! Silakan hubungi admin.");
       return;
     }
-    
+
+    // 2. Specific Exam access check (Teacher controlled)
     setLoading(true);
-    const questions = await getQuestions(test.id);
-    setSelectedTest({ ...test, questions });
-    setActiveView("pretest");
-    setLoading(false);
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: controls } = await supabase
+        .from('exam_access_controls')
+        .select('is_active, batch, student_id')
+        .eq('test_id', test.id)
+        .eq('is_active', true);
+
+      // Check if active for user's batch OR user's specific ID
+      const hasExamAccess = controls?.some(c => 
+        (c.batch && c.batch === userProfile.batch) || 
+        (c.student_id && c.student_id === userProfile.id) ||
+        (c.batch === 'Semua')
+      );
+
+      if (!hasExamAccess) {
+        alert("Akses ujian ini masih terkunci! Silakan hubungi pengajar Anda untuk membuka kuis ini.");
+        setLoading(false);
+        return;
+      }
+
+      const questions = await getQuestions(test.id);
+      setSelectedTest({ ...test, questions });
+      setActiveView("pretest");
+    } catch (err) {
+      console.error(err);
+      alert("Gagal memverifikasi akses ujian.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {

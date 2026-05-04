@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Profile, MaterialCategory, StudyLevel, StudyChapter, StudyMaterial, AppTheme } from "@/lib/types";
 import { getMaterialCategories, getStudyLevels, getStudyChapters, getStudyMaterials, upsertProfile, getCompletedMaterials, markMaterialCompleted } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { Lock, CheckCircle2, Trophy, Star } from "lucide-react";
 import { calculateChapterXPDistribution } from "@/lib/GamificationUtils";
 
@@ -28,9 +29,10 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
   const [completedMaterials, setCompletedMaterials] = useState<string[]>([]);
   const [allLevelMaterials, setAllLevelMaterials] = useState<StudyMaterial[]>([]);
   const [completing, setCompleting] = useState(false);
+  const [activeQuizzes, setActiveQuizzes] = useState<string[]>([]);
 
   const isLevelUnlocked = (lvlId: string) => {
-    if (user.is_admin || user.is_premium) return true;
+    if (user.is_admin || user.is_super_admin || user.is_premium) return true;
     const sameCatLevels = levels
       .filter(l => l.category_id === activeCategory)
       .sort((a, b) => a.sort_order - b.sort_order);
@@ -51,16 +53,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
   };
 
   const isChapterUnlocked = (chapterId: string) => {
-    if (user.is_admin || user.is_super_admin || user.is_premium) return true;
-    
-    const sortedChapters = [...chapters].sort((a, b) => a.sort_order - b.sort_order);
-    const chapterIndex = sortedChapters.findIndex(c => c.id === chapterId);
-    
-    if (chapterIndex === 0) return true; 
-    
-    const prevChapter = sortedChapters[chapterIndex - 1];
-    // ONLY unlock if the previous chapter is fully completed
-    return isChapterCompleted(prevChapter.id);
+    return true; // Semua chapter terbuka
   };
 
   const isMaterialCompleted = (materialId: string) => {
@@ -68,18 +61,26 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
   };
 
   const isMaterialUnlocked = (chapterId: string, materialId: string) => {
-    if (user.is_admin || user.is_premium) return true;
-    
     const mats = chapterMaterials[chapterId];
     if (!mats) return false;
     
     const sortedMats = [...mats].sort((a, b) => a.sort_order - b.sort_order);
     const matIndex = sortedMats.findIndex(m => m.id === materialId);
+    const mat = sortedMats[matIndex];
     
-    if (matIndex === 0) return true; // First material is always open
-    
-    const prevMat = sortedMats[matIndex - 1];
-    return isMaterialCompleted(prevMat.id);
+    // QUIZ LOCK
+    if (mat?.material_type === 'quiz' && !activeQuizzes.includes(materialId)) {
+        if (!(user.is_admin || user.is_super_admin)) {
+            return false; // Quiz harus dibuka oleh guru
+        }
+    }
+
+    // PREMIUM / ADMIN MANUAL LOCK
+    if (mat?.is_locked && !(user.is_admin || user.is_super_admin || user.is_premium)) {
+        return false; // Materi Premium / Terkunci
+    }
+
+    return true; // Semua materi & latihan bebas diakses
   };
 
   useEffect(() => {
@@ -92,11 +93,25 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
       setCategories(cats);
       setLevels(lvls);
       setCompletedMaterials(completed);
+      
+      if (user.id) {
+          let query = supabase.from('quiz_access_controls').select('material_id').eq('is_active', true);
+          if (user.batch) {
+             query = query.or(`batch.eq.${user.batch},student_id.eq.${user.id}`);
+          } else {
+             query = query.eq('student_id', user.id);
+          }
+          const { data: accessData } = await query;
+          if (accessData) {
+             setActiveQuizzes(accessData.map((a: any) => a.material_id));
+          }
+      }
+
       if (cats.length > 0) setActiveCategory(cats[0].id);
       setLoading(false);
     }
     loadInitial();
-  }, [user.email]);
+  }, [user.email, user.id, user.batch]);
 
   useEffect(() => {
     if (activeCategory) {
@@ -360,23 +375,22 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                     {/* Completion Action */}
                     <div className="mt-16 pt-10 border-t border-slate-100 flex flex-col items-center">
                         {!isMaterialCompleted(selectedMaterial.id) ? (
-                            <button 
-                                onClick={handleMarkCompleted}
-                                disabled={completing}
-                                className="group relative px-12 py-5 bg-slate-900 text-white rounded-[2rem] font-black italic text-sm uppercase tracking-widest shadow-2xl hover:bg-teal-600 transition-all active:scale-95 disabled:opacity-50"
+                            <a 
+                                href={`/study/material/${selectedMaterial.id}`}
+                                className="group relative px-12 py-5 bg-slate-900 text-white rounded-[2rem] font-black italic text-sm uppercase tracking-widest shadow-2xl hover:bg-teal-600 transition-all active:scale-95 flex items-center gap-3"
                             >
-                                <span className="flex items-center gap-3">
-                                   {completing ? 'MENYIMPAN...' : 'SELESAIKAN MATERI & AMBIL +50 EXP'}
-                                   {!completing && <Trophy size={18} className="group-hover:rotate-12 transition-transform" />}
-                                </span>
-                            </button>
+                                MENUJU KE MATERI INI
+                                <Trophy size={18} className="group-hover:rotate-12 transition-transform" />
+                            </a>
                         ) : (
                             <div className="flex flex-col items-center gap-4 text-emerald-600 font-black italic uppercase tracking-widest text-xs">
                                 <div className="h-16 w-16 bg-emerald-100 rounded-full flex items-center justify-center text-3xl">🎉</div>
                                 Materi Berhasil Diselesaikan!
                             </div>
                         )}
-                        <p className="mt-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Selesaikan materi untuk membuka Chapter selanjutnya</p>
+                        <p className="mt-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                           {!isMaterialCompleted(selectedMaterial.id) ? 'Kunjungi halaman materi untuk menyelesaikan dan membuka chapter selanjutnya' : 'Selesaikan materi untuk membuka Chapter selanjutnya'}
+                        </p>
                     </div>
                   </div>
                 </div>
@@ -390,11 +404,11 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                    </div>
                    <div className="relative z-10">
                       <div className="flex items-center gap-3 mb-6">
-                        <span className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-black uppercase tracking-[0.2em]">Study Path: Linear Mode</span>
+                        <span className="px-3 py-1 bg-white/10 rounded-lg text-[10px] font-black uppercase tracking-[0.2em]">Study Path: Open Access</span>
                         <div className="h-2 w-2 rounded-full bg-teal-400 animate-ping" />
                       </div>
                       <h4 className="text-5xl font-black italic mb-4 leading-tight">{activeLevel.title}</h4>
-                      <p className="text-white/60 font-medium max-w-xl text-sm leading-relaxed">Penyelesaian materi bersifat berurutan. Selesaikan semua materi di satu chapter untuk membuka akses ke chapter berikutnya.</p>
+                      <p className="text-white/60 font-medium max-w-xl text-sm leading-relaxed">Semua materi dan latihan dapat diakses secara bebas tanpa harus berurutan. Akses ujian (Quiz) akan dibuka secara manual oleh pengajar Anda.</p>
                    </div>
                 </div>
 

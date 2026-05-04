@@ -28,11 +28,27 @@ export default function MaterialRecap() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const { data: allMaterials, error: matErr } = await supabase.from('study_materials').select('*');
-      const { data: allChapters, error: chapErr } = await supabase.from('study_chapters').select('*');
-      const { data: allLevels, error: lvlErr } = await supabase.from('study_levels').select('*');
-      const { data: allCats, error: catErr } = await supabase.from('material_categories').select('*');
+      // Optimasi: Hanya ambil kolom yang dibutuhkan untuk statistik
+      const { data: allMaterials, error: matErr } = await supabase
+        .from('study_materials')
+        .select('id, chapter_id, material_type, video_url, file_size');
+        
+      const { data: allChapters, error: chapErr } = await supabase
+        .from('study_chapters')
+        .select('id, level_id, title');
+        
+      const { data: allLevels, error: lvlErr } = await supabase
+        .from('study_levels')
+        .select('id, level_code, title');
+        
+      const { data: allCats, error: catErr } = await supabase
+        .from('material_categories')
+        .select('id, name');
 
+      if (matErr) console.error("matErr", matErr);
+      if (chapErr) console.error("chapErr", chapErr);
+      if (lvlErr) console.error("lvlErr", lvlErr);
+      if (catErr) console.error("catErr", catErr);
       if (matErr || chapErr || lvlErr || catErr) throw new Error("Gagal mengambil data rekap");
 
       setLevels(allLevels as StudyLevel[]);
@@ -70,6 +86,7 @@ export default function MaterialRecap() {
         videos: levelMaterials.filter(m => m.video_url).length,
         audios: levelMaterials.filter(m => m.audio_url).length,
         quizzes: levelMaterials.filter(m => m.material_type === 'quiz').length,
+        latihans: levelMaterials.filter(m => m.material_type === 'latihan').length,
       };
     });
 
@@ -77,17 +94,19 @@ export default function MaterialRecap() {
     const totalVideos = statsByLevel.reduce((acc, s) => acc + s.videos, 0);
     const totalAudios = statsByLevel.reduce((acc, s) => acc + s.audios, 0);
     const totalQuizzes = statsByLevel.reduce((acc, s) => acc + s.quizzes, 0);
+    const totalLatihans = statsByLevel.reduce((acc, s) => acc + (s as any).latihans, 0);
 
-    return { statsByLevel, totalMaterials, totalVideos, totalAudios, totalQuizzes };
+    return { statsByLevel, totalMaterials, totalVideos, totalAudios, totalQuizzes, totalLatihans };
   };
 
-  const { statsByLevel, totalMaterials, totalVideos, totalAudios, totalQuizzes } = calculateStats();
+  const { statsByLevel, totalMaterials, totalVideos, totalAudios, totalQuizzes, totalLatihans } = calculateStats();
 
   const pieData = [
     { name: 'Videos', value: totalVideos, color: '#6366f1' },
     { name: 'Audios', value: totalAudios, color: '#10b981' },
     { name: 'Quizzes', value: totalQuizzes, color: '#f59e0b' },
-    { name: 'Reading/Vocab', value: totalMaterials - totalVideos - totalAudios - totalQuizzes, color: '#94a3b8' },
+    { name: 'Latihan', value: totalLatihans, color: '#fbbf24' },
+    { name: 'Reading/Vocab', value: totalMaterials - totalVideos - totalAudios - totalQuizzes - totalLatihans, color: '#94a3b8' },
   ].filter(d => d.value > 0);
 
   const toggleLevel = (id: string) => {
@@ -137,7 +156,8 @@ export default function MaterialRecap() {
             <SummaryCard label="Total Materi" value={totalMaterials} icon="📚" color="bg-indigo-600" />
             <SummaryCard label="Total Video" value={totalVideos} icon="🎬" color="bg-rose-600" />
             <SummaryCard label="Total Audio" value={totalAudios} icon="🔊" color="bg-emerald-600" />
-            <SummaryCard label="Total Quiz" value={totalQuizzes} icon="📝" color="bg-amber-600" />
+            <SummaryCard label="Total Quiz" value={totalQuizzes} icon="🎯" color="bg-rose-500" />
+            <SummaryCard label="Total Latihan" value={totalLatihans} icon="📝" color="bg-amber-600" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -229,7 +249,7 @@ export default function MaterialRecap() {
                         {level.level_code}
                       </div>
                       <div className="text-left">
-                         <h4 className="font-black text-slate-900 text-sm uppercase tracking-tight">{level.name}</h4>
+                         <h4 className="font-black text-slate-900 text-sm uppercase tracking-tight">{level.title || level.name}</h4>
                          <p className="text-[10px] font-bold text-slate-400 uppercase">{chapters[level.id]?.length || 0} Chapters</p>
                       </div>
                    </div>
@@ -266,7 +286,7 @@ export default function MaterialRecap() {
                                     <div key={mat.id} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-xl shadow-sm hover:border-indigo-200 transition-all group">
                                        <div className="flex items-center gap-3">
                                           <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center text-lg border border-slate-100 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                                             {mat.material_type === 'quiz' ? '📝' : mat.video_url ? '🎬' : mat.audio_url ? '🔊' : '📄'}
+                                             {mat.material_type === 'quiz' ? '🎯' : mat.material_type === 'latihan' ? '📝' : mat.video_url ? '🎬' : mat.audio_url ? '🔊' : '📄'}
                                           </div>
                                           <div>
                                              <div className="flex items-center gap-2">

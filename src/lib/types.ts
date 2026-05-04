@@ -219,7 +219,7 @@ export interface StudyChapter {
 export interface StudyMaterial {
   id: string
   chapter_id: string
-  material_type: 'moji_goi' | 'bunpou' | 'dokkai' | 'choukai' | 'quiz'
+  material_type: 'moji_goi' | 'bunpou' | 'dokkai' | 'choukai' | 'quiz' | 'latihan'
   title: string
   content: Json
   sort_order: number

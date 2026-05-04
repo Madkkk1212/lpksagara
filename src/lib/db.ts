@@ -626,18 +626,18 @@ export async function deleteStudentBatch(id: string) {
 // ==========================================
 
 export async function getTeacherStudents(teacherId: string): Promise<string[]> {
-  const { data, error } = await supabase.from('teacher_student_assignments').select('student_id').eq('teacher_id', teacherId);
+  const { data, error } = await supabase.from('teacher_students').select('student_id').eq('teacher_id', teacherId);
   if (error) return [];
   return data.map(d => d.student_id);
 }
 
 export async function assignStudentToTeacher(teacherId: string, studentId: string) {
-  const { error } = await supabase.from('teacher_student_assignments').upsert({ teacher_id: teacherId, student_id: studentId });
+  const { error } = await supabase.from('teacher_students').upsert({ teacher_id: teacherId, student_id: studentId });
   if (error) throw error;
 }
 
 export async function removeStudentFromTeacher(teacherId: string, studentId: string) {
-  const { error } = await supabase.from('teacher_student_assignments').delete().eq('teacher_id', teacherId).eq('student_id', studentId);
+  const { error } = await supabase.from('teacher_students').delete().eq('teacher_id', teacherId).eq('student_id', studentId);
   if (error) throw error;
 }
 

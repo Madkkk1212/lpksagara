@@ -8,7 +8,8 @@ import {
   upsertStudyMaterial, deleteStudyMaterial,
   getIconCategories, getIconLibrary,
   getMaterialCategories, upsertMaterialCategory, deleteMaterialCategory,
-  bulkUpdateMaterialCategories, bulkUpdateStudyLevels, bulkUpdateStudyChapters, bulkUpdateStudyMaterials
+  bulkUpdateMaterialCategories, bulkUpdateStudyLevels, bulkUpdateStudyChapters, bulkUpdateStudyMaterials,
+  getStudyMaterialById
 } from "@/lib/db";
 import { StudyLevel, StudyChapter, StudyMaterial, IconCategory, IconLibraryItem, MaterialCategory } from "@/lib/types";
 import MediaUploader from "@/app/components/MediaUploader";
@@ -216,21 +217,30 @@ export default function StudyHierarchyManager() {
     } catch (e) { alert("Error deleting category"); }
   };
 
-  const openMaterialModal = (mat: Partial<StudyMaterial>) => {
-    setEditingMaterial(mat);
-    const c = (mat.content || {}) as any;
-    if (mat.material_type === 'moji_goi' || mat.material_type === 'bunpou') {
+  const openMaterialModal = async (mat: Partial<StudyMaterial>) => {
+    let fullMat = mat;
+    
+    // Jika content tidak ada (karena fetch selective), ambil detail lengkapnya
+    if (mat.id && !mat.content) {
+      const detail = await getStudyMaterialById(mat.id);
+      if (detail) fullMat = detail;
+    }
+
+    setEditingMaterial(fullMat);
+    const c = (fullMat.content || {}) as any;
+    if (fullMat.material_type === 'moji_goi' || fullMat.material_type === 'bunpou') {
       setFormContent({ items: c.items || [] });
-    } else if (mat.material_type === 'dokkai') {
+    } else if (fullMat.material_type === 'dokkai') {
       setFormContent({ text_jp: c.text_jp || '', text_id: c.text_id || '', exercises: c.exercises || [] });
-    } else if (mat.material_type === 'choukai') {
+    } else if (fullMat.material_type === 'choukai') {
       setFormContent({ audioUrl: c.audioUrl || '', exercises: c.exercises || [] });
-    } else if (mat.material_type === 'quiz') {
+    } else if (fullMat.material_type === 'quiz' || fullMat.material_type === 'latihan') {
       setFormContent({ exercises: c.exercises || [] });
     } else {
       setFormContent(c);
     }
   };
+
 
   // --- ICON PICKER LOGIC ---
   const openIconPicker = async (target: 'category'|'level'|'chapter'|'material', extra?: any) => {
@@ -377,7 +387,7 @@ export default function StudyHierarchyManager() {
       );
     }
 
-    if (type === 'quiz') {
+    if (type === 'quiz' || type === 'latihan') {
       return renderExercisesEditor();
     }
 
@@ -576,7 +586,7 @@ export default function StudyHierarchyManager() {
                         </div>
                       )}
                       <div>
-                        <p className={`text-[10px] font-black uppercase tracking-widest ${mat.material_type === 'quiz' ? 'text-rose-500' : 'text-teal-600'}`}>{mat.material_type}</p>
+                        <p className={`text-[10px] font-black uppercase tracking-widest ${mat.material_type === 'quiz' ? 'text-rose-500' : mat.material_type === 'latihan' ? 'text-amber-500' : 'text-teal-600'}`}>{mat.material_type}</p>
                         <h4 className="font-bold text-slate-800 mt-1">{mat.title}</h4>
                         <span className="text-[8px] text-slate-400 font-bold">Order: {mat.sort_order}</span>
                       </div>
@@ -786,6 +796,7 @@ export default function StudyHierarchyManager() {
                          <option value="dokkai">Dokkai</option>
                          <option value="choukai">Choukai</option>
                          <option value="quiz">Quiz 🎯</option>
+                          <option value="latihan">Latihan 📝</option>
                       </select>
                     </div>
                     <div>

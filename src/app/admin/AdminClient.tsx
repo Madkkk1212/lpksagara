@@ -22,11 +22,13 @@ import AssessmentTemplateManager from "./components/AssessmentTemplateManager";
 import AllStudentsAssessment from "./components/AllStudentsAssessment";
 import MaterialRecap from "./components/MaterialRecap";
 import VideoManager from "./components/VideoManager";
+import QuizAccessManager from "../teacher/components/QuizAccessManager";
+import ExamAccessManager from "../teacher/components/ExamAccessManager";
 import { supabase } from "@/lib/supabase";
 import { getAdminMenuConfig, getProfiles, getStudyLevels } from "@/lib/db";
 import { Profile, StudyLevel } from "@/lib/types";
 
-type AdminTab = "dashboard" | "reports" | "weekly-reports" | "announcements" | "bulk-import" | "theme" | "banners" | "icons" | "materials" | "exams" | "settings" | "users" | "proposals" | "menu-manager" | "profile-config" | "batches" | "teachers" | "assessment-templates" | "all-students-assessment" | "material-recap" | "video-manager";
+type AdminTab = "dashboard" | "reports" | "weekly-reports" | "announcements" | "bulk-import" | "theme" | "banners" | "icons" | "materials" | "exams" | "settings" | "users" | "proposals" | "menu-manager" | "profile-config" | "batches" | "teachers" | "assessment-templates" | "all-students-assessment" | "material-recap" | "video-manager" | "quiz-access" | "exam-access";
 
 export default function AdminClient() {
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
@@ -143,6 +145,8 @@ export default function AdminClient() {
     { id: "material-recap", label: "Rekapan Materi", icon: "📋", is_active: true },
     { id: "exams", label: "Exams", icon: "E", is_active: true },
     { id: "users", label: "Users", icon: "U", is_active: true },
+    { id: "quiz-access", label: "Akses Quiz", icon: "⚡", is_active: true },
+    { id: "exam-access", label: "Akses Exam", icon: "🏆", is_active: true },
     { id: "batches", label: "Batches", icon: "B", is_active: true },
     { id: "teachers", label: "Kelola Guru", icon: "G", is_active: true },
     { id: "proposals", label: "Usulan Guru", icon: "P", is_active: true },
@@ -182,6 +186,18 @@ export default function AdminClient() {
     const targetIdx = uniqueTabs.findIndex(t => t.id === "assessment-templates");
     const insertAt = targetIdx !== -1 ? targetIdx + 1 : uniqueTabs.length;
     uniqueTabs.splice(insertAt, 0, { id: "all-students-assessment", label: "Nilai Seluruh Siswa", icon: "📊", is_active: true } as any);
+  }
+
+  // Ensure Quiz and Exam access appear
+  if (!uniqueTabs.some(t => t.id === "quiz-access")) {
+    const usersIdx = uniqueTabs.findIndex(t => t.id === "users");
+    const insertAt = usersIdx !== -1 ? usersIdx + 1 : uniqueTabs.length;
+    uniqueTabs.splice(insertAt, 0, { id: "quiz-access", label: "Akses Quiz", icon: "⚡", is_active: true } as any);
+  }
+  if (!uniqueTabs.some(t => t.id === "exam-access")) {
+    const quizIdx = uniqueTabs.findIndex(t => t.id === "quiz-access");
+    const insertAt = quizIdx !== -1 ? quizIdx + 1 : uniqueTabs.length;
+    uniqueTabs.splice(insertAt, 0, { id: "exam-access", label: "Akses Exam", icon: "🏆", is_active: true } as any);
   }
 
   // 'weekly-reports' — ensure it appears in the menu
@@ -330,6 +346,8 @@ export default function AdminClient() {
                {activeTab === "all-students-assessment" && <AllStudentsAssessment students={students} levels={studyLevels} />}
                {activeTab === "material-recap" && <MaterialRecap />}
                {activeTab === "video-manager" && <VideoManager />}
+               {activeTab === "quiz-access" && <QuizAccessManager teacher={userProfile!} />}
+               {activeTab === "exam-access" && <ExamAccessManager teacher={userProfile!} />}
            </section>
         </div>
       </main>

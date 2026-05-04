@@ -10,7 +10,8 @@ import WeeklyTargetManager from "./components/WeeklyTargetManager";
 import WeeklyReportManager from "./components/WeeklyReportManager";
 import AssessmentManager from "./components/AssessmentManager";
 import QuizAccessManager from "./components/QuizAccessManager";
-import { User, LogOut, LayoutDashboard, Target, FileText, ClipboardCheck, MessageSquarePlus, Zap, ChevronRight, CheckCircle2 } from "lucide-react";
+import ExamAccessManager from "./components/ExamAccessManager";
+import { User, LogOut, LayoutDashboard, Target, FileText, ClipboardCheck, MessageSquarePlus, Zap, ChevronRight, CheckCircle2, Trophy } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 
@@ -245,6 +246,7 @@ export default function TeacherClient() {
               { id: 'targets', label: 'Target Mingguan', icon: <Target className="w-4 h-4" /> },
               { id: 'grading', label: 'Penilaian Siswa', icon: <ClipboardCheck className="w-4 h-4" /> },
               { id: 'quizzes', label: 'Akses Quiz', icon: <Zap className="w-4 h-4" /> },
+              { id: 'exams', label: 'Akses Exam', icon: <Trophy className="w-4 h-4" /> },
               { id: 'reports', label: 'Riwayat Laporan', icon: <FileText className="w-4 h-4" /> },
               { id: 'proposals', label: 'Usul Konten', icon: <MessageSquarePlus className="w-4 h-4" /> },
             ] as { id: TeacherTab; label: string; icon: React.ReactNode }[]).map(tab => (
@@ -337,6 +339,8 @@ export default function TeacherClient() {
           />
         ) : activeTab === 'quizzes' ? (
           <QuizAccessManager teacher={teacherProfile!} />
+        ) : activeTab === 'exams' ? (
+          <ExamAccessManager teacher={teacherProfile!} />
         ) : activeTab === 'reports' ? (
           <WeeklyReportManager teacher={teacherProfile!} />
         ) : activeTab === 'profile' ? (
@@ -644,6 +648,8 @@ export default function TeacherClient() {
             { id: 'students', label: 'Home', icon: <LayoutDashboard className="w-5 h-5" /> },
             { id: 'targets', label: 'Target', icon: <Target className="w-5 h-5" /> },
             { id: 'grading', label: 'Nilai', icon: <ClipboardCheck className="w-5 h-5" /> },
+            { id: 'quizzes', label: 'Quiz', icon: <Zap className="w-5 h-5" /> },
+            { id: 'exams', label: 'Exam', icon: <Trophy className="w-5 h-5" /> },
             { id: 'reports', label: 'Laporan', icon: <FileText className="w-5 h-5" /> },
             { id: 'profile', label: 'Profil', icon: <User className="w-5 h-5" /> },
           ] as { id: TeacherTab; label: string; icon: React.ReactNode }[]).map(tab => {

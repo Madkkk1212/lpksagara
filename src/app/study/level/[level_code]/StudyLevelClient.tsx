@@ -131,6 +131,7 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
       case 'dokkai': return '📖';
       case 'choukai': return '🎧';
       case 'quiz': return '🎯';
+      case 'latihan': return '📝';
       default: return '📄';
     }
   };
@@ -184,6 +185,10 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
           const mats = materialsByChapter[chap.id] || [];
           const isCompleted = isChapterCompleted(chap.id);
           
+          // Logic Latihan: Terbuka jika semua materi (bukan quiz/latihan) sudah selesai
+          const studyMaterials = mats.filter(m => m.material_type !== 'quiz' && m.material_type !== 'latihan');
+          const allStudyCompleted = studyMaterials.length > 0 && studyMaterials.every(m => m.id ? completedMaterials.includes(m.id) : false);
+          
           return (
             <div key={chap.id} className="bg-white rounded-[2rem] shadow-sm ring-1 ring-slate-100 overflow-hidden transition-all duration-300">
               <button 
@@ -213,10 +218,13 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
                       if (!mat.id) return null;
                       const isComplete = completedMaterials.includes(mat.id!);
                       const isQuiz = mat.material_type === 'quiz';
+                      const isLatihan = mat.material_type === 'latihan';
                       
-                      // Materi biasa tidak dikunci. Kuis dikunci KECUALI jika ada di activeQuizzes.
+                      // Materi dan Latihan sekarang bebas diakses, tidak dikunci berurutan.
+                      // Kuis dikunci KECUALI jika ada di activeQuizzes (dibuka guru).
+                      const isLatihanLocked = false; 
                       const isQuizLocked = isQuiz && !activeQuizzes.includes(mat.id!);
-                      const disableClick = isQuizLocked;
+                      const disableClick = isQuizLocked || isLatihanLocked;
 
                       return (
                         <Link 
@@ -225,19 +233,25 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
                           onClick={(e) => {
                             if (disableClick) {
                               e.preventDefault();
-                              alert("Quiz ini belum dibuka oleh Guru Anda. Harap tunggu sesi ujian dimulai 🎯.");
+                              if (isQuizLocked) {
+                                alert("Quiz ini belum dibuka oleh Guru Anda. Harap tunggu sesi ujian dimulai 🎯.");
+                              } else if (isLatihanLocked) {
+                                alert("Selesaikan semua materi di bab ini terlebih dahulu untuk membuka Latihan! 📖");
+                              }
                             }
                           }}
                           className={`group flex flex-col items-center justify-center p-6 bg-slate-50 rounded-[1.5rem] active:scale-95 transition-all relative overflow-hidden ${disableClick ? 'opacity-60 grayscale border border-slate-200 bg-slate-50/50' : 'hover:bg-white hover:shadow-xl hover:ring-1 ring-teal-500/20 shadow-sm'}`}
                         >
                           {isComplete && <div className="absolute top-3 right-3 flex items-center justify-center p-1 bg-teal-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg">✓</div>}
                           {isQuizLocked && <div className="absolute top-3 left-3 flex items-center justify-center p-1 bg-rose-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg" title="Menunggu Guru Membuka Akses">🔒</div>}
+                          {isLatihanLocked && <div className="absolute top-3 left-3 flex items-center justify-center p-1 bg-amber-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg" title="Selesaikan materi untuk membuka">🔒</div>}
                           {isQuiz && !isQuizLocked && <div className="absolute top-3 left-3 flex items-center justify-center p-1 bg-emerald-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg animate-pulse" title="Quiz Live!">⚡</div>}
+                          {isLatihan && !isLatihanLocked && <div className="absolute top-3 left-3 flex items-center justify-center p-1 bg-sky-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg" title="Latihan Siap!">📝</div>}
                           
                           <div className={`text-3xl mb-3 transition-transform duration-500 ${!disableClick ? 'group-hover:scale-110' : ''}`}>
                             {mat.icon_url ? <img src={mat.icon_url || undefined} alt="icon" className="w-8 h-8 object-contain" /> : getIconForType(mat.material_type || "")}
                           </div>
-                          <span className={`text-xs font-black uppercase tracking-widest text-center ${isQuiz ? 'text-rose-500' : 'text-slate-800'}`}>
+                          <span className={`text-xs font-black uppercase tracking-widest text-center ${isQuiz ? 'text-rose-500' : isLatihan ? 'text-amber-500' : 'text-slate-800'}`}>
                             {(mat.material_type || "").replace('_', ' ')}
                           </span>
                           <span className="text-[10px] text-slate-400 mt-1 line-clamp-1 text-center">{mat.title || ''}</span>

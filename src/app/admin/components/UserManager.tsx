@@ -9,9 +9,12 @@ import {
   getProfileFields, 
   getProfileValuesByUserId, 
   upsertProfileValue,
-  getStudyLevels
+  getStudyLevels,
+  getProfileById
 } from "@/lib/db";
 import { motion, AnimatePresence } from "framer-motion";
+import MediaUploader from "@/app/components/MediaUploader";
+import { directUpload } from "@/lib/upload";
 
 export default function UserManager({ user: userProfile }: { user: Profile }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -62,34 +65,25 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
   };
 
   const handleEdit = async (p: Profile) => {
-    setEditingProfile(p);
-    setIsModalOpen(true);
-    if (p.id) {
-       const vals = await getProfileValuesByUserId(p.id);
-       const valMap: Record<string, string> = {};
-       vals.forEach(v => { valMap[v.field_id] = v.value; });
-       setDynamicValues(valMap);
+    setLoading(true);
+    const fullProfile = p.id ? await getProfileById(p.id) : p;
+    setLoading(false);
+    
+    if (fullProfile) {
+      setEditingProfile(fullProfile);
+      setIsModalOpen(true);
+      if (fullProfile.id) {
+         const vals = await getProfileValuesByUserId(fullProfile.id);
+         const valMap: Record<string, string> = {};
+         vals.forEach(v => { valMap[v.field_id] = v.value; });
+         setDynamicValues(valMap);
+      }
     }
   };
 
-  const handleAdminAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !editingProfile) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-       setEditingProfile({ ...editingProfile, avatar_url: reader.result as string });
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleDynamicFileChange = (e: React.ChangeEvent<HTMLInputElement>, fieldId: string) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-       setDynamicValues(prev => ({ ...prev, [fieldId]: reader.result as string }));
-    };
-    reader.readAsDataURL(file);
+  const handleAdminAvatarChange = async (url: string) => {
+    if (!editingProfile) return;
+    setEditingProfile({ ...editingProfile, avatar_url: url });
   };
 
   const handleAdminUpdate = async (e: React.FormEvent) => {
@@ -115,11 +109,13 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
   };
 
   const handleViewDetails = async (p: Profile) => {
-     setViewingProfile(p);
      setIsDetailLoading(true);
      try {
-        if (p.id) {
-           const vals = await getProfileValuesByUserId(p.id);
+        const fullProfile = p.id ? await getProfileById(p.id) : p;
+        setViewingProfile(fullProfile);
+        
+        if (fullProfile?.id) {
+           const vals = await getProfileValuesByUserId(fullProfile.id);
            const valMap: Record<string, string> = {};
            vals.forEach(v => { valMap[v.field_id] = v.value; });
            setDynamicValues(valMap);
@@ -317,21 +313,13 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
 
               <form onSubmit={handleAdminUpdate} className="p-10 space-y-10 overflow-y-auto custom-scrollbar flex-1">
                   {editingProfile.id && (
-                    <div className="flex items-center gap-10 bg-slate-50 p-8 rounded-[3rem]">
-                       <div className="relative group">
-                          <div className="h-32 w-32 rounded-[2.5rem] bg-white border-4 border-white shadow-xl flex items-center justify-center overflow-hidden ring-4 ring-slate-100">
-                             {editingProfile.avatar_url ? (
-                                <img src={editingProfile.avatar_url} className="w-full h-full object-cover" alt="avatar" />
-                             ) : (
-                                <span className="text-4xl grayscale opacity-20">👤</span>
-                             )}
-                          </div>
-                          <input type="file" id="admin-pfp" className="hidden" accept="image/*" onChange={handleAdminAvatarChange} />
-                          <label htmlFor="admin-pfp" className="absolute -bottom-2 -right-2 h-10 w-10 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg border-2 border-white cursor-pointer hover:scale-110 active:scale-95 transition">📷</label>
-                       </div>
-                       <div className="text-center">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Update Profile Photo</p>
-                       </div>
+                    <div className="bg-slate-50 p-8 rounded-[3rem]">
+                       <MediaUploader 
+                          label="Foto Profil (Cloudinary)"
+                          mediaType="image"
+                          value={editingProfile.avatar_url}
+                          onChange={(url) => handleAdminAvatarChange(url)}
+                       />
                     </div>
                   )}
 
@@ -461,43 +449,14 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
                            <label className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500 ml-4">Dokumen Pendukung (Lampiran)</label>
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                               {fileFields.map(field => {
-                                 const value = dynamicValues[field.id];
                                  return (
                                     <div key={field.id} className="space-y-3">
-                                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">
-                                          {field.name} {field.is_required && <span className="text-rose-500">*</span>}
-                                       </label>
-                                       
-                                       <div className="space-y-4">
-                                          {value ? (
-                                             <div className="relative group rounded-3xl overflow-hidden border border-slate-100 bg-white aspect-video shadow-sm">
-                                                {value.startsWith('data:image') ? (
-                                                   <img src={value} alt={field.name} className="w-full h-full object-contain" />
-                                                ) : (
-                                                   <div className="w-full h-full flex flex-col items-center justify-center bg-indigo-50 text-indigo-400">
-                                                      <span className="text-4xl mb-2">📄</span>
-                                                      <span className="text-[9px] font-black uppercase">Document Uploaded</span>
-                                                   </div>
-                                                )}
-                                                <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center flex-col gap-2 p-4">
-                                                   <label htmlFor={`admin-file-${field.id}`} className="px-5 py-2.5 bg-white text-slate-900 rounded-xl font-black text-[9px] uppercase shadow-xl cursor-pointer hover:bg-slate-50">Ganti Dokumen</label>
-                                                   <a href={value} download={field.name.replace(/\s+/g, '-')} className="text-white text-[9px] font-bold uppercase underline">Pratinjau Full</a>
-                                                </div>
-                                             </div>
-                                          ) : (
-                                             <label htmlFor={`admin-file-${field.id}`} className="h-32 border-2 border-dashed border-slate-200 rounded-[2rem] bg-slate-50 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-white transition-all group">
-                                                <span className="text-2xl group-hover:scale-125 transition">➕</span>
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Unggah {field.name}</p>
-                                             </label>
-                                          )}
-                                          <input 
-                                             type="file"
-                                             id={`admin-file-${field.id}`}
-                                             className="hidden"
-                                             onChange={e => handleDynamicFileChange(e, field.id)}
-                                             accept={field.allowed_file_types?.map(t => `.${t}`).join(',')}
-                                          />
-                                       </div>
+                                       <MediaUploader 
+                                          label={field.name}
+                                          mediaType={'image'} 
+                                          value={dynamicValues[field.id]}
+                                          onChange={(url) => setDynamicValues(prev => ({ ...prev, [field.id]: url }))}
+                                       />
                                     </div>
                                  );
                               })}
@@ -601,6 +560,37 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
                         </button>
                         </div>
                      </div>
+
+                  {/* Level Access Manager */}
+                  {(editingProfile.is_student || editingProfile.is_alumni) && (
+                    <div className="pt-6 border-t border-slate-100">
+                      <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4 mb-4 block italic">Level Akses (Hak Akses JLPT)</label>
+                      <div className="flex flex-wrap gap-3">
+                        {levels.sort((a, b) => a.sort_order - b.sort_order).map(level => {
+                          const isUnlocked = (editingProfile.unlocked_levels || []).includes(level.id);
+                          return (
+                            <button
+                              key={level.id}
+                              type="button"
+                              onClick={() => {
+                                let current = [...(editingProfile.unlocked_levels || [])];
+                                if (isUnlocked) {
+                                  current = current.filter(id => id !== level.id);
+                                } else {
+                                  current.push(level.id);
+                                }
+                                setEditingProfile({ ...editingProfile, unlocked_levels: current });
+                              }}
+                              className={`px-4 py-3 rounded-xl font-black text-[10px] transition uppercase tracking-widest border-2 ${isUnlocked ? 'bg-teal-50 border-teal-200 text-teal-700 shadow-sm' : 'bg-white border-slate-100 text-slate-300 hover:border-slate-300'}`}
+                            >
+                              {isUnlocked ? '✅ ' : '🔒 '}{level.level_code}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[9px] text-slate-400 font-bold mt-3 ml-4 italic uppercase tracking-wider">Level yang dicentang akan otomatis terbuka semua materi dan latihannya untuk murid ini.</p>
+                    </div>
+                  )}
 
                   {/* Profile Completion Toggle */}
                   <div className="pt-6 border-t border-slate-100">
