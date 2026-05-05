@@ -208,13 +208,17 @@ export default function TeacherClient() {
 
   if (!isAuthorized) return null;
 
-  const filteredStudents = students.filter(s =>
+  const assignedStudents = assignedStudentIds.length > 0
+    ? students.filter(s => assignedStudentIds.includes(s.id!))
+    : students;
+
+  const filteredStudents = assignedStudents.filter(s =>
     s.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const totalExp = students.reduce((sum, s) => sum + (s.exp || 0), 0);
-  const avgExp = students.length > 0 ? Math.round(totalExp / students.length) : 0;
+  const totalExp = assignedStudents.reduce((sum, s) => sum + (s.exp || 0), 0);
+  const avgExp = assignedStudents.length > 0 ? Math.round(totalExp / assignedStudents.length) : 0;
   const pendingCount = proposals.filter((p: any) => p.status === 'pending').length;
 
   return (
