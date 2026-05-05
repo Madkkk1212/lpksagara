@@ -13,6 +13,12 @@ VALUES
 ('video-manager', 'Video Manager', '🎞️', true, 'admin', 200),
 
 -- Teacher Scopes
+('students', 'Dashboard', '🏠', true, 'teacher', 10),
+('targets', 'Target Mingguan', '🎯', true, 'teacher', 20),
+('grading', 'Penilaian Siswa', '📝', true, 'teacher', 30),
 ('quizzes', 'Akses Quiz', '⚡', true, 'teacher', 40),
-('exams', 'Akses Exam', '🏆', true, 'teacher', 41)
+('exams', 'Akses Exam', '🏆', true, 'teacher', 41),
+('reports', 'Riwayat Laporan', '📊', true, 'teacher', 50),
+('proposals', 'Usulan Konten', '✉️', true, 'teacher', 60),
+('profile', 'Profil Saya', '👤', true, 'teacher', 70)
 ON CONFLICT (tab_id, scope) DO NOTHING;

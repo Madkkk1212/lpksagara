@@ -34,15 +34,22 @@ export default function ExamAccessManager({ teacher, assignedStudentIds = [] }: 
   const fetchInitialData = async () => {
     setLoading(true);
     try {
+      // Mandatory filter: only fetch profiles if we have assigned IDs
+      if (assignedStudentIds.length === 0) {
+        setStudents([]);
+        setBatches([]);
+        setLevels([]);
+        setTests([]);
+        setLoading(false);
+        return;
+      }
+
       let profilesQuery = supabase
         .from('profiles')
         .select('id, full_name, email, batch')
         .neq('is_teacher', true)
-        .neq('is_admin', true);
-
-      if (assignedStudentIds.length > 0) {
-        profilesQuery = profilesQuery.in('id', assignedStudentIds);
-      }
+        .neq('is_admin', true)
+        .in('id', assignedStudentIds);
 
       const [allLevels, profilesResult, { data: controls }] = await Promise.all([
         getExamLevels(),

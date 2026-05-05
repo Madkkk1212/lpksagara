@@ -17,8 +17,26 @@ export default function TeacherMenuManager({ onConfigChange }: TeacherMenuManage
   useEffect(() => {
     async function loadConfig() {
       const data = await getAdminMenuConfig();
-      // Only show teacher scope
-      setConfigs(data.filter(c => c.scope === 'teacher'));
+      const teacherConfigs = data.filter(c => c.scope === 'teacher');
+      
+      const defaults: AdminMenuConfig[] = [
+        { tab_id: 'students', label: 'Dashboard', icon: '🏠', is_active: true, scope: 'teacher' } as any,
+        { tab_id: 'targets', label: 'Target Mingguan', icon: '🎯', is_active: true, scope: 'teacher' } as any,
+        { tab_id: 'grading', label: 'Penilaian Siswa', icon: '📝', is_active: true, scope: 'teacher' } as any,
+        { tab_id: 'quizzes', label: 'Akses Quiz', icon: '⚡', is_active: true, scope: 'teacher' } as any,
+        { tab_id: 'exams', label: 'Akses Exam', icon: '🏆', is_active: true, scope: 'teacher' } as any,
+        { tab_id: 'reports', label: 'Riwayat Laporan', icon: '📊', is_active: true, scope: 'teacher' } as any,
+        { tab_id: 'proposals', label: 'Usulan Konten', icon: '✉️', is_active: true, scope: 'teacher' } as any,
+        { tab_id: 'profile', label: 'Profil Saya', icon: '👤', is_active: true, scope: 'teacher' } as any,
+      ];
+
+      // Merge: Use DB config if exists, otherwise use default
+      const merged = defaults.map(def => {
+        const existing = teacherConfigs.find(c => c.tab_id === def.tab_id);
+        return existing || def;
+      });
+
+      setConfigs(merged);
       setLoading(false);
     }
     loadConfig();
@@ -27,7 +45,15 @@ export default function TeacherMenuManager({ onConfigChange }: TeacherMenuManage
   const handleToggle = async (tabId: string, currentState: boolean) => {
     setSaving(tabId);
     try {
-      await updateAdminMenuConfig({ tab_id: tabId, is_active: !currentState, scope: 'teacher' });
+      const menuToUpdate = configs.find(c => c.tab_id === tabId);
+      const payload = { 
+        ...menuToUpdate, 
+        tab_id: tabId, 
+        is_active: !currentState, 
+        scope: 'teacher' as 'admin' | 'teacher'
+      };
+      
+      await updateAdminMenuConfig(payload);
       setConfigs(prev => prev.map(c => c.tab_id === tabId ? { ...c, is_active: !currentState } : c));
       if (onConfigChange) onConfigChange();
     } catch (err: any) {
@@ -81,7 +107,7 @@ export default function TeacherMenuManager({ onConfigChange }: TeacherMenuManage
         ) : (
           configs.map((menu) => (
             <div 
-              key={menu.id} 
+              key={menu.tab_id} 
               className={`p-6 bg-white border-2 rounded-[2rem] transition-all duration-500 flex flex-col md:flex-row md:items-center gap-8 ${menu.is_active ? 'border-slate-100 shadow-sm' : 'border-slate-50 bg-slate-50/30 opacity-60'}`}
             >
               <div className="flex items-center gap-6 flex-1">

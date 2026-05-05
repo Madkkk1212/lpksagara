@@ -16,7 +16,28 @@ export default function MenuManager({ onConfigChange }: MenuManagerProps) {
   useEffect(() => {
     async function loadConfig() {
       const data = await getAdminMenuConfig();
-      setConfigs(data);
+      if (data.length === 0) {
+        // Initialize with core system defaults if DB is empty
+        const defaults: AdminMenuConfig[] = [
+          // Admin Menus
+          { tab_id: 'dashboard', label: 'Dashboard', icon: '🏠', is_active: true, scope: 'admin' } as any,
+          { tab_id: 'reports', label: 'Statistik & Analisa', icon: '📊', is_active: true, scope: 'admin' } as any,
+          { tab_id: 'weekly-reports', label: 'Laporan Mingguan', icon: '📋', is_active: true, scope: 'admin' } as any,
+          { tab_id: 'materials', label: 'Materials', icon: '📚', is_active: true, scope: 'admin' } as any,
+          { tab_id: 'exams', label: 'Exams', icon: '🏆', is_active: true, scope: 'admin' } as any,
+          { tab_id: 'users', label: 'Users', icon: '👥', is_active: true, scope: 'admin' } as any,
+          
+          // Teacher Menus
+          { tab_id: 'students', label: 'Dashboard', icon: '🏠', is_active: true, scope: 'teacher' } as any,
+          { tab_id: 'quizzes', label: 'Akses Quiz', icon: '⚡', is_active: true, scope: 'teacher' } as any,
+          { tab_id: 'exams', label: 'Akses Exam', icon: '🏆', is_active: true, scope: 'teacher' } as any,
+          { tab_id: 'reports', label: 'Riwayat Laporan', icon: '📊', is_active: true, scope: 'teacher' } as any,
+          { tab_id: 'targets', label: 'Target Mingguan', icon: '🎯', is_active: true, scope: 'teacher' } as any,
+        ];
+        setConfigs(defaults);
+      } else {
+        setConfigs(data);
+      }
       setLoading(false);
     }
     loadConfig();
@@ -25,7 +46,15 @@ export default function MenuManager({ onConfigChange }: MenuManagerProps) {
   const handleToggle = async (tabId: string, currentState: boolean) => {
     setSaving(tabId);
     try {
-      await updateAdminMenuConfig({ tab_id: tabId, is_active: !currentState });
+      const menuToUpdate = configs.find(c => c.tab_id === tabId);
+      const payload = { 
+        ...menuToUpdate, 
+        tab_id: tabId, 
+        is_active: !currentState,
+        scope: menuToUpdate?.scope as 'admin' | 'teacher' | undefined
+      };
+
+      await updateAdminMenuConfig(payload);
       setConfigs(prev => prev.map(c => c.tab_id === tabId ? { ...c, is_active: !currentState } : c));
       if (onConfigChange) onConfigChange();
     } catch (err: any) {
@@ -65,7 +94,7 @@ export default function MenuManager({ onConfigChange }: MenuManagerProps) {
       <div className="grid gap-4">
         {items.map((menu) => (
           <div 
-            key={menu.id} 
+            key={menu.tab_id} 
             className={`p-5 bg-white border rounded-2xl transition-all flex flex-col md:flex-row md:items-center gap-6 ${menu.is_active ? 'border-slate-200' : 'border-slate-100 bg-slate-50/50 opacity-70'}`}
           >
             <div className="flex items-center gap-4 flex-1">

@@ -208,9 +208,7 @@ export default function TeacherClient() {
 
   if (!isAuthorized) return null;
 
-  const assignedStudents = assignedStudentIds.length > 0
-    ? students.filter(s => assignedStudentIds.includes(s.id!))
-    : students;
+  const assignedStudents = students.filter(s => assignedStudentIds.includes(s.id!));
 
   const filteredStudents = assignedStudents.filter(s =>
     s.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -245,7 +243,7 @@ export default function TeacherClient() {
       <div className="hidden md:block border-b border-slate-200 bg-white sticky top-[73px] z-10">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex gap-1">
-            {([
+            {[
               { id: 'students', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
               { id: 'targets', label: 'Target Mingguan', icon: <Target className="w-4 h-4" /> },
               { id: 'grading', label: 'Penilaian Siswa', icon: <ClipboardCheck className="w-4 h-4" /> },
@@ -253,23 +251,31 @@ export default function TeacherClient() {
               { id: 'exams', label: 'Akses Exam', icon: <Trophy className="w-4 h-4" /> },
               { id: 'reports', label: 'Riwayat Laporan', icon: <FileText className="w-4 h-4" /> },
               { id: 'proposals', label: 'Usul Konten', icon: <MessageSquarePlus className="w-4 h-4" /> },
-            ] as { id: TeacherTab; label: string; icon: React.ReactNode }[]).map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`relative px-6 py-5 text-sm font-bold transition-all flex items-center gap-2 ${
-                  activeTab === tab.id
-                    ? 'text-indigo-600 border-b-2 border-indigo-600'
-                    : 'text-slate-400 hover:text-slate-700'
-                }`}
-              >
-                {tab.icon && <span>{tab.icon}</span>}
-                {tab.label}
-                {tab.id === 'proposals' && pendingCount > 0 && (
-                  <span className="ml-2 px-1.5 py-0.5 bg-amber-500 text-white text-[9px] font-black rounded-full">{pendingCount}</span>
-                )}
-              </button>
-            ))}
+              { id: 'profile', label: 'Profil Saya', icon: <User className="w-4 h-4" /> },
+            ].filter(tab => {
+              const dynamic = dynamicTabs.find(dt => dt.id === tab.id);
+              return dynamic ? dynamic.is_active : true; // Default to true if not in DB yet
+            }).map(tab => {
+              const dynamic = dynamicTabs.find(dt => dt.id === tab.id);
+              const label = dynamic?.label || tab.label;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`relative px-6 py-5 text-sm font-bold transition-all flex items-center gap-2 ${
+                    activeTab === tab.id
+                      ? 'text-indigo-600 border-b-2 border-indigo-600'
+                      : 'text-slate-400 hover:text-slate-700'
+                  }`}
+                >
+                  {tab.icon && <span>{tab.icon}</span>}
+                  {label}
+                  {tab.id === 'proposals' && pendingCount > 0 && (
+                    <span className="ml-2 px-1.5 py-0.5 bg-amber-500 text-white text-[9px] font-black rounded-full">{pendingCount}</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -648,7 +654,7 @@ export default function TeacherClient() {
       {/* Bottom Navigation for Mobile */}
       <nav className="fixed inset-x-0 bottom-[calc(1.2rem+env(safe-area-inset-bottom))] z-50 px-8 md:hidden">
         <div className="mx-auto max-w-[360px] bg-slate-900 rounded-full p-1.5 flex items-center justify-around shadow-2xl ring-1 ring-white/10 outline outline-4 outline-black/5">
-          {([
+          {[
             { id: 'students', label: 'Home', icon: <LayoutDashboard className="w-5 h-5" /> },
             { id: 'targets', label: 'Target', icon: <Target className="w-5 h-5" /> },
             { id: 'grading', label: 'Nilai', icon: <ClipboardCheck className="w-5 h-5" /> },
@@ -656,16 +662,21 @@ export default function TeacherClient() {
             { id: 'exams', label: 'Exam', icon: <Trophy className="w-5 h-5" /> },
             { id: 'reports', label: 'Laporan', icon: <FileText className="w-5 h-5" /> },
             { id: 'profile', label: 'Profil', icon: <User className="w-5 h-5" /> },
-          ] as { id: TeacherTab; label: string; icon: React.ReactNode }[]).map(tab => {
+          ].filter(tab => {
+            const dynamic = dynamicTabs.find(dt => dt.id === tab.id);
+            return dynamic ? dynamic.is_active : true;
+          }).map(tab => {
             const active = activeTab === tab.id;
+            const dynamic = dynamicTabs.find(dt => dt.id === tab.id);
+            const label = dynamic?.label || tab.label;
             return (
               <button 
                 key={tab.id} 
-                onClick={() => setActiveTab(tab.id)} 
+                onClick={() => setActiveTab(tab.id as any)} 
                 className={`relative flex h-14 w-14 flex-col items-center justify-center rounded-full transition-all duration-500 ${active ? 'text-indigo-400 bg-white/10' : 'text-slate-400'}`}
               >
                 <span className={`transition-all duration-500 ${active ? 'scale-110 -translate-y-0.5' : 'scale-100'}`}> {tab.icon} </span>
-                <span className={`text-[7px] font-black uppercase tracking-widest mt-1 transition-all duration-500 ${active ? 'opacity-100' : 'opacity-0 scale-50'}`}> {tab.label} </span>
+                <span className={`text-[7px] font-black uppercase tracking-widest mt-1 transition-all duration-500 ${active ? 'opacity-100' : 'opacity-0 scale-50'}`}> {label} </span>
                 {active && <div className="absolute top-1 right-2 h-1.5 w-1.5 rounded-full bg-indigo-400" />}
               </button>
             );

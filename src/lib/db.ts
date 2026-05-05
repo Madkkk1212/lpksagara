@@ -555,8 +555,7 @@ export async function getAdminMenuConfig(scope?: 'admin' | 'teacher'): Promise<A
 export async function updateAdminMenuConfig(config: Partial<AdminMenuConfig>) {
   const { data, error } = await supabase
     .from('admin_menu_config')
-    .update(config)
-    .eq('tab_id', config.tab_id)
+    .upsert(config, { onConflict: 'tab_id,scope' })
     .select();
   if (error) throw error;
   return data;
