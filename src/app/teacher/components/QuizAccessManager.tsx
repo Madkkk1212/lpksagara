@@ -2,15 +2,16 @@
 
 import React, { useState, useEffect } from "react";
 import { Profile, StudyChapter, StudyMaterial, StudyLevel } from "@/lib/types";
-import { getStudyChapters, getStudyMaterials, getAllStudyChapters, getBasicStudyMaterials, getStudentBatches } from "@/lib/db";
+import { getAllStudyChapters, getBasicStudyMaterials } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { BookOpen, CheckCircle, XCircle, Search, Filter, ShieldCheck, Zap, X } from "lucide-react";
 
 interface QuizAccessManagerProps {
   teacher: Profile;
+  assignedStudentIds?: string[];
 }
 
-export default function QuizAccessManager({ teacher }: QuizAccessManagerProps) {
+export default function QuizAccessManager({ teacher, assignedStudentIds = [] }: QuizAccessManagerProps) {
   const [chapters, setChapters] = useState<StudyChapter[]>([]);
   const [quizzes, setQuizzes] = useState<StudyMaterial[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
@@ -28,17 +29,27 @@ export default function QuizAccessManager({ teacher }: QuizAccessManagerProps) {
 
   useEffect(() => {
     fetchInitialData();
-  }, []);
+  }, [assignedStudentIds.join(',')]);
 
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      // Fetch data without buggy inline .catch/.match builders
-      const [allChapters, allMaterials, allBatches, profilesResult] = await Promise.all([
+      // Build student query — always filter by assigned IDs if available
+      let profilesQuery = supabase
+        .from('profiles')
+        .select('id, full_name, email, batch')
+        .neq('is_teacher', true)
+        .neq('is_admin', true);
+
+      if (assignedStudentIds.length > 0) {
+        profilesQuery = profilesQuery.in('id', assignedStudentIds);
+      }
+
+      const [allChapters, allMaterials, profilesResult, { data: controls }] = await Promise.all([
         getAllStudyChapters(),
         getBasicStudyMaterials(),
-        getStudentBatches(),
-        supabase.from('profiles').select('*').neq('is_teacher', true).neq('is_admin', true)
+        profilesQuery,
+        supabase.from('quiz_access_controls').select('*')
       ]);
 
       const uniqueChapters = Array.from(new Map(allChapters.map((c: any) => [c.id, c])).values()) as StudyChapter[];
@@ -51,21 +62,15 @@ export default function QuizAccessManager({ teacher }: QuizAccessManagerProps) {
       const studentProfiles = (profilesResult.data || []) as Profile[];
       setStudents(studentProfiles);
 
+      // Derive batches ONLY from assigned students — not from all system batches
       const batchNames = new Set<string>();
-      if (allBatches) allBatches.forEach((b: any) => batchNames.add(b.name));
       studentProfiles.forEach(s => { if (s.batch) batchNames.add(s.batch); });
-
       const finalBatches = Array.from(batchNames).sort().map((name, idx) => ({
         id: `batch-${idx}`,
-        name: name
+        name
       }));
-      
       setBatches(finalBatches);
 
-      const { data: controls } = await supabase
-        .from('quiz_access_controls')
-        .select('*');
-      
       setAccessControls(controls || []);
     } catch (err) {
       console.error("Error fetching quiz data:", err);
@@ -74,24 +79,34 @@ export default function QuizAccessManager({ teacher }: QuizAccessManagerProps) {
     }
   };
 
-  const toggleQuizAccess = async (quizId: string, type: 'batch' | 'student', identifiers: string[], currentStatus: boolean) => {
+  // Resolve the effective student IDs for a given action:
+  // - In 'student' mode: use selectedStudentIds directly
+  // - In 'batch' mode: use assigned students that belong to the selected batch
+  const resolveTargetStudentIds = (mode: 'batch' | 'student'): string[] => {
+    if (mode === 'student') return selectedStudentIds;
+    if (selectedBatch === 'Semua') return students.map(s => s.id!);
+    return students.filter(s => s.batch === selectedBatch).map(s => s.id!);
+  };
+
+  const toggleQuizAccess = async (quizId: string, currentStatus: boolean) => {
+    const mode = selectedStudentIds.length > 0 ? 'student' : 'batch';
+    const targetIds = resolveTargetStudentIds(mode);
+    if (targetIds.length === 0) return;
+
     try {
       const newStatus = !currentStatus;
       
-      const requests = identifiers.map(id => {
-        const payload: any = {
+      // Always toggle per-student (never write batch-level records),
+      // so only assigned students are affected.
+      const requests = targetIds.map(sid =>
+        supabase.from('quiz_access_controls').upsert({
           material_id: quizId,
+          student_id: sid,
           is_active: newStatus,
           teacher_id: teacher.id,
           updated_at: new Date().toISOString()
-        };
-        if (type === 'batch') payload.batch = id;
-        else payload.student_id = id;
-        
-        return supabase.from('quiz_access_controls').upsert(payload, { 
-          onConflict: type === 'batch' ? 'batch,material_id' : 'student_id,material_id' 
-        });
-      });
+        }, { onConflict: 'student_id,material_id' })
+      );
 
       const results = await Promise.all(requests);
       const errors = results.filter(r => r.error);
@@ -99,19 +114,11 @@ export default function QuizAccessManager({ teacher }: QuizAccessManagerProps) {
 
       setAccessControls(prev => {
         const updated = [...prev];
-        identifiers.forEach(id => {
-           const idx = updated.findIndex(c => 
-             (type === 'batch' ? c.batch === id : c.student_id === id) && 
-             c.material_id === quizId
-           );
-           const payload = {
-             material_id: quizId,
-             is_active: newStatus,
-             teacher_id: teacher.id,
-             ...(type === 'batch' ? { batch: id } : { student_id: id })
-           };
-           if (idx > -1) updated[idx] = { ...updated[idx], is_active: newStatus };
-           else updated.push(payload);
+        targetIds.forEach(sid => {
+          const idx = updated.findIndex(c => c.student_id === sid && c.material_id === quizId);
+          const payload = { material_id: quizId, student_id: sid, is_active: newStatus, teacher_id: teacher.id };
+          if (idx > -1) updated[idx] = { ...updated[idx], is_active: newStatus };
+          else updated.push(payload);
         });
         return updated;
       });
@@ -120,19 +127,17 @@ export default function QuizAccessManager({ teacher }: QuizAccessManagerProps) {
     }
   };
 
-  const isQuizActive = (quizId: string, batch: string, studentIds: string[]) => {
-    if (studentIds.length > 0) {
-      const activeCount = studentIds.filter(sid => {
-        const control = accessControls.find(c => c.student_id === sid && c.material_id === quizId);
-        return control ? control.is_active : false;
-      }).length;
-      
-      if (activeCount === 0) return false;
-      if (activeCount === studentIds.length) return true;
-      return 'partial';
-    }
-    const control = accessControls.find(c => c.batch === batch && c.material_id === quizId);
-    return control ? control.is_active : false;
+  const isQuizActive = (quizId: string) => {
+    const mode = selectedStudentIds.length > 0 ? 'student' : 'batch';
+    const targetIds = resolveTargetStudentIds(mode);
+    if (targetIds.length === 0) return false;
+    const activeCount = targetIds.filter(sid => {
+      const control = accessControls.find(c => c.student_id === sid && c.material_id === quizId);
+      return control ? control.is_active : false;
+    }).length;
+    if (activeCount === 0) return false;
+    if (activeCount === targetIds.length) return true;
+    return 'partial';
   };
 
   const toggleChapter = (id: string) => {
@@ -349,7 +354,7 @@ export default function QuizAccessManager({ teacher }: QuizAccessManagerProps) {
                {isExpanded && (
                  <div className="px-10 pb-12 pt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in slide-in-from-top-6 duration-700">
                     {chapterQuizzes.map(quiz => {
-                      const active = isQuizActive(quiz.id, selectedBatch, selectedStudentIds);
+                      const active = isQuizActive(quiz.id);
                       const isPartial = active === 'partial';
                       
                       return (
@@ -366,12 +371,7 @@ export default function QuizAccessManager({ teacher }: QuizAccessManagerProps) {
                            <h4 className="text-base font-black text-slate-800 mb-8 leading-tight min-h-[48px] group-hover:text-indigo-600 transition-colors">{quiz.title}</h4>
                            
                            <button 
-                             onClick={() => toggleQuizAccess(
-                               quiz.id, 
-                               selectedStudentIds.length > 0 ? 'student' : 'batch', 
-                               selectedStudentIds.length > 0 ? selectedStudentIds : [selectedBatch], 
-                               active === true
-                             )}
+                             onClick={() => toggleQuizAccess(quiz.id, active === true)}
                              className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 ${active === true ? 'bg-rose-500 text-white shadow-xl shadow-rose-500/20 hover:bg-rose-600' : isPartial ? 'bg-amber-600 text-white shadow-xl shadow-amber-500/20 hover:bg-amber-700' : 'bg-slate-900 text-white shadow-xl shadow-slate-900/10 hover:bg-emerald-600'}`}
                            >
                              {active === true ? 'Tutup Akses' : isPartial ? 'Buka Untuk Semua' : 'Buka Akses'}

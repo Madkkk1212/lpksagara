@@ -342,9 +342,9 @@ export default function TeacherClient() {
             levels={levels} 
           />
         ) : activeTab === 'quizzes' ? (
-          <QuizAccessManager teacher={teacherProfile!} />
+          <QuizAccessManager teacher={teacherProfile!} assignedStudentIds={assignedStudentIds} />
         ) : activeTab === 'exams' ? (
-          <ExamAccessManager teacher={teacherProfile!} />
+          <ExamAccessManager teacher={teacherProfile!} assignedStudentIds={assignedStudentIds} />
         ) : activeTab === 'reports' ? (
           <WeeklyReportManager teacher={teacherProfile!} />
         ) : activeTab === 'profile' ? (

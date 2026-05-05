@@ -2,15 +2,16 @@
 
 import React, { useState, useEffect } from "react";
 import { Profile, ExamLevel, ExamTest } from "@/lib/types";
-import { getExamLevels, getExamTests, getStudentBatches } from "@/lib/db";
+import { getExamLevels, getExamTests } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { BookOpen, Search, Zap, X, Trophy } from "lucide-react";
 
 interface ExamAccessManagerProps {
   teacher: Profile;
+  assignedStudentIds?: string[];
 }
 
-export default function ExamAccessManager({ teacher }: ExamAccessManagerProps) {
+export default function ExamAccessManager({ teacher, assignedStudentIds = [] }: ExamAccessManagerProps) {
   const [levels, setLevels] = useState<ExamLevel[]>([]);
   const [tests, setTests] = useState<ExamTest[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
@@ -28,15 +29,25 @@ export default function ExamAccessManager({ teacher }: ExamAccessManagerProps) {
 
   useEffect(() => {
     fetchInitialData();
-  }, []);
+  }, [assignedStudentIds.join(',')]);
 
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [allLevels, allBatches, profilesResult] = await Promise.all([
+      let profilesQuery = supabase
+        .from('profiles')
+        .select('id, full_name, email, batch')
+        .neq('is_teacher', true)
+        .neq('is_admin', true);
+
+      if (assignedStudentIds.length > 0) {
+        profilesQuery = profilesQuery.in('id', assignedStudentIds);
+      }
+
+      const [allLevels, profilesResult, { data: controls }] = await Promise.all([
         getExamLevels(),
-        getStudentBatches(),
-        supabase.from('profiles').select('*').neq('is_teacher', true).neq('is_admin', true)
+        profilesQuery,
+        supabase.from('exam_access_controls').select('*')
       ]);
 
       setLevels(allLevels.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
@@ -44,27 +55,20 @@ export default function ExamAccessManager({ teacher }: ExamAccessManagerProps) {
       const studentProfiles = (profilesResult.data || []) as Profile[];
       setStudents(studentProfiles);
 
+      // Derive batches ONLY from assigned students — not from all system batches
       const batchNames = new Set<string>();
-      if (allBatches) allBatches.forEach((b: any) => batchNames.add(b.name));
       studentProfiles.forEach(s => { if (s.batch) batchNames.add(s.batch); });
-
       const finalBatches = Array.from(batchNames).sort().map((name, idx) => ({
         id: `batch-${idx}`,
-        name: name
+        name
       }));
-      
       setBatches(finalBatches);
 
       // Fetch all tests
       const allTestsRequests = allLevels.map(l => getExamTests(l.id));
       const testsResults = await Promise.all(allTestsRequests);
-      const flattenedTests = testsResults.flat();
-      setTests(flattenedTests);
+      setTests(testsResults.flat());
 
-      const { data: controls } = await supabase
-        .from('exam_access_controls')
-        .select('*');
-      
       setAccessControls(controls || []);
     } catch (err) {
       console.error("Error fetching exam data:", err);
@@ -73,24 +77,31 @@ export default function ExamAccessManager({ teacher }: ExamAccessManagerProps) {
     }
   };
 
-  const toggleExamAccess = async (testId: string, type: 'batch' | 'student', identifiers: string[], currentStatus: boolean) => {
+  // Resolve student IDs for the current mode
+  const resolveTargetStudentIds = (mode: 'batch' | 'student'): string[] => {
+    if (mode === 'student') return selectedStudentIds;
+    if (selectedBatch === 'Semua') return students.map(s => s.id!);
+    return students.filter(s => s.batch === selectedBatch).map(s => s.id!);
+  };
+
+  const toggleExamAccess = async (testId: string, currentStatus: boolean) => {
+    const mode = selectedStudentIds.length > 0 ? 'student' : 'batch';
+    const targetIds = resolveTargetStudentIds(mode);
+    if (targetIds.length === 0) return;
+
     try {
       const newStatus = !currentStatus;
-      
-      const requests = identifiers.map(id => {
-        const payload: any = {
+
+      // Always toggle per-student so only assigned students are affected
+      const requests = targetIds.map(sid =>
+        supabase.from('exam_access_controls').upsert({
           test_id: testId,
+          student_id: sid,
           is_active: newStatus,
           teacher_id: teacher.id,
           updated_at: new Date().toISOString()
-        };
-        if (type === 'batch') payload.batch = id;
-        else payload.student_id = id;
-        
-        return supabase.from('exam_access_controls').upsert(payload, { 
-          onConflict: type === 'batch' ? 'batch,test_id' : 'student_id,test_id' 
-        });
-      });
+        }, { onConflict: 'student_id,test_id' })
+      );
 
       const results = await Promise.all(requests);
       const errors = results.filter(r => r.error);
@@ -98,19 +109,11 @@ export default function ExamAccessManager({ teacher }: ExamAccessManagerProps) {
 
       setAccessControls(prev => {
         const updated = [...prev];
-        identifiers.forEach(id => {
-           const idx = updated.findIndex(c => 
-             (type === 'batch' ? c.batch === id : c.student_id === id) && 
-             c.test_id === testId
-           );
-           const payload = {
-             test_id: testId,
-             is_active: newStatus,
-             teacher_id: teacher.id,
-             ...(type === 'batch' ? { batch: id } : { student_id: id })
-           };
-           if (idx > -1) updated[idx] = { ...updated[idx], is_active: newStatus };
-           else updated.push(payload);
+        targetIds.forEach(sid => {
+          const idx = updated.findIndex(c => c.student_id === sid && c.test_id === testId);
+          const payload = { test_id: testId, student_id: sid, is_active: newStatus, teacher_id: teacher.id };
+          if (idx > -1) updated[idx] = { ...updated[idx], is_active: newStatus };
+          else updated.push(payload);
         });
         return updated;
       });
@@ -119,19 +122,17 @@ export default function ExamAccessManager({ teacher }: ExamAccessManagerProps) {
     }
   };
 
-  const isExamActive = (testId: string, batch: string, studentIds: string[]) => {
-    if (studentIds.length > 0) {
-      const activeCount = studentIds.filter(sid => {
-        const control = accessControls.find(c => c.student_id === sid && c.test_id === testId);
-        return control ? control.is_active : false;
-      }).length;
-      
-      if (activeCount === 0) return false;
-      if (activeCount === studentIds.length) return true;
-      return 'partial';
-    }
-    const control = accessControls.find(c => c.batch === batch && c.test_id === testId);
-    return control ? control.is_active : false;
+  const isExamActive = (testId: string) => {
+    const mode = selectedStudentIds.length > 0 ? 'student' : 'batch';
+    const targetIds = resolveTargetStudentIds(mode);
+    if (targetIds.length === 0) return false;
+    const activeCount = targetIds.filter(sid => {
+      const control = accessControls.find(c => c.student_id === sid && c.test_id === testId);
+      return control ? control.is_active : false;
+    }).length;
+    if (activeCount === 0) return false;
+    if (activeCount === targetIds.length) return true;
+    return 'partial';
   };
 
   const toggleLevel = (id: string) => {
@@ -348,7 +349,7 @@ export default function ExamAccessManager({ teacher }: ExamAccessManagerProps) {
                {isExpanded && (
                  <div className="px-10 pb-12 pt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in slide-in-from-top-6 duration-700">
                     {levelTests.map(test => {
-                      const active = isExamActive(test.id, selectedBatch, selectedStudentIds);
+                      const active = isExamActive(test.id);
                       const isPartial = active === 'partial';
                       
                       return (
@@ -365,12 +366,7 @@ export default function ExamAccessManager({ teacher }: ExamAccessManagerProps) {
                            <h4 className="text-base font-black text-slate-800 mb-8 leading-tight min-h-[48px] group-hover:text-indigo-600 transition-colors">{test.title}</h4>
                            
                            <button 
-                             onClick={() => toggleExamAccess(
-                               test.id, 
-                               selectedStudentIds.length > 0 ? 'student' : 'batch', 
-                               selectedStudentIds.length > 0 ? selectedStudentIds : [selectedBatch], 
-                               active === true
-                             )}
+                             onClick={() => toggleExamAccess(test.id, active === true)}
                              className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 ${active === true ? 'bg-rose-500 text-white shadow-xl shadow-rose-500/20 hover:bg-rose-600' : isPartial ? 'bg-amber-600 text-white shadow-xl shadow-amber-500/20 hover:bg-amber-700' : 'bg-slate-900 text-white shadow-xl shadow-slate-900/10 hover:bg-emerald-600'}`}
                            >
                              {active === true ? 'Tutup Akses' : isPartial ? 'Buka Untuk Semua' : 'Buka Akses'}
