@@ -128,16 +128,20 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
         
         // Fetch ALL materials for the entire level first to ensure progression logic works
         const allMats: StudyMaterial[] = [];
+        const matsMap: Record<string, StudyMaterial[]> = {};
         for (const chap of sortedChaps) {
             const mats = await getStudyMaterials(chap.id);
             allMats.push(...mats);
+            matsMap[chap.id] = mats;
         }
         setAllLevelMaterials(allMats);
+        setChapterMaterials(matsMap);
         setChapters(sortedChaps);
       });
     } else {
       setChapters([]);
       setAllLevelMaterials([]);
+      setChapterMaterials({});
     }
   }, [activeLevel]);
 
@@ -285,6 +289,80 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                   </div>
                   <h2 className="text-4xl font-black text-slate-900 italic mb-8 relative z-10">{selectedMaterial.title}</h2>
                   
+                  {/* Media Banners */}
+                  {selectedMaterial.video_url && (
+                    <div className="mb-8 rounded-[2rem] overflow-hidden bg-black shadow-xl ring-1 ring-black/10 relative z-10">
+                      <video controls className="w-full max-h-80" src={selectedMaterial.video_url} poster={selectedMaterial.image_url || undefined}>
+                        Browser tidak mendukung video.
+                      </video>
+                    </div>
+                  )}
+                  {selectedMaterial.image_url && (
+                    <div className="mb-8 rounded-[2rem] overflow-hidden shadow-md ring-1 ring-black/5 relative z-10">
+                      <img src={selectedMaterial.image_url} alt={selectedMaterial.title} className="w-full max-h-64 object-cover" />
+                    </div>
+                  )}
+
+                  {(() => {
+                      const content = typeof selectedMaterial.content === 'string' 
+                          ? JSON.parse(selectedMaterial.content) 
+                          : selectedMaterial.content;
+                      return (
+                        <>
+                          {/* PDF Document Viewer */}
+                          {(content.pdf_url || content.document_url) && (
+                            <div className="mb-8 rounded-[2rem] overflow-hidden bg-white border border-slate-100 shadow-lg p-6 relative z-10">
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-2xl">📕</span>
+                                  <div>
+                                    <h3 className="text-lg font-black text-slate-800">Dokumen PDF</h3>
+                                    <p className="text-xs font-bold text-slate-400">Silakan pelajari materi PDF di bawah ini langsung.</p>
+                                  </div>
+                                </div>
+                                <a 
+                                  href={content.pdf_url || content.document_url} 
+                                  target="_blank" 
+                                  rel="noreferrer"
+                                  className="px-4 py-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 rounded-xl text-xs font-black transition-all"
+                                >
+                                  Buka Tab Baru ↗
+                                </a>
+                              </div>
+                              <iframe 
+                                src={`${content.pdf_url || content.document_url}#toolbar=0`} 
+                                className="w-full h-[500px] rounded-2xl border border-slate-100 shadow-inner"
+                                title="PDF Viewer"
+                              />
+                            </div>
+                          )}
+
+                          {/* PPT Slides banner */}
+                          {content.ppt_url && (
+                            <div className="mb-8 p-8 bg-gradient-to-br from-amber-50 to-white rounded-[2rem] border border-amber-100 shadow-sm flex flex-col md:flex-row items-center gap-6 justify-between relative z-10">
+                              <div className="flex items-center gap-5">
+                                <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-3xl shadow-inner">
+                                  📊
+                                </div>
+                                <div>
+                                  <h3 className="text-xl font-black text-slate-800 mb-1">Slide PPT / Presentasi</h3>
+                                  <p className="text-sm font-bold text-slate-400">Silakan unduh atau buka slide PPT untuk presentasi materi ini.</p>
+                                </div>
+                              </div>
+                              <a 
+                                href={content.ppt_url} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="px-8 py-4 bg-amber-600 text-white font-black text-sm uppercase tracking-widest rounded-xl hover:bg-amber-700 hover:shadow-lg transition-all whitespace-nowrap active:scale-95"
+                              >
+                                Buka PPT
+                              </a>
+                            </div>
+                          )}
+                        </>
+                      );
+                  })()}
+
                   {/* Dynamic Content Renderer */}
                   <div className="w-full relative z-10">
                     {(() => {
@@ -419,33 +497,30 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                      
                      return (
                       <div key={chapter.id} className={`bg-white/60 backdrop-blur-md rounded-[2.5rem] border border-white/80 shadow-sm overflow-hidden transition-all duration-500 ${!unlocked ? 'opacity-60 saturate-50' : ''}`}>
-                         <button 
-                           onClick={() => unlocked && toggleChapter(chapter.id)}
-                           className={`w-full p-8 flex items-center justify-between hover:bg-white/80 transition-all ${expandedChapter === chapter.id ? 'bg-white/40' : ''} ${!unlocked ? 'cursor-not-allowed' : ''}`}
-                         >
-                            <div className="flex items-center gap-6 text-left">
-                               <div className={`h-16 w-16 rounded-[1.2rem] flex items-center justify-center p-3.5 shadow-sm ring-1 ring-slate-100 ${!unlocked ? 'bg-slate-200' : completed ? 'bg-emerald-50 text-emerald-600 ring-emerald-100' : 'bg-indigo-50'}`}>
-                                  {!unlocked ? <Lock size={24} className="text-slate-400" /> : completed ? <CheckCircle2 size={24} /> : chapter.icon_url ? <img src={chapter.icon_url} className="w-full h-full object-contain" alt="icon"/> : '📖'}
-                               </div>
-                               <div>
-                                 <h5 className={`text-xl font-black italic uppercase tracking-tight ${unlocked ? 'text-slate-800' : 'text-slate-400'}`}>
-                                    {chapter.title}
-                                 </h5>
-                                 <div className="flex items-center gap-2 mt-1">
-                                    <span className={`text-[10px] font-bold uppercase tracking-widest ${completed ? 'text-emerald-500' : unlocked ? 'text-indigo-400' : 'text-slate-400'}`}>
-                                       {completed ? 'Chapter Selesai' : unlocked ? 'Sedang Dipelajari' : 'Masih Terkunci'}
-                                    </span>
-                                 </div>
-                               </div>
-                            </div>
-                            {unlocked ? (
-                                <div className={`h-10 w-10 rounded-full border border-slate-100 flex items-center justify-center transition-all duration-500 ${expandedChapter === chapter.id ? 'rotate-180 bg-slate-900 text-white' : 'bg-white text-slate-300'}`}>▼</div>
-                            ) : (
-                                <div className="h-10 w-10 flex items-center justify-center text-slate-300">🔒</div>
-                            )}
-                         </button>
+                         <div 
+                            className={`w-full p-8 flex items-center justify-between border-b border-slate-100/50 ${!unlocked ? 'cursor-not-allowed' : ''}`}
+                          >
+                             <div className="flex items-center gap-6 text-left">
+                                <div className={`h-16 w-16 rounded-[1.2rem] flex items-center justify-center p-3.5 shadow-sm ring-1 ring-slate-100 ${!unlocked ? 'bg-slate-200' : completed ? 'bg-emerald-50 text-emerald-600 ring-emerald-100' : 'bg-indigo-50'}`}>
+                                   {!unlocked ? <Lock size={24} className="text-slate-400" /> : completed ? <CheckCircle2 size={24} /> : chapter.icon_url ? <img src={chapter.icon_url} className="w-full h-full object-contain" alt="icon"/> : '📖'}
+                                </div>
+                                <div>
+                                  <h5 className={`text-xl font-black italic uppercase tracking-tight ${unlocked ? 'text-slate-800' : 'text-slate-400'}`}>
+                                     {chapter.title}
+                                  </h5>
+                                  <div className="flex items-center gap-2 mt-1">
+                                     <span className={`text-[10px] font-bold uppercase tracking-widest ${completed ? 'text-emerald-500' : unlocked ? 'text-indigo-400' : 'text-slate-400'}`}>
+                                        {completed ? 'Chapter Selesai' : unlocked ? 'Sedang Dipelajari' : 'Masih Terkunci'}
+                                     </span>
+                                  </div>
+                                </div>
+                             </div>
+                             {!unlocked && (
+                                 <div className="h-10 w-10 flex items-center justify-center text-slate-300">🔒</div>
+                             )}
+                          </div>
 
-                         {expandedChapter === chapter.id && unlocked && (
+                         {unlocked && (
                            <div className="px-8 pb-8 space-y-3 animate-in fade-in slide-in-from-top-4 duration-500">
                               {chapterMaterials[chapter.id]?.map((mat) => {
                                 const matDone = isMaterialCompleted(mat.id);
@@ -458,8 +533,31 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                                     className={`w-full p-6 bg-white/40 hover:bg-white hover:shadow-xl rounded-3xl flex items-center justify-between group transition-all border ${matDone ? 'border-emerald-100' : 'border-transparent hover:border-white/80'} ${!matUnlocked ? 'opacity-40 cursor-not-allowed grayscale' : ''}`}
                                   >
                                     <div className="flex items-center gap-5">
-                                       <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform ${!matUnlocked ? 'bg-slate-200' : matDone ? 'bg-emerald-50 text-emerald-600' : 'bg-white border border-slate-50'}`}>
-                                          {!matUnlocked ? <Lock size={16} className="text-slate-400" /> : matDone ? <CheckCircle2 size={18} /> : mat.material_type === 'quiz' ? '🎯' : mat.material_type === 'choukai' ? '🎧' : '📄'}
+                                       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-sm group-hover:scale-110 transition-transform overflow-hidden relative ${!matUnlocked ? 'bg-slate-200' : matDone ? 'bg-emerald-50 text-emerald-600' : 'bg-white border border-slate-50'}`}>
+                                          {!matUnlocked ? (
+                                            <Lock size={16} className="text-slate-400" />
+                                          ) : matDone ? (
+                                            <CheckCircle2 size={18} />
+                                          ) : mat.video_url ? (
+                                            <div className="w-full h-full flex items-center justify-center relative bg-slate-950 text-white text-[10px]">
+                                              {mat.image_url ? (
+                                                <img src={mat.image_url} alt="video" className="w-full h-full object-cover opacity-60" />
+                                              ) : (
+                                                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-500 opacity-80" />
+                                              )}
+                                              <span className="relative z-10">▶</span>
+                                            </div>
+                                          ) : mat.image_url ? (
+                                            <img src={mat.image_url} alt="image" className="w-full h-full object-cover" />
+                                          ) : mat.icon_url ? (
+                                            <img src={mat.icon_url} alt="icon" className="w-full h-full object-contain p-2" />
+                                          ) : mat.material_type === 'quiz' ? (
+                                            '🎯'
+                                          ) : mat.material_type === 'choukai' ? (
+                                            '🎧'
+                                          ) : (
+                                            '📄'
+                                          )}
                                        </div>
                                        <span className={`text-sm font-black transition-colors uppercase tracking-tight ${!matUnlocked ? 'text-slate-400' : matDone ? 'text-emerald-600' : 'text-slate-600 group-hover:text-slate-900'}`}>{mat.title}</span>
                                     </div>

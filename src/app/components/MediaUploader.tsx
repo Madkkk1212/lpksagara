@@ -3,7 +3,7 @@
 import { useRef, useState, useCallback } from "react";
 import { directUpload } from "@/lib/upload";
 
-type MediaType = "image" | "audio" | "video";
+type MediaType = "image" | "audio" | "video" | "document";
 
 interface MediaUploaderProps {
   label: string;
@@ -17,12 +17,14 @@ const ACCEPT_MAP: Record<MediaType, string> = {
   image: "image/*",
   audio: "audio/mp3,audio/ogg,audio/wav,audio/mpeg,audio/*",
   video: "video/mp4,video/webm,video/ogg,video/*",
+  document: ".pdf,.ppt,.pptx,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation",
 };
 
 const ICON_MAP: Record<MediaType, string> = {
   image: "🖼️",
   audio: "🔊",
   video: "🎬",
+  document: "📄",
 };
 
 // ── Compress image client-side (fast, aggressive) ──────────────────────────
@@ -80,12 +82,38 @@ export default function MediaUploader({ label, mediaType, value, onChange, accep
       alert("⚠️ File ditolak!\n\nHanya file gambar (seperti jpg, png) yang diperbolehkan.");
       return;
     }
+    if (mediaType === "document") {
+      if (accept) {
+        const allowed = accept.split(",").map(a => a.trim().toLowerCase());
+        const fileName = file.name.toLowerCase();
+        const fileType = file.type.toLowerCase();
+        const matches = allowed.some(pattern => {
+          if (pattern.startsWith(".")) {
+            return fileName.endsWith(pattern);
+          }
+          if (pattern.includes("/*")) {
+            const [main] = pattern.split("/");
+            return fileType.startsWith(main + "/");
+          }
+          return fileType === pattern || fileType.includes(pattern);
+        });
+        if (!matches) {
+          alert(`⚠️ File ditolak!\n\nHarap unggah file yang sesuai (${accept}).`);
+          return;
+        }
+      } else {
+        if (!(file.type === "application/pdf" || file.type.includes("powerpoint") || file.type.includes("presentation") || file.name.endsWith(".pdf") || file.name.endsWith(".ppt") || file.name.endsWith(".pptx"))) {
+          alert("⚠️ File ditolak!\n\nHanya file dokumen (PDF, PPT) yang diperbolehkan.");
+          return;
+        }
+      }
+    }
 
     // Limits: Cloudinary free (image 10MB), Cloudflare R2 free (video/audio 5GB)
-    const limitMB = mediaType === "image" ? 10 : 5120;
+    const limitMB = mediaType === "image" ? 10 : (mediaType === "document" ? 100 : 5120);
     const limitBytes = limitMB * 1024 * 1024;
     if (file.size > limitBytes) {
-      alert(`⚠️ File terlalu besar!\n\nBatas upload:\n• Gambar: maks 10 MB (Cloudinary)\n• Video: maks 5 GB (Cloudflare R2)\n• Audio: maks 5 GB (Cloudflare R2)\n\nFile Anda: ${(file.size / 1024 / 1024).toFixed(1)} MB`);
+      alert(`⚠️ File terlalu besar!\n\nBatas upload:\n• Gambar: maks 10 MB (Cloudinary)\n• Video: maks 5 GB (Cloudflare R2)\n• Audio: maks 5 GB (Cloudflare R2)\n• Dokumen: maks 100 MB\n\nFile Anda: ${(file.size / 1024 / 1024).toFixed(1)} MB`);
       return;
     }
 
@@ -238,6 +266,8 @@ export default function MediaUploader({ label, mediaType, value, onChange, accep
                 <p className="text-[9px] text-slate-400 font-bold uppercase">
                   {mediaType === "image"
                     ? "Direct Cloudinary · Maks 10 MB"
+                    : mediaType === "document"
+                    ? "Direct Cloudflare R2 · Maks 100 MB"
                     : "Direct Cloudflare R2 · Maks 5 GB"}
                 </p>
               </div>
@@ -256,9 +286,9 @@ export default function MediaUploader({ label, mediaType, value, onChange, accep
           <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-orange-50 border border-orange-200 text-[9px] font-bold text-orange-700 uppercase tracking-wide">
             <span className="text-base leading-none">⚡</span>
             <span>
-              Video/Audio otomatis dialihkan ke{" "}
+              File besar otomatis dialihkan ke{" "}
               <span className="text-orange-900">Cloudflare R2</span>{" "}
-              (Super Cepat · Maks 5 GB)
+              (Super Cepat)
             </span>
           </div>
         )}
@@ -290,7 +320,7 @@ export default function MediaUploader({ label, mediaType, value, onChange, accep
           <div className="h-12 w-12 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-xl overflow-hidden shadow-sm shrink-0">
             {mediaType === "image" ? (
               <img src={value} className="h-full w-full object-cover" alt="preview" />
-            ) : mediaType === "video" ? "🎬" : "🔊"}
+            ) : mediaType === "video" ? "🎬" : mediaType === "document" ? "📄" : "🔊"}
           </div>
           <div className="flex-1 overflow-hidden">
             <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5">✓ Uploaded</p>

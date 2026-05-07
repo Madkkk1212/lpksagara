@@ -289,13 +289,14 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                  controls
                  className="w-full max-h-80"
                  src={materialData.video_url}
+                  poster={materialData.image_url || undefined}
                >
                  Browser tidak mendukung video.
                </video>
              </div>
            )}
            {/* Image banner if material has image */}
-           {!materialData.video_url && materialData.image_url && (
+           {materialData.image_url && (
              <div className="mb-8 rounded-[2rem] overflow-hidden shadow-md ring-1 ring-black/5">
                <img
                  src={materialData.image_url}
@@ -304,6 +305,57 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                />
              </div>
            )}
+
+                       {/* PDF Document Viewer */}
+            {(content.pdf_url || content.document_url) && (
+              <div className="mb-8 rounded-[2rem] overflow-hidden bg-white border border-slate-100 shadow-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">📕</span>
+                    <div>
+                      <h3 className="text-lg font-black text-slate-800">Dokumen PDF</h3>
+                      <p className="text-xs font-bold text-slate-400">Silakan pelajari materi PDF di bawah ini langsung.</p>
+                    </div>
+                  </div>
+                  <a 
+                    href={content.pdf_url || content.document_url} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="px-4 py-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 rounded-xl text-xs font-black transition-all"
+                  >
+                    Buka Tab Baru ↗
+                  </a>
+                </div>
+                <iframe 
+                  src={`${content.pdf_url || content.document_url}#toolbar=0`} 
+                  className="w-full h-[600px] rounded-2xl border border-slate-100 shadow-inner"
+                  title="PDF Viewer"
+                />
+              </div>
+            )}
+
+            {/* PPT Slides banner */}
+            {content.ppt_url && (
+              <div className="mb-8 p-8 bg-gradient-to-br from-amber-50 to-white rounded-[2rem] border border-amber-100 shadow-sm flex flex-col md:flex-row items-center gap-6 justify-between">
+                <div className="flex items-center gap-5">
+                  <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-3xl shadow-inner">
+                    📊
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800 mb-1">Slide PPT / Presentasi</h3>
+                    <p className="text-sm font-bold text-slate-400">Silakan unduh atau buka slide PPT untuk presentasi materi ini.</p>
+                  </div>
+                </div>
+                <a 
+                  href={content.ppt_url} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="px-8 py-4 bg-amber-600 text-white font-black text-sm uppercase tracking-widest rounded-xl hover:bg-amber-700 hover:shadow-lg transition-all whitespace-nowrap active:scale-95"
+                >
+                  Buka PPT
+                </a>
+              </div>
+            )}
 
            {materialData.material_type === 'moji_goi' && renderMojiGoi()}
            {materialData.material_type === 'bunpou' && renderBunpou()}

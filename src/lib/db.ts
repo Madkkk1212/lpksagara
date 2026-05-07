@@ -310,7 +310,7 @@ export async function getMaterialsWithVideos(): Promise<Partial<StudyMaterial>[]
 }
 
 export async function getBasicStudyMaterials(chapterId?: string): Promise<Partial<StudyMaterial>[]> {
-  let query = supabase.from('study_materials').select('id, title, chapter_id, material_type, is_locked, sort_order, icon_url');
+  let query = supabase.from('study_materials').select('id, title, chapter_id, material_type, is_locked, sort_order, icon_url, video_url, image_url, document_url');
   if (chapterId) query = query.eq('chapter_id', chapterId);
   const { data, error } = await query.order('sort_order', { ascending: true });
   if (error) return []

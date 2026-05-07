@@ -70,7 +70,7 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
         if (chapterIds.length > 0) {
           const { data: mats } = await supabase
             .from('study_materials')
-            .select('id, title, chapter_id, material_type, is_locked, sort_order, icon_url')
+            .select('id, title, chapter_id, material_type, is_locked, sort_order, icon_url, video_url, image_url')
             .in('chapter_id', chapterIds)
             .order('sort_order', { ascending: true });
           
@@ -248,9 +248,26 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
                           {isQuiz && !isQuizLocked && <div className="absolute top-3 left-3 flex items-center justify-center p-1 bg-emerald-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg animate-pulse" title="Quiz Live!">⚡</div>}
                           {isLatihan && !isLatihanLocked && <div className="absolute top-3 left-3 flex items-center justify-center p-1 bg-sky-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg" title="Latihan Siap!">📝</div>}
                           
-                          <div className={`text-3xl mb-3 transition-transform duration-500 ${!disableClick ? 'group-hover:scale-110' : ''}`}>
-                            {mat.icon_url ? <img src={mat.icon_url || undefined} alt="icon" className="w-8 h-8 object-contain" /> : getIconForType(mat.material_type || "")}
-                          </div>
+                          {mat.video_url ? (
+                            <div className="w-full h-24 mb-3 rounded-2xl overflow-hidden bg-slate-900 flex items-center justify-center relative shadow-inner">
+                              {mat.image_url ? (
+                                <img src={mat.image_url} alt={mat.title || ""} className="w-full h-full object-cover opacity-60" />
+                              ) : (
+                                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-purple-500/20" />
+                              )}
+                              <div className="h-10 w-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-lg text-indigo-600 transition-transform duration-300 group-hover:scale-110 relative z-10 font-bold text-xs">
+                                ▶
+                              </div>
+                            </div>
+                          ) : mat.image_url ? (
+                            <div className="w-full h-24 mb-3 rounded-2xl overflow-hidden shadow-sm relative border border-slate-100">
+                              <img src={mat.image_url} alt={mat.title || ""} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                            </div>
+                          ) : (
+                            <div className={`text-3xl mb-3 transition-transform duration-500 ${!disableClick ? 'group-hover:scale-110' : ''}`}>
+                              {mat.icon_url ? <img src={mat.icon_url || undefined} alt="icon" className="w-8 h-8 object-contain mx-auto" /> : getIconForType(mat.material_type || "")}
+                            </div>
+                          )}
                           <span className={`text-xs font-black uppercase tracking-widest text-center ${isQuiz ? 'text-rose-500' : isLatihan ? 'text-amber-500' : 'text-slate-800'}`}>
                             {(mat.material_type || "").replace('_', ' ')}
                           </span>

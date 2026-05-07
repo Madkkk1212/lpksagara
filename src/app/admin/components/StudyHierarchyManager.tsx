@@ -824,6 +824,20 @@ export default function StudyHierarchyManager() {
                           value={editingMaterial.image_url}
                           onChange={(url, size, provider) => setEditingMaterial({...editingMaterial, image_url: url})}
                         />
+                        <MediaUploader
+                          label="Dokumen PDF (Maks 100 MB)"
+                          mediaType="document"
+                          accept=".pdf,application/pdf"
+                          value={formContent.pdf_url || formContent.document_url}
+                          onChange={(url) => setFormContent({...formContent, pdf_url: url, document_url: url})}
+                        />
+                        <MediaUploader
+                          label="Slide PPT / Presentasi (Maks 100 MB)"
+                          mediaType="document"
+                          accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                          value={formContent.ppt_url}
+                          onChange={(url) => setFormContent({...formContent, ppt_url: url})}
+                        />
                      </div>
                     <div className="col-span-2 pt-4 border-t mt-2">
                         <div className="flex gap-6">
