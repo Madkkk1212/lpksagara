@@ -334,26 +334,31 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
               </div>
             )}
 
-            {/* PPT Slides banner */}
+            {/* PPT Slides iframe viewer */}
             {content.ppt_url && (
-              <div className="mb-8 p-8 bg-gradient-to-br from-amber-50 to-white rounded-[2rem] border border-amber-100 shadow-sm flex flex-col md:flex-row items-center gap-6 justify-between">
-                <div className="flex items-center gap-5">
-                  <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-3xl shadow-inner">
-                    📊
+              <div className="mb-8 rounded-[2rem] overflow-hidden bg-white border border-slate-100 shadow-lg p-6 relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">📊</span>
+                    <div>
+                      <h3 className="text-lg font-black text-slate-800">Slide PPT / Presentasi</h3>
+                      <p className="text-xs font-bold text-slate-400">Silakan pelajari slide presentasi PPT di bawah ini langsung.</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-xl font-black text-slate-800 mb-1">Slide PPT / Presentasi</h3>
-                    <p className="text-sm font-bold text-slate-400">Silakan unduh atau buka slide PPT untuk presentasi materi ini.</p>
-                  </div>
+                  <a 
+                    href={content.ppt_url} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="px-4 py-2 bg-slate-100 hover:bg-amber-50 hover:text-amber-600 text-slate-600 rounded-xl text-xs font-black transition-all"
+                  >
+                    Download PPT ↗
+                  </a>
                 </div>
-                <a 
-                  href={content.ppt_url} 
-                  target="_blank" 
-                  rel="noreferrer"
-                  className="px-8 py-4 bg-amber-600 text-white font-black text-sm uppercase tracking-widest rounded-xl hover:bg-amber-700 hover:shadow-lg transition-all whitespace-nowrap active:scale-95"
-                >
-                  Buka PPT
-                </a>
+                <iframe 
+                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(content.ppt_url)}`} 
+                  className="w-full h-[600px] rounded-2xl border border-slate-100 shadow-inner"
+                  title="PPT Viewer"
+                />
               </div>
             )}
 

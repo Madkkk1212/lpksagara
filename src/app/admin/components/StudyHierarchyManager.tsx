@@ -228,16 +228,22 @@ export default function StudyHierarchyManager() {
 
     setEditingMaterial(fullMat);
     const c = (fullMat.content || {}) as any;
+    const mediaFields = {
+      pdf_url: c.pdf_url || null,
+      document_url: c.document_url || null,
+      ppt_url: c.ppt_url || null,
+    };
+
     if (fullMat.material_type === 'moji_goi' || fullMat.material_type === 'bunpou') {
-      setFormContent({ items: c.items || [] });
+      setFormContent({ items: c.items || [], ...mediaFields });
     } else if (fullMat.material_type === 'dokkai') {
-      setFormContent({ text_jp: c.text_jp || '', text_id: c.text_id || '', exercises: c.exercises || [] });
+      setFormContent({ text_jp: c.text_jp || '', text_id: c.text_id || '', exercises: c.exercises || [], ...mediaFields });
     } else if (fullMat.material_type === 'choukai') {
-      setFormContent({ audioUrl: c.audioUrl || '', exercises: c.exercises || [] });
+      setFormContent({ audioUrl: c.audioUrl || '', exercises: c.exercises || [], ...mediaFields });
     } else if (fullMat.material_type === 'quiz' || fullMat.material_type === 'latihan') {
-      setFormContent({ exercises: c.exercises || [] });
+      setFormContent({ exercises: c.exercises || [], ...mediaFields });
     } else {
-      setFormContent(c);
+      setFormContent({ ...c, ...mediaFields });
     }
   };
 
@@ -784,10 +790,17 @@ export default function StudyHierarchyManager() {
                          onChange={e => {
                            const newType = e.target.value as any;
                            setEditingMaterial({...editingMaterial, material_type: newType});
-                           if (newType === 'moji_goi' || newType === 'bunpou') setFormContent({ items: [] });
-                           else if (newType === 'dokkai') setFormContent({ text_jp: '', text_id: '', exercises: [] });
-                           else if (newType === 'choukai') setFormContent({ audioUrl: '', exercises: [] });
-                           else setFormContent({ exercises: [] });
+                           
+                           const mediaFields = {
+                             pdf_url: formContent.pdf_url || null,
+                             document_url: formContent.document_url || null,
+                             ppt_url: formContent.ppt_url || null,
+                           };
+
+                           if (newType === 'moji_goi' || newType === 'bunpou') setFormContent({ items: [], ...mediaFields });
+                           else if (newType === 'dokkai') setFormContent({ text_jp: '', text_id: '', exercises: [], ...mediaFields });
+                           else if (newType === 'choukai') setFormContent({ audioUrl: '', exercises: [], ...mediaFields });
+                           else setFormContent({ exercises: [], ...mediaFields });
                          }}
                          className="w-full px-4 py-3 rounded-xl bg-slate-50 font-bold appearance-none outline-none border focus:border-teal-500"
                       >
