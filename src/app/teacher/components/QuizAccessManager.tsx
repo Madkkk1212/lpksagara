@@ -34,22 +34,18 @@ export default function QuizAccessManager({ teacher, assignedStudentIds = [] }: 
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      // Mandatory filter: only fetch profiles if we have assigned IDs
-      if (assignedStudentIds.length === 0) {
-        setStudents([]);
-        setBatches([]);
-        setChapters([]);
-        setQuizzes([]);
-        setLoading(false);
-        return;
-      }
-
       let profilesQuery = supabase
         .from('profiles')
         .select('id, full_name, email, batch')
         .neq('is_teacher', true)
-        .neq('is_admin', true)
-        .in('id', assignedStudentIds);
+        .neq('is_admin', true);
+
+      if (assignedStudentIds.length > 0) {
+        profilesQuery = profilesQuery.in('id', assignedStudentIds);
+      } else {
+        // Query empty result safely by using a non-matching UUID
+        profilesQuery = profilesQuery.eq('id', '00000000-0000-0000-0000-000000000000');
+      }
 
       const [allChapters, allMaterials, profilesResult, { data: controls }] = await Promise.all([
         getAllStudyChapters(),
@@ -173,6 +169,12 @@ export default function QuizAccessManager({ teacher, assignedStudentIds = [] }: 
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-20">
+      {assignedStudentIds.length === 0 && (
+        <div className="p-6 bg-amber-50 border border-amber-200 rounded-[2rem] text-amber-800 text-xs font-medium">
+          ⚠️ <strong>Pemberitahuan:</strong> Anda belum memiliki siswa yang ditugaskan kepada Anda. Hubungi Admin untuk mendaftarkan siswa ke kelas Anda agar Anda dapat mengontrol akses kuis untuk mereka.
+        </div>
+      )}
+
       {isStudentModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-6">
           <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl space-y-8 animate-in zoom-in-95 duration-300">
