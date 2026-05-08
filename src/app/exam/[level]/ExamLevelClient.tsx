@@ -5,6 +5,7 @@ import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { getExamLevels, getExamTests, getQuestions, getProfileByEmail } from "@/lib/db";
 import { ExamLevel, ExamTest, Question, Profile } from "@/lib/types";
 import KioskBarrier from "@/app/components/KioskBarrier";
+import ModernQuizPlayer, { NormalizedQuestion } from "@/app/components/ModernQuizPlayer";
 
 // --- ART ICON COMPONENTS ---
 const ArtIcon = {
@@ -303,212 +304,44 @@ export default function ExamLevelClient({ level }: { level: string }) {
     );
   }
 
-  // 3. ACTIVE EXAM
+  // 3. ACTIVE EXAM & RESULT REVIEW
   if (activeView === "exam" && selectedTest) {
-    const q = selectedTest.questions[currentIdx];
-    const progress = ((currentIdx + 1) / selectedTest.questions.length) * 100;
+    const normalizedQuestions: NormalizedQuestion[] = selectedTest.questions.map((q, idx) => ({
+      id: q.id,
+      question_text: q.question_text,
+      options: [q.option_a, q.option_b, q.option_c, q.option_d].filter(Boolean),
+      correct_option: q.correct_option !== undefined ? q.correct_option : -1,
+      explanation: q.explanation || "Tidak ada pembahasan.",
+      audio_url: q.audio_url,
+      image_url: q.image_url,
+      video_url: q.video_url,
+      question_type: q.question_type || 'multiple_choice',
+      section_title: q.section_title,
+      section_instructions: q.section_instructions,
+      section_audio_url: q.section_audio_url,
+      section_image_url: q.section_image_url,
+      section_pdf_url: q.section_pdf_url,
+      section_ppt_url: q.section_ppt_url,
+      section_video_url: q.section_video_url,
+    }));
 
     return (
       <KioskBarrier title={`Mode Ujian: ${selectedTest.title}`}>
-        <div className="h-screen flex flex-col bg-slate-50 font-sans overflow-hidden">
-
-          {/* Header / Progress Bar - Fixed */}
-          <div className="shrink-0 bg-white shadow-sm">
-            <div className="max-w-2xl mx-auto px-6 py-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-                  <span className="text-xl font-black italic text-slate-800 tracking-tighter tabular-nums">{formatTime(timer)}</span>
-                </div>
-                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Soal {currentIdx + 1} / {selectedTest.questions.length}</span>
-              </div>
-              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-teal-500 transition-all duration-700 ease-out shadow-[0_0_8px_rgba(20,184,166,0.3)]"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Question + Options - Scrollable only inside, no outer scroll */}
-          <div className="flex-1 overflow-y-auto overscroll-contain">
-            <div className="max-w-2xl mx-auto w-full px-6 py-8 flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              
-              {/* Question Card */}
-              <section className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm ring-1 ring-slate-100">
-                <div className="mb-4 flex items-center gap-2 flex-wrap">
-                  <span className="px-3 py-1 rounded-full bg-teal-50 text-teal-600 text-[10px] font-black uppercase tracking-widest">Soal {currentIdx + 1}</span>
-                  {q.question_type === 'listening' && <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-600 text-[10px] font-black uppercase tracking-widest">🔊 Listening</span>}
-                  {q.question_type === 'reading' && <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest">📖 Reading</span>}
-                  {q.question_type === 'image_based' && <span className="px-3 py-1 rounded-full bg-sky-50 text-sky-600 text-[10px] font-black uppercase tracking-widest">🖼️ Gambar</span>}
-                  {q.question_type === 'video_based' && <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-600 text-[10px] font-black uppercase tracking-widest">🎬 Video</span>}
-                </div>
-
-                {/* AUDIO player */}
-                {q.question_type === 'listening' && q.audio_url && (
-                  <div className="mb-5 p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                    <p className="text-[10px] font-black uppercase text-amber-500 mb-2 tracking-widest">🔊 Putar audio terlebih dahulu</p>
-                    <audio controls className="w-full" src={q.audio_url}>
-                      Browser tidak mendukung audio.
-                    </audio>
-                  </div>
-                )}
-
-                {/* IMAGE */}
-                {q.question_type === 'image_based' && q.image_url && (
-                  <div className="mb-5 rounded-2xl overflow-hidden border border-sky-100 bg-sky-50">
-                    <img
-                      src={q.image_url}
-                      alt="Gambar soal"
-                      className="w-full max-h-72 object-contain"
-                    />
-                  </div>
-                )}
-
-                {/* VIDEO */}
-                {q.question_type === 'video_based' && q.video_url && (
-                  <div className="mb-5 rounded-2xl overflow-hidden border border-purple-100 bg-black">
-                    <video
-                      controls
-                      className="w-full max-h-72"
-                      src={q.video_url}
-                    >
-                      Browser tidak mendukung video.
-                    </video>
-                  </div>
-                )}
-
-                <h2 className="text-xl md:text-2xl font-black text-slate-900 italic leading-snug">{q.question_text}</h2>
-              </section>
-
-              {/* Answer Options */}
-              <div className="grid gap-3">
-                {[q.option_a, q.option_b, q.option_c, q.option_d].map((opt, i) => (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      handleAnswer(q.id, i);
-                      // Auto-advance after 400ms
-                      if (currentIdx < selectedTest.questions.length - 1) {
-                        setTimeout(() => setCurrentIdx(p => p + 1), 400);
-                      }
-                    }}
-                    className={`flex items-center gap-5 p-5 rounded-[2rem] text-left transition-all duration-300 group ${userAnswers[q.id] === i ? 'bg-teal-500 text-white shadow-xl shadow-teal-500/20 scale-[1.02]' : 'bg-white ring-1 ring-slate-100 hover:ring-teal-500/30 active:scale-95'}`}
-                  >
-                    <div className={`h-10 w-10 shrink-0 rounded-[1rem] flex items-center justify-center font-black transition-colors ${userAnswers[q.id] === i ? 'bg-white/20 text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-teal-50 group-hover:text-teal-600'}`}>
-                      {String.fromCharCode(65 + i)}
-                    </div>
-                    <span className={`text-base font-bold leading-tight ${userAnswers[q.id] === i ? 'text-white' : 'text-slate-700'}`}>{opt}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Footer Navigation - Fixed */}
-          <div className="shrink-0 bg-white/90 backdrop-blur-xl border-t border-slate-100 px-6 py-4 shadow-[0_-4px_20px_rgba(0,0,0,0.04)]">
-            <div className="max-w-2xl mx-auto flex gap-3">
-              <button 
-                onClick={() => setCurrentIdx(p => p - 1)} 
-                disabled={currentIdx === 0}
-                className="h-14 w-14 flex items-center justify-center rounded-2xl bg-white ring-1 ring-slate-200 text-slate-400 disabled:opacity-20 disabled:pointer-events-none active:scale-95 transition shrink-0"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-              </button>
-              
-              {currentIdx === selectedTest.questions.length - 1 ? (
-                <button 
-                  onClick={() => {
-                    const questions = selectedTest.questions;
-                    const unansweredIdx = questions.findIndex(q => userAnswers[q.id] === undefined);
-                    if (unansweredIdx !== -1) {
-                      const count = questions.length - Object.keys(userAnswers).length;
-                      setAlertData({
-                        title: "Soal Belum Lengkap",
-                        message: `Ada ${count} soal belum dijawab. Mohon lengkapi jawaban Anda (dimulai dari Soal ${unansweredIdx + 1}).`,
-                        type: 'warning'
-                      });
-                      setCurrentIdx(unansweredIdx);
-                      return;
-                    }
-                    setActiveView("result");
-                  }}
-                  className="flex-1 h-14 bg-teal-500 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-teal-500/20 active:scale-95 transition text-sm"
-                >
-                  🎯 Selesaikan Ujian
-                </button>
-              ) : (
-                <button 
-                  onClick={() => setCurrentIdx(p => p + 1)}
-                  className="flex-1 h-14 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition flex items-center justify-center gap-2 text-sm"
-                >
-                  Lanjutkan
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                </button>
-              )}
-            </div>
-          </div>
- 
-          {/* Custom Alert Modal for Exams */}
-          {alertData && (
-            <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
-              <div className="bg-white rounded-[2.5rem] p-10 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-300">
-                <div className="text-5xl mb-6 text-center">
-                  {alertData.type === 'error' ? '❌' : alertData.type === 'success' ? '✅' : '⚠️'}
-                </div>
-                <h3 className="text-2xl font-black text-slate-800 text-center mb-2 italic tracking-tight">{alertData.title}</h3>
-                <p className="text-slate-500 font-medium text-center mb-10 leading-relaxed text-sm">{alertData.message}</p>
-                <button 
-                  onClick={() => setAlertData(null)}
-                  className="w-full py-5 bg-teal-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-teal-700 active:scale-95 transition-all shadow-xl"
-                >
-                  Fokus Lagi
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        <ModernQuizPlayer
+          title={selectedTest.title}
+          questions={normalizedQuestions}
+          mode="ujian"
+          durationMinutes={selectedTest.duration_minutes || 10}
+          localStorageKey={`exam_test_${selectedTest.id}`}
+          onFinish={(answers, scorePct) => {
+            // Exam completed and scores can be reviewed inside the review layout.
+          }}
+          onClose={() => {
+            setActiveView("dashboard");
+            setSelectedTest(null);
+          }}
+        />
       </KioskBarrier>
-    );
-  }
-
-  // 4. RESULT VIEW
-  if (activeView === "result" && selectedTest) {
-    const score = selectedTest.questions.reduce((acc, q) => acc + (userAnswers[q.id] === q.correct_option ? 1 : 0), 0) || 0;
-    const total = selectedTest.questions.length || 1;
-    const finalScore = Math.round((score / total) * 100);
-    const passed = finalScore >= (selectedTest.pass_point || 60);
-
-    return (
-      <div className="min-h-screen bg-slate-900 text-white flex flex-col p-8 font-sans">
-         <div className="flex-1 flex flex-col items-center justify-center max-w-md mx-auto w-full text-center py-10">
-            <div className={`h-40 w-40 rounded-[3.5rem] flex items-center justify-center text-7xl shadow-2xl mb-12 animate-in zoom-in duration-1000 ${passed ? 'bg-teal-500 shadow-teal-500/30' : 'bg-rose-500 shadow-rose-500/30'}`}>
-               {passed ? '🎓' : '📚'}
-            </div>
-            
-            <h2 className="text-5xl font-black italic tracking-tighter mb-4 animate-in fade-in slide-in-from-bottom-4 duration-700">Hasil Ujian</h2>
-            <p className="text-teal-400 font-black uppercase tracking-[0.4em] text-[10px] mb-14">Latihan JLPT {level.toUpperCase()}</p>
-            
-            <div className="w-full space-y-4 mb-16">
-               <div className="bg-white/5 rounded-[2.5rem] p-10 ring-1 ring-white/10 flex justify-between items-center transition-all hover:bg-white/10">
-                  <span className="text-slate-400 font-black uppercase tracking-widest text-[10px]">Precision</span>
-                  <span className={`text-5xl font-black italic ${passed ? 'text-teal-400' : 'text-rose-400'}`}>{finalScore}%</span>
-               </div>
-               <div className="bg-white/5 rounded-[2.5rem] p-10 ring-1 ring-white/10 flex justify-between items-center transition-all hover:bg-white/10">
-                  <span className="text-slate-400 font-black uppercase tracking-widest text-[10px]">Correct Answers</span>
-                  <span className="text-5xl font-black italic text-white">{score}/{total}</span>
-               </div>
-            </div>
-            
-            <button 
-              onClick={() => setActiveView("dashboard")}
-              className="w-full py-7 bg-white text-slate-900 rounded-[2.5rem] font-black uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition duration-500"
-            >
-               Kembali ke Hub
-            </button>
-         </div>
-      </div>
     );
   }
 

@@ -11,7 +11,8 @@ import {
   getIconCategories, getIconLibrary,
   bulkUpdateExamLevels, bulkUpdateExamTests, bulkUpdateQuestions
 } from "@/lib/db";
-import { motion, Reorder } from "framer-motion";
+import { motion, Reorder, AnimatePresence } from "framer-motion";
+import QuizCreatorDashboard from "./QuizCreatorDashboard";
 
 export default function ExamManager() {
   const [levels, setLevels] = useState<ExamLevel[]>([]);
@@ -20,6 +21,8 @@ export default function ExamManager() {
   const [selectedTest, setSelectedTest] = useState<ExamTest | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCanvas, setShowCanvas] = useState(false);
+  const [canvasData, setCanvasData] = useState<any>(null);
 
   // Modals / Forms
   const [editingLevel, setEditingLevel] = useState<Partial<ExamLevel> | null>(null);
@@ -113,6 +116,154 @@ export default function ExamManager() {
       await deleteQuestion(id);
       handleSelectTest(selectedTest!);
     } catch (e) { alert("Error deleting question"); }
+  };
+
+  const getCanvasInitialData = () => {
+    if (!selectedTest) return null;
+
+    // Group questions by section_title
+    const sectionsMap: Record<string, any> = {};
+    const sectionsOrder: string[] = [];
+
+    questions.forEach((q) => {
+      const secTitle = q.section_title || "Section Utama";
+      if (!sectionsMap[secTitle]) {
+        sectionsMap[secTitle] = {
+          id: `sec-${secTitle}-${Date.now()}`,
+          title: secTitle,
+          instructions: q.section_instructions || "Silakan jawab pertanyaan-pertanyaan berikut.",
+          media: {
+            audio_url: q.section_audio_url || "",
+            image_url: q.section_image_url || "",
+            pdf_url: q.section_pdf_url || "",
+            ppt_url: q.section_ppt_url || "",
+            video_url: q.section_video_url || "",
+          },
+          questions: [],
+        };
+        sectionsOrder.push(secTitle);
+      }
+
+      sectionsMap[secTitle].questions.push({
+        id: q.id,
+        q: q.question_text,
+        question_type: q.question_type || "multiple_choice",
+        options: [q.option_a, q.option_b, q.option_c, q.option_d].filter(Boolean),
+        answer: q.correct_option,
+        explanation: q.explanation || "",
+        audio_url: q.audio_url || "",
+        image_url: q.image_url || "",
+        video_url: q.video_url || "",
+        audio_play_limit: q.audio_play_limit || 0,
+        autoplay: q.autoplay || false,
+        keywords: q.keywords || [],
+        rubric: q.rubric || "",
+      });
+    });
+
+    const sectionsList = sectionsOrder.map(title => sectionsMap[title]);
+
+    if (sectionsList.length === 0) {
+      sectionsList.push({
+        id: "section-default",
+        title: "Section Utama",
+        instructions: "Silakan jawab pertanyaan-pertanyaan berikut.",
+        media: {},
+        questions: [],
+      });
+    }
+
+    return {
+      is_section_test: true,
+      sections: sectionsList,
+      duration_minutes: selectedTest.duration_minutes,
+      pass_point: selectedTest.pass_point,
+    };
+  };
+
+  const handleSaveCanvasData = async () => {
+    if (!selectedTest || !canvasData) return;
+    try {
+      const dbQuestionsToUpsert: Partial<Question>[] = [];
+      const activeIds: string[] = [];
+
+      let globalSortOrder = 1;
+      canvasData.sections.forEach((sec: any) => {
+        sec.questions.forEach((q: any) => {
+          const isNew = q.id.startsWith("q-");
+          const cleanId = isNew ? undefined : q.id;
+
+          const dbQ: Partial<Question> = {
+            id: cleanId,
+            test_id: selectedTest.id,
+            question_text: q.q,
+            question_type: q.question_type || "multiple_choice",
+            option_a: q.options[0] || "",
+            option_b: q.options[1] || "",
+            option_c: q.options[2] || "",
+            option_d: q.options[3] || "",
+            correct_option: q.answer,
+            explanation: q.explanation || "",
+            audio_url: q.audio_url || "",
+            image_url: q.image_url || "",
+            video_url: q.video_url || "",
+            sort_order: globalSortOrder++,
+            
+            // Section info
+            section_title: sec.title,
+            section_instructions: sec.instructions || "",
+            section_audio_url: sec.media.audio_url || "",
+            section_image_url: sec.media.image_url || "",
+            section_pdf_url: sec.media.pdf_url || "",
+            section_ppt_url: sec.media.ppt_url || "",
+            section_video_url: sec.media.video_url || "",
+
+            // Extras
+            keywords: q.keywords || [],
+            rubric: q.rubric || "",
+            audio_play_limit: q.audio_play_limit || 0,
+            autoplay: q.autoplay || false
+          };
+
+          dbQuestionsToUpsert.push(dbQ);
+          if (q.id && !isNew) {
+            activeIds.push(q.id);
+          }
+        });
+      });
+
+      // Find questions that were deleted
+      const deletedQuestions = questions.filter(origQ => !activeIds.includes(origQ.id));
+      for (const delQ of deletedQuestions) {
+        await deleteQuestion(delQ.id);
+      }
+
+      // Bulk upsert new and updated questions
+      if (dbQuestionsToUpsert.length > 0) {
+        await bulkUpdateQuestions(dbQuestionsToUpsert);
+      }
+
+      // Update exam duration & pass_point if edited inside canvas settings
+      const testUpdates = {
+        id: selectedTest.id,
+        duration_minutes: canvasData.duration_minutes || selectedTest.duration_minutes,
+        pass_point: canvasData.pass_point || selectedTest.pass_point,
+      };
+      await upsertExamTest(testUpdates);
+
+      // Reload selections
+      await handleSelectTest({ ...selectedTest, ...testUpdates });
+      alert("Berhasil menyimpan seluruh konfigurasi CBT Section!");
+    } catch (e) {
+      console.error(e);
+      alert("Terjadi kesalahan saat menyimpan data.");
+    }
+  };
+
+  const handleLaunchCanvas = () => {
+    const data = getCanvasInitialData();
+    setCanvasData(data);
+    setShowCanvas(true);
   };
 
   // --- REORDER HANDLERS ---
@@ -244,15 +395,55 @@ export default function ExamManager() {
       {/* 3. QUESTIONS LIST (Visible if test selected) */}
       {selectedTest && (
         <section className="animate-in fade-in slide-in-from-top-4 duration-500">
-           <div className="flex justify-between items-center mb-6 pt-10 border-t">
-              <h3 className="text-xl font-black text-slate-800 italic">3. Questions in {selectedTest.title} <span className="text-teal-500 font-black">({questions.length} soal)</span></h3>
-              <button 
-                onClick={() => setEditingQuestion({ question_type: 'multiple_choice', question_text: "", audio_url: "", option_a: "", option_b: "", option_c: "", option_d: "", correct_option: 0, sort_order: questions.length + 1 })}
-                className="text-[10px] font-black uppercase bg-slate-900 text-white px-4 py-2 rounded-xl"
-              >
-                Add Question
-              </button>
+           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pt-10 border-t">
+              <div>
+                <h3 className="text-xl font-black text-slate-800 italic">3. Questions in {selectedTest.title}</h3>
+                <p className="text-slate-400 text-xs font-semibold mt-1">
+                  Mendukung pembuatan section test, petunjuk global, audio choukai, video, dan essay.
+                </p>
+              </div>
+
+              <div className="flex gap-2 w-full md:w-auto">
+                <button 
+                  onClick={handleLaunchCanvas}
+                  className="flex-1 md:flex-none px-6 py-3 bg-gradient-to-r from-teal-500 to-indigo-600 hover:from-teal-600 hover:to-indigo-700 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition active:scale-95 shadow-lg shadow-teal-500/15"
+                >
+                  🎨 Buka Visual Canvas Creator
+                </button>
+                <button 
+                  onClick={() => setEditingQuestion({ question_type: 'multiple_choice', question_text: "", audio_url: "", option_a: "", option_b: "", option_c: "", option_d: "", correct_option: 0, sort_order: questions.length + 1 })}
+                  className="flex-1 md:flex-none text-[10px] font-black uppercase bg-slate-900 text-white px-4 py-3 rounded-xl transition active:scale-95"
+                >
+                  + Soal Biasa
+                </button>
+              </div>
            </div>
+
+           {/* FULLSCREEN CANVAS MODAL OVERLAY */}
+           <AnimatePresence>
+             {showCanvas && (
+               <div className="fixed inset-0 z-[150] bg-slate-950/70 backdrop-blur-md flex flex-col p-4 md:p-8 overflow-y-auto">
+                 <div className="bg-white rounded-[3rem] p-6 md:p-8 shadow-2xl max-w-7xl w-full mx-auto relative flex flex-col min-h-[90vh] border border-slate-100">
+                   <button
+                     onClick={() => setShowCanvas(false)}
+                     className="absolute top-6 right-6 h-12 w-12 bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-full flex items-center justify-center font-black text-lg shadow-sm transition active:scale-95 z-50"
+                     title="Tutup Canvas"
+                   >
+                     ✕
+                   </button>
+                   <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                     <QuizCreatorDashboard
+                       initialData={canvasData}
+                       onChange={(newData) => setCanvasData(newData)}
+                       materialType="exam"
+                       onSave={handleSaveCanvasData}
+                     />
+                   </div>
+                 </div>
+               </div>
+             )}
+           </AnimatePresence>
+
            <Reorder.Group axis="y" values={questions} onReorder={handleReorderQuestions} className="space-y-4">
               {questions.map((q, idx) => (
                 <Reorder.Item 
@@ -432,16 +623,14 @@ export default function ExamManager() {
                  </div>
 
                  {/* Media Uploaders based on type */}
-                 {editingQuestion.question_type === 'listening' && (
-                   <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
-                     <MediaUploader
-                       label="File Audio Soal (MP3/OGG/WAV)"
-                       mediaType="audio"
-                       value={editingQuestion.audio_url}
-                       onChange={(url) => setEditingQuestion({...editingQuestion, audio_url: url})}
-                     />
-                   </div>
-                 )}
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl mb-4">
+                    <MediaUploader
+                      label="File Audio Soal (MP3/OGG/WAV - Opsional)"
+                      mediaType="audio"
+                      value={editingQuestion.audio_url}
+                      onChange={(url) => setEditingQuestion({...editingQuestion, audio_url: url})}
+                    />
+                  </div>
                  {editingQuestion.question_type === 'image_based' && (
                    <div className="p-4 bg-sky-50 border border-sky-200 rounded-2xl">
                      <MediaUploader

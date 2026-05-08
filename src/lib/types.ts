@@ -116,7 +116,7 @@ export interface ExamTest {
 export interface Question {
   id: string
   test_id: string
-  question_type: 'multiple_choice' | 'listening' | 'reading' | 'image_based' | 'video_based'
+  question_type: string
   question_text: string
   audio_url?: string | null
   image_url?: string | null
@@ -130,6 +130,19 @@ export interface Question {
   sort_order: number
   created_at: string
   updated_at: string
+
+  // Section Test fields
+  section_title?: string | null
+  section_instructions?: string | null
+  section_audio_url?: string | null
+  section_image_url?: string | null
+  section_pdf_url?: string | null
+  section_ppt_url?: string | null
+  section_video_url?: string | null
+  keywords?: string[] | null
+  rubric?: string | null
+  audio_play_limit?: number | null
+  autoplay?: boolean | null
 }
 
 export interface Profile {

@@ -13,6 +13,9 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
   const [chapters, setChapters] = useState<StudyChapter[]>([]);
   const [materialsByChapter, setMaterialsByChapter] = useState<Record<string, Partial<StudyMaterial>[]>>({});
   const [activeQuizzes, setActiveQuizzes] = useState<string[]>([]);
+  const [accessControls, setAccessControls] = useState<any[]>([]);
+  const [timeRemaining, setTimeRemaining] = useState<Record<string, string>>({});
+  const [expiredQuizzes, setExpiredQuizzes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [expandedChapter, setExpandedChapter] = useState<string | null>(null);
@@ -49,7 +52,7 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
           
           // Ambil data kontrol akses kuis untuk murid ini
           if (saved.id) {
-             let query = supabase.from('quiz_access_controls').select('material_id').eq('is_active', true);
+             let query = supabase.from('quiz_access_controls').select('material_id, updated_at, is_active');
              
              if (saved.batch) {
                query = query.or(`batch.eq.${saved.batch},student_id.eq.${saved.id}`);
@@ -59,8 +62,9 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
              
              const { data: accessData } = await query;
              if (accessData) {
-               quizAccessIds = accessData.map(a => a.material_id);
-               setActiveQuizzes(quizAccessIds);
+               setAccessControls(accessData || []);
+               const activeIds = accessData.filter(a => a.is_active).map(a => a.material_id);
+               setActiveQuizzes(activeIds);
              }
           }
         }
@@ -223,8 +227,10 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
                       // Materi dan Latihan sekarang bebas diakses, tidak dikunci berurutan.
                       // Kuis dikunci KECUALI jika ada di activeQuizzes (dibuka guru).
                       const isLatihanLocked = false; 
-                      const isQuizLocked = isQuiz && !activeQuizzes.includes(mat.id!);
-                      const disableClick = isQuizLocked || isLatihanLocked;
+                      const isStaff = userProfile?.is_admin || userProfile?.is_super_admin || userProfile?.is_teacher;
+                      const isExpired = expiredQuizzes.includes(mat.id!);
+                      const isQuizLocked = isQuiz && !activeQuizzes.includes(mat.id!) && !isStaff;
+                      const disableClick = (isQuizLocked || isLatihanLocked) && !isStaff;
 
                       return (
                         <Link 
@@ -233,7 +239,9 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
                           onClick={(e) => {
                             if (disableClick) {
                               e.preventDefault();
-                              if (isQuizLocked) {
+                              if (isExpired) {
+                                alert("Waktu akses kuis ini telah habis ⏰. Harap hubungi guru Anda jika memerlukan akses tambahan.");
+                              } else if (isQuizLocked) {
                                 alert("Quiz ini belum dibuka oleh Guru Anda. Harap tunggu sesi ujian dimulai 🎯.");
                               } else if (isLatihanLocked) {
                                 alert("Selesaikan semua materi di bab ini terlebih dahulu untuk membuka Latihan! 📖");
@@ -243,8 +251,14 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
                           className={`group flex flex-col items-center justify-center p-6 bg-slate-50 rounded-[1.5rem] active:scale-95 transition-all relative overflow-hidden ${disableClick ? 'opacity-60 grayscale border border-slate-200 bg-slate-50/50' : 'hover:bg-white hover:shadow-xl hover:ring-1 ring-teal-500/20 shadow-sm'}`}
                         >
                           {isComplete && <div className="absolute top-3 right-3 flex items-center justify-center p-1 bg-teal-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg">✓</div>}
-                          {isQuizLocked && <div className="absolute top-3 left-3 flex items-center justify-center p-1 bg-rose-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg" title="Menunggu Guru Membuka Akses">🔒</div>}
+                          {isQuizLocked && <div className="absolute top-3 left-3 flex items-center justify-center p-1 bg-rose-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg" title={isExpired ? "Akses Kuis Ditutup" : "Menunggu Guru Membuka Akses"}>{isExpired ? "⏰" : "🔒"}</div>}
                           {isLatihanLocked && <div className="absolute top-3 left-3 flex items-center justify-center p-1 bg-amber-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg" title="Selesaikan materi untuk membuka">🔒</div>}
+                          {isQuiz && !isQuizLocked && (
+                            <div className="absolute top-3 right-3 flex items-center gap-1 bg-emerald-500 text-white px-2 py-1 rounded-full text-[9px] font-black tracking-tight shadow-md animate-pulse z-10">
+                              <span>⏳</span>
+                              <span>{timeRemaining[mat.id!] || "--:--"}</span>
+                            </div>
+                          )}
                           {isQuiz && !isQuizLocked && <div className="absolute top-3 left-3 flex items-center justify-center p-1 bg-emerald-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg animate-pulse" title="Quiz Live!">⚡</div>}
                           {isLatihan && !isLatihanLocked && <div className="absolute top-3 left-3 flex items-center justify-center p-1 bg-sky-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg" title="Latihan Siap!">📝</div>}
                           

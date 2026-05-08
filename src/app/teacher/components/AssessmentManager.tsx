@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Profile, StudyLevel, ChapterTemplate, AdditionalCol, StudentBatch } from "@/lib/types";
+import { Profile, StudyLevel, ChapterTemplate, AdditionalCol, StudentBatch, ColDef } from "@/lib/types";
 import { exportToExcel, exportToPDF } from "@/lib/ExportUtils";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
@@ -42,12 +42,89 @@ export default function AssessmentManager({ students, levels, teacher }: { stude
   const fetchTemplatesAndSettings = async (levelId: string) => {
     setTemplateLoading(true);
     try {
-      const [tplRes, setRes] = await Promise.all([
+      const [tplRes, setRes, matRes] = await Promise.all([
         supabase.from("assessment_chapter_templates").select("*").eq("level_id", levelId).eq("is_active", true).order("sort_order"),
-        supabase.from("assessment_report_settings").select("*").eq("level_id", levelId).maybeSingle()
+        supabase.from("assessment_report_settings").select("*").eq("level_id", levelId).maybeSingle(),
+        supabase.from("study_materials").select("id, chapter_id, title, material_type").order("sort_order")
       ]);
 
-      setTemplates(tplRes.data || []);
+      const tplData = tplRes.data || [];
+      const matData = matRes.data || [];
+
+      const matsByChapter = new Map<string, any[]>();
+      matData.forEach(m => {
+        if (!matsByChapter.has(m.chapter_id)) matsByChapter.set(m.chapter_id, []);
+        matsByChapter.get(m.chapter_id)?.push(m);
+      });
+
+      const DEFAULT_COLS: ColDef[] = [
+        { label: "Nilai", col_type: "number" },
+        { label: "Predikat", col_type: "grade" },
+        { label: "Keterangan", col_type: "text" },
+      ];
+
+      const existingTemplates: ChapterTemplate[] = tplData.map((t: any) => {
+        // Auto-fix legacy labels that don't have the " ::: " delimiter
+        const fixedColumns: ColDef[] = (t.columns || []).map((col: any) => {
+          if (!col.label.includes(" ::: ")) {
+            return { ...col, label: `${t.chapter_title} ::: ${col.label}` };
+          }
+          return col;
+        });
+        return {
+          ...t,
+          columns: fixedColumns.length > 0 ? fixedColumns : DEFAULT_COLS
+        };
+      });
+
+      // Auto-merge newly added quizzes into existing templates
+      const merged = existingTemplates.map(t => {
+        const isGrouped = t.chapter_title && t.chapter_title.includes(" - ");
+        
+        // Clean up placeholder "-" column if we now have real quizzes
+        let cleanedColumns = [...t.columns];
+        
+        if (isGrouped) {
+          return {
+            ...t,
+            columns: cleanedColumns.length > 0 ? cleanedColumns : DEFAULT_COLS
+          };
+        }
+
+        const chapterQuizzes = (matsByChapter.get(t.chapter_id || "") || []).filter(m => m.material_type === 'quiz');
+        
+        if (chapterQuizzes.length > 0) {
+          cleanedColumns = cleanedColumns.filter(c => {
+            const parts = c.label.split(" ::: ");
+            const colLabel = parts.length > 1 ? parts[1] : c.label;
+            return colLabel !== "-";
+          });
+        }
+
+        const existingLabels = cleanedColumns.map(c => c.label);
+        const newQuizzes = chapterQuizzes.filter(q => {
+          const expectedLabel = `${t.chapter_title} ::: ${q.title}`;
+          return !existingLabels.includes(expectedLabel);
+        });
+
+        if (newQuizzes.length > 0) {
+          const newCols: ColDef[] = newQuizzes.map(q => ({
+            label: `${t.chapter_title} ::: ${q.title}`,
+            col_type: "number"
+          }));
+          return {
+            ...t,
+            columns: [...cleanedColumns, ...newCols]
+          };
+        }
+
+        return {
+          ...t,
+          columns: cleanedColumns.length > 0 ? cleanedColumns : DEFAULT_COLS
+        };
+      });
+
+      setTemplates(merged);
       setAdditionalCols(setRes.data?.additional_columns || []);
     } catch (err) {
       console.error("Fetch template error:", err);
@@ -62,22 +139,30 @@ export default function AssessmentManager({ students, levels, teacher }: { stude
       const currentBatchStudents = selectedBatchId === "ALL" 
         ? students 
         : students.filter(s => s.batch === selectedBatchId);
-      const studentEmails = currentBatchStudents.map(s => s.email);
+      const studentEmails = currentBatchStudents.map(s => s.email.trim().toLowerCase());
 
       if (studentEmails.length === 0) {
         setMatrix({});
         return;
       }
 
-      const { data } = await supabase
+      const templateIds = templates.map(t => t.id).filter(Boolean);
+      let query = supabase
         .from("assessment_chapter_grades")
         .select("*")
-        .in("student_email", studentEmails)
-        .or(`level_id.eq.${selectedLevelId},template_id.in.(${templates.map(t => t.id).join(",")})`);
+        .in("student_email", studentEmails);
+
+      if (templateIds.length > 0) {
+        query = query.or(`level_id.eq.${selectedLevelId},template_id.in.(${templateIds.join(",")})`);
+      } else {
+        query = query.eq("level_id", selectedLevelId);
+      }
+
+      const { data } = await query;
 
       const newMatrix: Record<string, Record<string, Record<string, string>>> = {};
       (data || []).forEach((item: any) => {
-        const email = item.student_email;
+        const email = String(item.student_email).trim().toLowerCase();
         const key = item.template_id || "additional";
         if (!newMatrix[email]) newMatrix[email] = {};
         if (!newMatrix[email][key]) newMatrix[email][key] = {};
@@ -93,12 +178,13 @@ export default function AssessmentManager({ students, levels, teacher }: { stude
 
   const handleValueChange = (email: string, templateId: string | null, columnLabel: string, value: string) => {
     const key = templateId || "additional";
+    const normalizedEmail = email.trim().toLowerCase();
     setMatrix(prev => ({
       ...prev,
-      [email]: {
-        ...(prev[email] || {}),
+      [normalizedEmail]: {
+        ...(prev[normalizedEmail] || {}),
         [key]: {
-          ...(prev[email]?.[key] || {}),
+          ...(prev[normalizedEmail]?.[key] || {}),
           [columnLabel]: value
         }
       }
@@ -135,19 +221,44 @@ export default function AssessmentManager({ students, levels, teacher }: { stude
         });
       });
 
-      const promises = [];
-      if (chapterPayload.length > 0) {
-        promises.push(supabase.from("assessment_chapter_grades").upsert(chapterPayload, {
-          onConflict: "student_email,column_label,template_id"
-        }));
-      }
-      if (additionalPayload.length > 0) {
-        promises.push(supabase.from("assessment_chapter_grades").upsert(additionalPayload, {
-          onConflict: "student_email,column_label,level_id"
-        }));
-      }
+      const allPayloads = [...chapterPayload, ...additionalPayload];
+      
+      const savePromises = allPayloads.map(async (row) => {
+        let existingQuery = supabase
+          .from("assessment_chapter_grades")
+          .select("id")
+          .eq("student_email", row.student_email)
+          .eq("column_label", row.column_label);
+          
+        if (row.template_id) {
+          existingQuery = existingQuery.eq("template_id", row.template_id);
+        } else if (row.level_id) {
+          existingQuery = existingQuery.is("template_id", null).eq("level_id", row.level_id);
+        } else {
+          existingQuery = existingQuery.is("template_id", null).is("level_id", null);
+        }
+        
+        const { data: existingRows } = await existingQuery;
+        
+        if (existingRows && existingRows.length > 0) {
+          return supabase
+            .from("assessment_chapter_grades")
+            .update({
+              value: row.value,
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", existingRows[0].id);
+        } else {
+          return supabase
+            .from("assessment_chapter_grades")
+            .insert({
+              ...row,
+              updated_at: new Date().toISOString()
+            });
+        }
+      });
 
-      const results = await Promise.all(promises);
+      const results = await Promise.all(savePromises);
       const errors = results.filter(r => r.error).map(r => r.error);
       if (errors.length > 0) throw errors[0];
       
@@ -192,7 +303,7 @@ export default function AssessmentManager({ students, levels, teacher }: { stude
 
   const computedData = useMemo(() => {
     return filteredStudents.map((stu, sIdx) => {
-      const stuMatrix = matrix[stu.email] || {};
+      const stuMatrix = matrix[stu.email?.trim().toLowerCase()] || {};
       
       const quizGroupScores: Record<string, number[]> = {};
       uniqueBaseQuizNames.forEach(l => quizGroupScores[l] = []);
@@ -560,9 +671,9 @@ export default function AssessmentManager({ students, levels, teacher }: { stude
 
                       <tbody className="divide-y divide-slate-100">
                         {filteredStudents.map((stu, sIdx) => {
-                          const stuMatrix = matrix[stu.email] || {};
+                          const stuMatrix = matrix[stu.email?.trim().toLowerCase()] || {};
                           const tplGrades = stuMatrix[tpl.id || ""] || {};
-                          const scores = tpl.columns.map(col => tplGrades[col.label] || "");
+                          const scores = tpl.columns.map(col => tplGrades[`${col.label} (Remedial)`] || tplGrades[col.label] || "");
                           const numScores = scores.map(s => parseFloat(s)).filter(n => !isNaN(n));
                           const total = numScores.reduce((a, b) => a + b, 0);
                           const avg = numScores.length > 0 ? Math.round(total / numScores.length) : 0;
@@ -605,11 +716,21 @@ export default function AssessmentManager({ students, levels, teacher }: { stude
 
                               {tpl.columns.map((col, ci) => {
                                 const isQuiz = col.label.toLowerCase().includes("quiz") || col.col_type === "number";
+                                const remedialLabel = `${col.label} (Remedial)`;
+                                const hasRemedial = tplGrades[remedialLabel] !== undefined;
+
                                 return (
                                   <td key={ci} className={`p-2 border-r border-slate-100 ${isQuiz ? 'bg-emerald-50/5' : ''}`}>
                                     {isQuiz ? (
-                                      <div className="w-full text-center text-sm font-black text-emerald-600/70 select-none tabular-nums">
-                                        {tplGrades[col.label] || "0"}
+                                      <div className="w-full flex flex-col items-center justify-center py-1">
+                                        <div className={`text-sm font-black tabular-nums select-none ${hasRemedial ? 'line-through text-slate-300' : 'text-emerald-600/70'}`}>
+                                          {tplGrades[col.label] || "0"}
+                                        </div>
+                                        {hasRemedial && (
+                                          <div className="text-[10px] font-black text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full mt-0.5 border border-teal-100">
+                                            R: {tplGrades[remedialLabel]}
+                                          </div>
+                                        )}
                                       </div>
                                     ) : (
                                       <input
@@ -715,7 +836,7 @@ export default function AssessmentManager({ students, levels, teacher }: { stude
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {filteredStudents.map((stu, sIdx) => {
-                          const stuMatrix = matrix[stu.email] || {};
+                          const stuMatrix = matrix[stu.email?.trim().toLowerCase()] || {};
                           const addMatrix = stuMatrix["additional"] || {};
 
                           return (

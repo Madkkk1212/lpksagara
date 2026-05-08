@@ -289,7 +289,7 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
                                      mat.material_type === 'choukai' ? 'bg-rose-50 text-rose-500' :
                                      'bg-slate-100 text-slate-400'
                                    }`}>
-                                     {mat.material_type}
+                                     {(() => { const c = (typeof mat.content === 'string' ? JSON.parse(mat.content) : mat.content) || {}; return c.custom_type_name || mat.material_type; })()}
                                    </span>
                                  )}
                                </div>
@@ -337,7 +337,7 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
                   </h4>
                   {lastProgress[0]?.study_materials && (
                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
-                      {lastProgress[0]?.study_materials?.material_type || ''} 
+                      {(() => { const sm = lastProgress[0]?.study_materials; if (!sm) return ''; const c = (typeof sm.content === 'string' ? JSON.parse(sm.content) : sm.content) || {}; return c.custom_type_name || sm.material_type || ''; })()} 
                       {lastProgress[0]?.study_materials?.study_chapters?.title ? ` · ${lastProgress[0]?.study_materials?.study_chapters?.title}` : ''}
                     </p>
                   )}

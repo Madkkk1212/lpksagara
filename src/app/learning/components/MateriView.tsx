@@ -70,13 +70,13 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
     
     // QUIZ LOCK
     if (mat?.material_type === 'quiz' && !activeQuizzes.includes(materialId)) {
-        if (!(user.is_admin || user.is_super_admin)) {
+        if (!(user.is_admin || user.is_super_admin || user.is_teacher)) {
             return false; // Quiz harus dibuka oleh guru
         }
     }
 
     // PREMIUM / ADMIN MANUAL LOCK
-    if (mat?.is_locked && !(user.is_admin || user.is_super_admin || user.is_premium)) {
+    if (mat?.is_locked && !(user.is_admin || user.is_super_admin || user.is_teacher || user.is_premium)) {
         return false; // Materi Premium / Terkunci
     }
 
@@ -309,6 +309,25 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                           : selectedMaterial.content) || {};
                       return (
                         <>
+                          {/* Audio Player */}
+                          {((content?.audioUrl || content?.audio_url || selectedMaterial?.audio_url) && selectedMaterial.material_type !== 'choukai') && (
+                            <div className="mb-8 p-6 bg-gradient-to-r from-teal-500 via-emerald-500 to-teal-400 rounded-2xl shadow-lg text-white flex flex-col md:flex-row items-center gap-4 relative z-10">
+                              <div className="h-12 w-12 shrink-0 bg-white/20 rounded-full flex items-center justify-center text-xl shadow-inner">🎧</div>
+                              <div className="flex-1 text-center md:text-left">
+                                <p className="text-xs font-black uppercase tracking-wider opacity-85">Audio Pendukung</p>
+                                <p className="text-sm font-bold mt-0.5">Silakan dengarkan audio pendukung materi di bawah ini.</p>
+                              </div>
+                              <audio 
+                                controls 
+                                controlsList="nodownload"
+                                className="w-full md:min-w-[300px] md:w-auto shrink-0 outline-none rounded-full" 
+                                src={content?.audioUrl || content?.audio_url || selectedMaterial?.audio_url}
+                              >
+                                Browser Anda tidak mendukung elemen audio.
+                              </audio>
+                            </div>
+                          )}
+
                           {/* PDF Document Viewer */}
                           {(content.pdf_url || content.document_url) && (
                             <div className="mb-8 rounded-[2rem] overflow-hidden bg-white border border-slate-100 shadow-lg p-6 relative z-10">
@@ -316,7 +335,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                                 <div className="flex items-center gap-3">
                                   <span className="text-2xl">📕</span>
                                   <div>
-                                    <h3 className="text-lg font-black text-slate-800">Dokumen PDF</h3>
+                                    <h3 className="text-lg font-black text-slate-800">{content.pdf_name || "Dokumen PDF"}</h3>
                                     <p className="text-xs font-bold text-slate-400">Silakan pelajari materi PDF di bawah ini langsung.</p>
                                   </div>
                                 </div>
@@ -344,7 +363,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                                 <div className="flex items-center gap-3">
                                   <span className="text-2xl">📊</span>
                                   <div>
-                                    <h3 className="text-lg font-black text-slate-800">Slide PPT / Presentasi</h3>
+                                    <h3 className="text-lg font-black text-slate-800">{content.ppt_name || "Slide PPT / Presentasi"}</h3>
                                     <p className="text-xs font-bold text-slate-400">Silakan pelajari slide presentasi PPT di bawah ini langsung.</p>
                                   </div>
                                 </div>
@@ -441,8 +460,8 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                                  <div className="relative z-10">
                                    <div className="h-24 w-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-5xl mx-auto mb-8 shadow-inner ring-4 ring-white/10">🎧</div>
                                    <h3 className="text-white font-black text-3xl italic tracking-tight mb-8">Dengarkan Audio Berikut</h3>
-                                   {content.audioUrl ? (
-                                      <audio controls className="w-full" src={content.audioUrl}></audio>
+                                   {(content?.audioUrl || content?.audio_url || selectedMaterial?.audio_url) ? (
+                                      <audio controls className="w-full" src={content?.audioUrl || content?.audio_url || selectedMaterial?.audio_url}></audio>
                                    ) : (
                                       <div className="bg-black/20 text-white rounded-2xl px-6 py-3 inline-block font-bold text-sm tracking-widest uppercase">Audio tidak tersedia</div>
                                    )}

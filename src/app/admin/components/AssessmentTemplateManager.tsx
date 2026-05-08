@@ -98,10 +98,57 @@ export default function AssessmentTemplateManager() {
     });
 
     let merged: ChapterTemplate[] = [];
-
+ 
     if (existingTemplates.length > 0) {
-      // If we have saved templates, ONLY use those (respect grouping)
-      merged = existingTemplates;
+      // Auto-merge newly added quizzes into existing templates
+      merged = existingTemplates.map(t => {
+        const isGrouped = t.chapter_title && t.chapter_title.includes(" - ");
+        
+        // Clean up placeholder "-" column if we now have real quizzes
+        let cleanedColumns = [...t.columns];
+        
+        if (isGrouped) {
+          // For grouped templates, auto-merge is complex because it spans multiple chapters.
+          // We rely on the "Sync" button to rebuild grouped templates.
+          return {
+            ...t,
+            columns: cleanedColumns.length > 0 ? cleanedColumns : DEFAULT_COLS
+          };
+        }
+
+        const chapterQuizzes = (matsByChapter.get(t.chapter_id || "") || []).filter(m => m.material_type === 'quiz');
+        
+        if (chapterQuizzes.length > 0) {
+          cleanedColumns = cleanedColumns.filter(c => {
+            const parts = c.label.split(" ::: ");
+            const colLabel = parts.length > 1 ? parts[1] : c.label;
+            return colLabel !== "-";
+          });
+        }
+
+        const existingLabels = cleanedColumns.map(c => c.label);
+        const newQuizzes = chapterQuizzes.filter(q => {
+          // Use the exact format saved by StudyMaterialClient
+          const expectedLabel = `${t.chapter_title} ::: ${q.title}`;
+          return !existingLabels.includes(expectedLabel);
+        });
+
+        if (newQuizzes.length > 0) {
+          const newCols: ColDef[] = newQuizzes.map(q => ({
+            label: `${t.chapter_title} ::: ${q.title}`,
+            col_type: "number"
+          }));
+          return {
+            ...t,
+            columns: [...cleanedColumns, ...newCols]
+          };
+        }
+
+        return {
+          ...t,
+          columns: cleanedColumns.length > 0 ? cleanedColumns : DEFAULT_COLS
+        };
+      });
     } else {
       // Only auto-generate if nothing exists yet
       merged = chaps.map((ch, idx) => {

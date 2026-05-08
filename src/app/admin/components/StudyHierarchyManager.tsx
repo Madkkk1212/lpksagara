@@ -14,6 +14,7 @@ import {
 import { StudyLevel, StudyChapter, StudyMaterial, IconCategory, IconLibraryItem, MaterialCategory } from "@/lib/types";
 import MediaUploader from "@/app/components/MediaUploader";
 import { motion } from "framer-motion";
+import QuizCreatorDashboard from "./QuizCreatorDashboard";
 
 export default function StudyHierarchyManager() {
   const [levels, setLevels] = useState<StudyLevel[]>([]);
@@ -34,6 +35,7 @@ export default function StudyHierarchyManager() {
   
   // Dynamic Editor Content state
   const [formContent, setFormContent] = useState<any>({});
+  const [useCustomTypeName, setUseCustomTypeName] = useState(false);
 
   // Icon Picker states
   const [pickerTarget, setPickerTarget] = useState<'category'|'level'|'chapter'|'material'|null>(null);
@@ -183,7 +185,11 @@ export default function StudyHierarchyManager() {
   const handleSaveMaterial = async () => {
     if (!editingMaterial || !selectedChapter) return;
     try {
-      await upsertStudyMaterial({ ...editingMaterial, chapter_id: selectedChapter.id, content: formContent });
+      const finalContent = { ...formContent };
+      if (!useCustomTypeName) {
+        finalContent.custom_type_name = null;
+      }
+      await upsertStudyMaterial({ ...editingMaterial, chapter_id: selectedChapter.id, content: finalContent });
       alert("Material saved!");
       setEditingMaterial(null);
       loadMaterials(selectedChapter.id);
@@ -228,10 +234,15 @@ export default function StudyHierarchyManager() {
 
     setEditingMaterial(fullMat);
     const c = (fullMat.content || {}) as any;
+    setUseCustomTypeName(!!c.custom_type_name);
     const mediaFields = {
       pdf_url: c.pdf_url || null,
       document_url: c.document_url || null,
       ppt_url: c.ppt_url || null,
+      pdf_name: c.pdf_name || null,
+      ppt_name: c.ppt_name || null,
+      custom_type_name: c.custom_type_name || null,
+      audioUrl: c.audioUrl || null,
     };
 
     if (fullMat.material_type === 'moji_goi' || fullMat.material_type === 'bunpou') {
@@ -239,9 +250,22 @@ export default function StudyHierarchyManager() {
     } else if (fullMat.material_type === 'dokkai') {
       setFormContent({ text_jp: c.text_jp || '', text_id: c.text_id || '', exercises: c.exercises || [], ...mediaFields });
     } else if (fullMat.material_type === 'choukai') {
-      setFormContent({ audioUrl: c.audioUrl || '', exercises: c.exercises || [], ...mediaFields });
-    } else if (fullMat.material_type === 'quiz' || fullMat.material_type === 'latihan') {
       setFormContent({ exercises: c.exercises || [], ...mediaFields });
+    } else if (fullMat.material_type === 'quiz' || fullMat.material_type === 'latihan') {
+      setFormContent({ 
+        exercises: c.exercises || [], 
+        is_section_test: c.is_section_test || false,
+        sections: c.sections || [],
+        duration_minutes: c.duration_minutes || 60,
+        pass_point: c.pass_point || 60,
+        shuffle_questions: c.shuffle_questions || false,
+        shuffle_answers: c.shuffle_answers || false,
+        fullscreen_mode: c.fullscreen_mode || false,
+        limit_attempts: c.limit_attempts || 1,
+        anti_back: c.anti_back || false,
+        auto_submit: c.auto_submit || true,
+        ...mediaFields 
+      });
     } else {
       setFormContent({ ...c, ...mediaFields });
     }
@@ -286,40 +310,25 @@ export default function StudyHierarchyManager() {
 
   // --- DYNAMIC FORM RENDERERS ---
 
-  const renderExercisesEditor = () => (
-    <div className="mt-8 pt-6 border-t border-slate-200">
-      <h4 className="text-[10px] font-black uppercase text-rose-500 tracking-widest mb-4">Exercises / Soal Latihan</h4>
-      {formContent.exercises?.map((ex: any, i: number) => (
-        <div key={i} className="mb-6 p-6 bg-slate-50 border border-slate-200 rounded-2xl relative">
-          <button onClick={() => setFormContent({...formContent, exercises: formContent.exercises.filter((_:any, idx:number) => idx !== i)})} className="absolute top-4 right-4 text-rose-500 font-bold text-xs p-2 bg-rose-50 rounded-lg">✕</button>
-          
-          <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Pertanyaan</label>
-          <input value={ex.q} onChange={e => {
-            const newEx = [...formContent.exercises];
-            newEx[i].q = e.target.value;
-            setFormContent({...formContent, exercises: newEx});
-          }} className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 font-bold mb-4" />
-
-          <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Opsi Jawaban (Pisahkan dengan koma)</label>
-          <input value={ex.options.join(', ')} onChange={e => {
-            const newEx = [...formContent.exercises];
-            newEx[i].options = e.target.value.split(',').map(s=>s.trim());
-            setFormContent({...formContent, exercises: newEx});
-          }} className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 font-bold mb-4" />
-
-          <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Index Jawaban Benar (0, 1, 2, ...)</label>
-          <input type="number" value={ex.answer} onChange={e => {
-            const newEx = [...formContent.exercises];
-            newEx[i].answer = parseInt(e.target.value);
-            setFormContent({...formContent, exercises: newEx});
-          }} className="w-full px-4 py-3 rounded-xl bg-white border border-slate-200 font-bold mb-4" />
-        </div>
-      ))}
-      <button onClick={() => setFormContent({...formContent, exercises: [...(formContent.exercises || []), { q: 'Soal Baru', options: ['A','B'], answer: 0 }]})} className="px-4 py-2 bg-rose-50 text-rose-600 rounded-xl font-bold text-xs">
-        + Tambah Soal
-      </button>
-    </div>
-  );
+  const renderExercisesEditor = () => {
+    return (
+      <div className="mt-6">
+        <QuizCreatorDashboard
+          initialData={formContent}
+          onChange={(newData) => {
+            setFormContent({ ...formContent, ...newData });
+          }}
+          materialType={
+            editingMaterial?.material_type === "quiz"
+              ? "quiz"
+              : editingMaterial?.material_type === "latihan"
+              ? "latihan"
+              : "quiz"
+          }
+        />
+      </div>
+    );
+  };
 
   const renderDynamicFields = () => {
     if (!editingMaterial) return null;
@@ -347,15 +356,67 @@ export default function StudyHierarchyManager() {
         <div className="space-y-4">
           <h4 className="text-[10px] font-black uppercase text-teal-600 tracking-widest mb-4 border-b pb-2">Grammar Patterns</h4>
           {formContent.items?.map((item: any, i: number) => (
-            <div key={i} className="p-4 bg-slate-50 rounded-2xl relative mb-4">
+            <div key={i} className="p-4 bg-slate-50 rounded-2xl relative mb-4 border border-slate-200">
                <button onClick={() => setFormContent({...formContent, items: formContent.items.filter((_:any, idx:number) => idx !== i)})} className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 p-2">✕</button>
                <label className="text-[10px] font-bold text-slate-400">Pattern</label>
-               <input placeholder="N は N です" value={item.pattern || ''} onChange={e => { const newItems = [...formContent.items]; newItems[i].pattern = e.target.value; setFormContent({...formContent, items: newItems}); }} className="w-full px-4 py-2 rounded-lg border mb-2 font-bold" />
+               <input placeholder="N は N です" value={item.pattern || ''} onChange={e => { const newItems = [...formContent.items]; newItems[i].pattern = e.target.value; setFormContent({...formContent, items: newItems}); }} className="w-full px-4 py-2 rounded-lg border mb-2 font-bold focus:border-teal-500 focus:outline-none" />
                <label className="text-[10px] font-bold text-slate-400">Explanation</label>
-               <textarea placeholder="Penjelasan..." value={item.explanation || ''} onChange={e => { const newItems = [...formContent.items]; newItems[i].explanation = e.target.value; setFormContent({...formContent, items: newItems}); }} className="w-full px-4 py-2 rounded-lg border mb-2 text-sm" />
-               {/* Simplified Example Input for Bunpou */}
-               <label className="text-[10px] font-bold text-slate-400 block mt-2">Example (JSON array)</label>
-               <textarea value={JSON.stringify(item.examples || [])} onChange={e => { try { const newItems = [...formContent.items]; newItems[i].examples = JSON.parse(e.target.value); setFormContent({...formContent, items: newItems}); } catch(e){} }} className="w-full px-4 py-2 rounded-lg border mb-2 font-mono text-xs" />
+               <textarea placeholder="Penjelasan..." value={item.explanation || ''} onChange={e => { const newItems = [...formContent.items]; newItems[i].explanation = e.target.value; setFormContent({...formContent, items: newItems}); }} className="w-full px-4 py-2 rounded-lg border mb-2 text-sm focus:border-teal-500 focus:outline-none" />
+               
+               {/* Beautiful multiple example sentence form editor */}
+               <label className="text-[10px] font-black uppercase text-teal-600 tracking-wider block mt-4 mb-2">Daftar Contoh Kalimat (Examples)</label>
+               <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-200">
+                 {(item.examples || []).map((ex: any, exIdx: number) => (
+                   <div key={exIdx} className="flex gap-2 items-center bg-slate-50 p-3 rounded-lg relative border border-slate-100">
+                     <div className="flex-1 space-y-2">
+                       <input 
+                         placeholder="Contoh Jepang (ex: これは何ですか。)" 
+                         value={ex.jp || ''} 
+                         onChange={e => {
+                           const newItems = [...formContent.items];
+                           if (!newItems[i].examples) newItems[i].examples = [];
+                           newItems[i].examples[exIdx] = { ...newItems[i].examples[exIdx], jp: e.target.value };
+                           setFormContent({...formContent, items: newItems});
+                         }} 
+                         className="w-full px-3 py-1.5 rounded bg-white border text-sm font-bold focus:border-teal-500 focus:outline-none" 
+                       />
+                       <input 
+                         placeholder="Terjemahan Arti (ex: Ini apa?)" 
+                         value={ex.id || ''} 
+                         onChange={e => {
+                           const newItems = [...formContent.items];
+                           if (!newItems[i].examples) newItems[i].examples = [];
+                           newItems[i].examples[exIdx] = { ...newItems[i].examples[exIdx], id: e.target.value };
+                           setFormContent({...formContent, items: newItems});
+                         }} 
+                         className="w-full px-3 py-1.5 rounded bg-white border text-xs focus:border-teal-500 focus:outline-none" 
+                       />
+                     </div>
+                     <button 
+                       onClick={() => {
+                         const newItems = [...formContent.items];
+                         newItems[i].examples = newItems[i].examples.filter((_: any, idx: number) => idx !== exIdx);
+                         setFormContent({...formContent, items: newItems});
+                       }} 
+                       className="text-slate-400 hover:text-rose-500 p-2 shrink-0 font-bold self-start mt-1"
+                       title="Hapus Contoh"
+                     >
+                       ✕
+                     </button>
+                   </div>
+                 ))}
+                 <button 
+                   onClick={() => {
+                     const newItems = [...formContent.items];
+                     if (!newItems[i].examples) newItems[i].examples = [];
+                     newItems[i].examples.push({ jp: '', id: '' });
+                     setFormContent({...formContent, items: newItems});
+                   }} 
+                   className="px-3 py-1.5 bg-teal-50 text-teal-600 rounded-lg font-black text-[10px] tracking-wider uppercase hover:bg-teal-100 transition"
+                 >
+                   + Tambah Contoh Kalimat
+                 </button>
+               </div>
             </div>
           ))}
           <button onClick={() => setFormContent({...formContent, items: [...(formContent.items || []), { pattern: '', explanation: '', examples: [] }]})} className="px-4 py-2 bg-slate-100 rounded-xl font-bold text-xs block w-full text-center">+ Add Pattern</button>
@@ -592,7 +653,13 @@ export default function StudyHierarchyManager() {
                         </div>
                       )}
                       <div>
-                        <p className={`text-[10px] font-black uppercase tracking-widest ${mat.material_type === 'quiz' ? 'text-rose-500' : mat.material_type === 'latihan' ? 'text-amber-500' : 'text-teal-600'}`}>{mat.material_type}</p>
+                        <p className={`text-[10px] font-black uppercase tracking-widest ${mat.material_type === 'quiz' ? 'text-rose-500' : mat.material_type === 'latihan' ? 'text-amber-500' : 'text-teal-600'}`}>
+                          {mat.material_type}
+                          {(() => {
+                            const c = (typeof mat.content === 'string' ? JSON.parse(mat.content) : mat.content) || {};
+                            return c.custom_type_name ? ` (${c.custom_type_name})` : '';
+                          })()}
+                        </p>
                         <h4 className="font-bold text-slate-800 mt-1">{mat.title}</h4>
                         <span className="text-[8px] text-slate-400 font-bold">Order: {mat.sort_order}</span>
                       </div>
@@ -782,7 +849,7 @@ export default function StudyHierarchyManager() {
                </div>
                
                <div className="overflow-y-auto flex-1 pr-4 custom-scrollbar">
-                 <div className="grid grid-cols-2 gap-4 mb-6">
+                 <div className={`grid gap-4 mb-6 ${useCustomTypeName ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
                     <div>
                       <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Material Type</label>
                       <select 
@@ -794,12 +861,16 @@ export default function StudyHierarchyManager() {
                            const mediaFields = {
                              pdf_url: formContent.pdf_url || null,
                              document_url: formContent.document_url || null,
+                              pdf_name: formContent.pdf_name || null,
+                              ppt_name: formContent.ppt_name || null,
+                               custom_type_name: formContent.custom_type_name || null,
                              ppt_url: formContent.ppt_url || null,
+                             audioUrl: formContent.audioUrl || null,
                            };
 
                            if (newType === 'moji_goi' || newType === 'bunpou') setFormContent({ items: [], ...mediaFields });
                            else if (newType === 'dokkai') setFormContent({ text_jp: '', text_id: '', exercises: [], ...mediaFields });
-                           else if (newType === 'choukai') setFormContent({ audioUrl: '', exercises: [], ...mediaFields });
+                           else if (newType === 'choukai') setFormContent({ exercises: [], ...mediaFields });
                            else setFormContent({ exercises: [], ...mediaFields });
                          }}
                          className="w-full px-4 py-3 rounded-xl bg-slate-50 font-bold appearance-none outline-none border focus:border-teal-500"
@@ -811,7 +882,27 @@ export default function StudyHierarchyManager() {
                          <option value="quiz">Quiz 🎯</option>
                           <option value="latihan">Latihan 📝</option>
                       </select>
+                       <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
+                         <input 
+                           type="checkbox" 
+                           checked={useCustomTypeName} 
+                           onChange={e => setUseCustomTypeName(e.target.checked)}
+                           className="rounded text-teal-600 focus:ring-teal-500 h-4 w-4"
+                         />
+                         <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Kustom Nama Tipe</span>
+                       </label>
                     </div>
+                    {useCustomTypeName && (
+                      <div className="animate-in fade-in duration-300">
+                        <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Custom Nama Tipe</label>
+                        <input 
+                          placeholder="Contoh: Kosakata, Tata Bahasa" 
+                          value={formContent.custom_type_name || ""} 
+                          onChange={e => setFormContent({...formContent, custom_type_name: e.target.value})} 
+                          className="w-full px-4 py-3 rounded-xl bg-slate-50 border font-bold focus:border-teal-500 focus:outline-none" 
+                        />
+                      </div>
+                    )}
                     <div>
                       <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Title</label>
                       <input value={editingMaterial.title || ""} onChange={e => setEditingMaterial({...editingMaterial, title: e.target.value})} className="w-full px-4 py-3 rounded-xl bg-slate-50 border font-bold" />
@@ -823,6 +914,44 @@ export default function StudyHierarchyManager() {
                          <button onClick={() => openIconPicker('material')} className="px-4 py-2 bg-slate-100 font-bold text-xs rounded-lg hover:bg-slate-200">🖼️ Pilih dari Galeri</button>
                        </div>
                     </div>
+                     {(editingMaterial.material_type === 'quiz' || editingMaterial.material_type === 'latihan') && (
+                       <div className="col-span-2 p-5 bg-amber-500/[0.04] border border-amber-500/10 rounded-2xl space-y-4 mt-2 animate-in fade-in duration-300">
+                         <div className="flex items-center gap-2">
+                           <span className="text-lg">⏱️</span>
+                           <p className="text-[10px] font-black uppercase text-amber-600 tracking-widest">Pengaturan Waktu & Kelulusan Kuis</p>
+                         </div>
+                         <div className="grid grid-cols-2 gap-4">
+                           <div>
+                             <label className="text-[10px] font-black uppercase text-slate-400 mb-1.5 block">Durasi Kuis (Menit)</label>
+                             <input 
+                               type="number" 
+                               min="1" 
+                               value={formContent.duration_minutes !== undefined ? formContent.duration_minutes : 60} 
+                               onChange={e => {
+                                 const val = parseInt(e.target.value) || 60;
+                                 setFormContent({ ...formContent, duration_minutes: val });
+                               }} 
+                               className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold focus:border-teal-500 focus:outline-none"
+                             />
+                           </div>
+                           <div>
+                             <label className="text-[10px] font-black uppercase text-slate-400 mb-1.5 block">Skor Kelulusan (%)</label>
+                             <input 
+                               type="number" 
+                               min="1" 
+                               max="100" 
+                               value={formContent.pass_point !== undefined ? formContent.pass_point : 60} 
+                               onChange={e => {
+                                 const val = parseInt(e.target.value) || 60;
+                                 setFormContent({ ...formContent, pass_point: val });
+                               }} 
+                               className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold focus:border-teal-500 focus:outline-none"
+                             />
+                           </div>
+                         </div>
+                       </div>
+                     )}
+                     {editingMaterial.material_type !== 'quiz' && editingMaterial.material_type !== 'latihan' && (
                      <div className="col-span-2 p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-5 mt-2">
                         <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">🎬 Media Materi (Opsional)</p>
                         <MediaUploader
@@ -838,20 +967,57 @@ export default function StudyHierarchyManager() {
                           onChange={(url, size, provider) => setEditingMaterial({...editingMaterial, image_url: url})}
                         />
                         <MediaUploader
-                          label="Dokumen PDF (Maks 100 MB)"
-                          mediaType="document"
-                          accept=".pdf,application/pdf"
-                          value={formContent.pdf_url || formContent.document_url}
-                          onChange={(url) => setFormContent({...formContent, pdf_url: url, document_url: url})}
+                          label="Audio Materi / Pendukung (MP3/OGG - Opsional)"
+                          mediaType="audio"
+                          accept="audio/*"
+                          value={formContent.audioUrl}
+                          onChange={(url) => setFormContent({...formContent, audioUrl: url})}
                         />
-                        <MediaUploader
-                          label="Slide PPT / Presentasi (Maks 100 MB)"
-                          mediaType="document"
-                          accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                          value={formContent.ppt_url}
-                          onChange={(url) => setFormContent({...formContent, ppt_url: url})}
-                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                          <div className="p-4 bg-white/40 border border-slate-100 rounded-2xl space-y-3">
+                            <MediaUploader
+                              label="Dokumen PDF (Maks 100 MB)"
+                              mediaType="document"
+                              accept=".pdf,application/pdf"
+                              value={formContent.pdf_url || formContent.document_url}
+                              onChange={(url) => setFormContent({...formContent, pdf_url: url, document_url: url})}
+                            />
+                            {(formContent.pdf_url || formContent.document_url) && (
+                              <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Custom Judul PDF (Opsional)</label>
+                                <input 
+                                  placeholder="Default: Dokumen PDF"
+                                  value={formContent.pdf_name || ""} 
+                                  onChange={e => setFormContent({...formContent, pdf_name: e.target.value})} 
+                                  className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold focus:border-teal-500 focus:outline-none"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="p-4 bg-white/40 border border-slate-100 rounded-2xl space-y-3">
+                            <MediaUploader
+                              label="Slide PPT / Presentasi (Maks 100 MB)"
+                              mediaType="document"
+                              accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                              value={formContent.ppt_url}
+                              onChange={(url) => setFormContent({...formContent, ppt_url: url})}
+                            />
+                            {formContent.ppt_url && (
+                              <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Custom Judul PPT (Opsional)</label>
+                                <input 
+                                  placeholder="Default: Slide PPT / Presentasi"
+                                  value={formContent.ppt_name || ""} 
+                                  onChange={e => setFormContent({...formContent, ppt_name: e.target.value})} 
+                                  className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold focus:border-teal-500 focus:outline-none"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
                      </div>
+                     )}
                     <div className="col-span-2 pt-4 border-t mt-2">
                         <div className="flex gap-6">
                            <div className="flex-1">
