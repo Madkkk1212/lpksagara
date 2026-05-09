@@ -418,7 +418,7 @@ export default function ModernQuizPlayer({
 
                     {/* Detailed Explanation */}
                     {item.explanation && (
-                      <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-200 text-xs leading-relaxed">
+                      <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-200 text-xs leading-relaxed whitespace-pre-wrap">
                         <p className="font-black uppercase text-[10px] tracking-wider mb-1 text-amber-400">Pembahasan & Arti:</p>
                         {item.explanation}
                       </div>

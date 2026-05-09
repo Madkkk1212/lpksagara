@@ -361,7 +361,7 @@ export default function StudyHierarchyManager() {
                <label className="text-[10px] font-bold text-slate-400">Pattern</label>
                <input placeholder="N は N です" value={item.pattern || ''} onChange={e => { const newItems = [...formContent.items]; newItems[i].pattern = e.target.value; setFormContent({...formContent, items: newItems}); }} className="w-full px-4 py-2 rounded-lg border mb-2 font-bold focus:border-teal-500 focus:outline-none" />
                <label className="text-[10px] font-bold text-slate-400">Explanation</label>
-               <textarea placeholder="Penjelasan..." value={item.explanation || ''} onChange={e => { const newItems = [...formContent.items]; newItems[i].explanation = e.target.value; setFormContent({...formContent, items: newItems}); }} className="w-full px-4 py-2 rounded-lg border mb-2 text-sm focus:border-teal-500 focus:outline-none" />
+               <textarea placeholder="Penjelasan..." value={item.explanation || ''} onChange={e => { const newItems = [...formContent.items]; newItems[i].explanation = e.target.value; setFormContent({...formContent, items: newItems}); }} className="w-full h-32 px-4 py-2 rounded-lg border mb-2 text-sm focus:border-teal-500 focus:outline-none" />
                
                {/* Beautiful multiple example sentence form editor */}
                <label className="text-[10px] font-black uppercase text-teal-600 tracking-wider block mt-4 mb-2">Daftar Contoh Kalimat (Examples)</label>

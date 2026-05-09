@@ -422,7 +422,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                                       <div className="inline-block bg-indigo-600 shadow-[0_10px_30px_rgba(79,70,229,0.3)] text-white px-5 py-3 rounded-2xl text-xl font-black tracking-widest mb-6">
                                         {item.pattern}
                                       </div>
-                                      <p className="text-slate-600 font-medium mb-8 leading-relaxed text-lg max-w-2xl">{item.explanation}</p>
+                                      <p className="text-slate-600 font-medium mb-8 leading-relaxed text-lg max-w-2xl whitespace-pre-wrap">{item.explanation}</p>
                                       
                                       <div className="space-y-4 bg-white/80 p-8 rounded-[2rem] shadow-sm border border-white">
                                          {item.examples?.map((ex: any, i: number) => (

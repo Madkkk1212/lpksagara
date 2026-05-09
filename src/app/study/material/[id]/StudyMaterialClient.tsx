@@ -397,7 +397,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
           </div>
           <div className="p-8">
             <h4 className="text-xs font-black uppercase text-slate-400 mb-2">Penjelasan</h4>
-            <p className="text-slate-700 font-medium leading-relaxed mb-6">{item.explanation}</p>
+            <p className="text-slate-700 font-medium leading-relaxed mb-6 whitespace-pre-wrap">{item.explanation}</p>
             
             <h4 className="text-xs font-black uppercase text-slate-400 mb-4 border-t border-slate-100 pt-6">Contoh Kalimat</h4>
             <ul className="space-y-4">
