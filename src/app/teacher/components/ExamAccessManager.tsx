@@ -9,9 +9,10 @@ import { BookOpen, Search, Zap, X, Trophy } from "lucide-react";
 interface ExamAccessManagerProps {
   teacher: Profile;
   assignedStudentIds?: string[];
+  isSuperAdmin?: boolean;
 }
 
-export default function ExamAccessManager({ teacher, assignedStudentIds = [] }: ExamAccessManagerProps) {
+export default function ExamAccessManager({ teacher, assignedStudentIds = [], isSuperAdmin = false }: ExamAccessManagerProps) {
   const [levels, setLevels] = useState<ExamLevel[]>([]);
   const [tests, setTests] = useState<ExamTest[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
@@ -40,10 +41,12 @@ export default function ExamAccessManager({ teacher, assignedStudentIds = [] }: 
         .neq('is_teacher', true)
         .neq('is_admin', true);
 
-      if (assignedStudentIds.length > 0) {
+      if (isSuperAdmin) {
+        // Super admin: load ALL students, no filter
+      } else if (assignedStudentIds.length > 0) {
         profilesQuery = profilesQuery.in('id', assignedStudentIds);
       } else {
-        // Query empty result safely by using a non-matching UUID
+        // Regular teacher with no assigned students — empty result
         profilesQuery = profilesQuery.eq('id', '00000000-0000-0000-0000-000000000000');
       }
 
@@ -165,7 +168,7 @@ export default function ExamAccessManager({ teacher, assignedStudentIds = [] }: 
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-20">
-      {assignedStudentIds.length === 0 && (
+      {assignedStudentIds.length === 0 && !isSuperAdmin && (
         <div className="p-6 bg-amber-50 border border-amber-200 rounded-[2rem] text-amber-800 text-xs font-medium">
           ⚠️ <strong>Pemberitahuan:</strong> Anda belum memiliki siswa yang ditugaskan kepada Anda. Hubungi Admin untuk mendaftarkan siswa ke kelas Anda agar Anda dapat mengontrol akses ujian (exam) untuk mereka.
         </div>

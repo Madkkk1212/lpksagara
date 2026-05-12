@@ -2,17 +2,19 @@
 
 import React, { useState, useEffect } from "react";
 import { Profile, StudyChapter, StudyMaterial, StudyLevel } from "@/lib/types";
-import { getAllStudyChapters, getBasicStudyMaterials } from "@/lib/db";
+import { getAllStudyChapters, getBasicStudyMaterials, getStudyLevels } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { BookOpen, CheckCircle, XCircle, Search, Filter, ShieldCheck, Zap, X } from "lucide-react";
 
 interface QuizAccessManagerProps {
   teacher: Profile;
   assignedStudentIds?: string[];
+  isSuperAdmin?: boolean;
 }
 
-export default function QuizAccessManager({ teacher, assignedStudentIds = [] }: QuizAccessManagerProps) {
+export default function QuizAccessManager({ teacher, assignedStudentIds = [], isSuperAdmin = false }: QuizAccessManagerProps) {
   const [chapters, setChapters] = useState<StudyChapter[]>([]);
+  const [levels, setLevels] = useState<any[]>([]);
   const [quizzes, setQuizzes] = useState<StudyMaterial[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
   const [students, setStudents] = useState<Profile[]>([]);
@@ -23,6 +25,7 @@ export default function QuizAccessManager({ teacher, assignedStudentIds = [] }: 
   const [selectedBatch, setSelectedBatch] = useState<string>("Semua");
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedLevelId, setSelectedLevelId] = useState("");
   const [expandedChapters, setExpandedChapters] = useState<string[]>([]);
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
@@ -84,19 +87,25 @@ export default function QuizAccessManager({ teacher, assignedStudentIds = [] }: 
         .neq('is_teacher', true)
         .neq('is_admin', true);
 
-      if (assignedStudentIds.length > 0) {
+      if (isSuperAdmin) {
+        // Super admin: load ALL students, no filter
+        // (no extra .eq / .in filter — fetches everyone)
+      } else if (assignedStudentIds.length > 0) {
         profilesQuery = profilesQuery.in('id', assignedStudentIds);
       } else {
-        // Query empty result safely by using a non-matching UUID
+        // Regular teacher with no assigned students — empty result
         profilesQuery = profilesQuery.eq('id', '00000000-0000-0000-0000-000000000000');
       }
 
-      const [allChapters, allMaterials, profilesResult, { data: controls }] = await Promise.all([
+      const [allChapters, allMaterials, profilesResult, { data: controls }, allLevels] = await Promise.all([
         getAllStudyChapters(),
         getBasicStudyMaterials(),
         profilesQuery,
-        supabase.from('quiz_access_controls').select('*')
+        supabase.from('quiz_access_controls').select('*'),
+        getStudyLevels()
       ]);
+
+      setLevels(allLevels || []);
 
       const uniqueChapters = Array.from(new Map(allChapters.map((c: any) => [c.id, c])).values()) as StudyChapter[];
       const filteredQuizzes = allMaterials.filter((m: any) => m.material_type === 'quiz');
@@ -290,13 +299,55 @@ export default function QuizAccessManager({ teacher, assignedStudentIds = [] }: 
     return <div className="p-20 text-center text-slate-400 font-black uppercase tracking-widest text-xs animate-pulse">Loading Quiz Controls...</div>;
   }
 
+  // No students assigned — show full empty state, hide quiz controls entirely
+  // Super admin always bypasses this check
+  if (assignedStudentIds.length === 0 && !isSuperAdmin) {
+    return (
+      <div className="animate-in fade-in duration-700 flex flex-col items-center justify-center py-24 px-6">
+        <div className="w-full max-w-lg bg-white rounded-[3rem] border border-slate-100 shadow-sm p-14 flex flex-col items-center text-center gap-8">
+          {/* Icon */}
+          <div className="h-24 w-24 rounded-[2rem] bg-amber-50 border-2 border-amber-100 flex items-center justify-center text-5xl shadow-lg shadow-amber-100">
+            🔒
+          </div>
+
+          {/* Text */}
+          <div className="space-y-3">
+            <h2 className="text-2xl font-black text-slate-900 italic tracking-tight uppercase leading-none">
+              Belum Ada Murid
+            </h2>
+            <p className="text-sm text-slate-500 font-medium leading-relaxed">
+              Anda belum memiliki murid yang ditugaskan ke kelas Anda.
+              Kontrol akses kuis hanya tersedia setelah Admin menetapkan murid kepada Anda.
+            </p>
+          </div>
+
+          {/* Steps */}
+          <div className="w-full space-y-3 text-left">
+            <p className="text-[9px] font-black uppercase text-slate-400 tracking-[0.25em] mb-4">Langkah Selanjutnya</p>
+            {[
+              { icon: "👤", step: "Hubungi Admin sistem Anda." },
+              { icon: "📋", step: "Minta Admin untuk menambahkan murid ke kelas Anda melalui menu Manajemen Guru." },
+              { icon: "✅", step: "Setelah murid ditetapkan, halaman ini akan otomatis menampilkan kontrol akses kuis." },
+            ].map((item, i) => (
+              <div key={i} className="flex items-start gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <span className="text-xl shrink-0">{item.icon}</span>
+                <p className="text-xs text-slate-600 font-medium leading-snug">{item.step}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-50 border border-amber-200 rounded-full text-[10px] font-black uppercase tracking-widest text-amber-600">
+            <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+            Menunggu Penugasan Murid
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-20">
-      {assignedStudentIds.length === 0 && (
-        <div className="p-6 bg-amber-50 border border-amber-200 rounded-[2rem] text-amber-800 text-xs font-medium">
-          ⚠️ <strong>Pemberitahuan:</strong> Anda belum memiliki siswa yang ditugaskan kepada Anda. Hubungi Admin untuk mendaftarkan siswa ke kelas Anda agar Anda dapat mengontrol akses kuis untuk mereka.
-        </div>
-      )}
 
       {isStudentModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-6">
@@ -706,6 +757,22 @@ export default function QuizAccessManager({ teacher, assignedStudentIds = [] }: 
             </div>
           )}
 
+          <div className="flex flex-col gap-2 w-56">
+            <label className="text-[9px] font-black uppercase text-slate-400 ml-2">Filter Level Studi</label>
+            <select
+              value={selectedLevelId}
+              onChange={(e) => setSelectedLevelId(e.target.value)}
+              className="px-6 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-bold text-slate-700 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all shadow-sm cursor-pointer"
+            >
+              <option value="">Semua Level</option>
+              {levels.map((lvl: any) => (
+                <option key={lvl.id} value={lvl.id}>
+                  {lvl.level_code} — {lvl.title || lvl.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="flex flex-col gap-2 w-72">
             <label className="text-[9px] font-black uppercase text-slate-400 ml-2">Cari Judul Kuis</label>
             <div className="relative">
@@ -723,7 +790,9 @@ export default function QuizAccessManager({ teacher, assignedStudentIds = [] }: 
       </div>
 
       <div className="space-y-6">
-        {chapters.map(chapter => {
+        {chapters
+          .filter(chapter => !selectedLevelId || chapter.level_id === selectedLevelId)
+          .map(chapter => {
           const chapterQuizzes = quizzes.filter(q => q.chapter_id === chapter.id && q.title.toLowerCase().includes(searchTerm.toLowerCase()));
           if (chapterQuizzes.length === 0) return null;
           
@@ -741,7 +810,17 @@ export default function QuizAccessManager({ teacher, assignedStudentIds = [] }: 
                     </div>
                     <div>
                       <h3 className="text-xl font-black text-slate-900 italic tracking-tight leading-none mb-2">{chapter.title}</h3>
-                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.3em]">{chapterQuizzes.length} Evaluation Materials</p>
+                      <div className="flex items-center gap-3">
+                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.3em]">{chapterQuizzes.length} Evaluation Materials</p>
+                        {(() => {
+                          const lvl = levels.find((l) => l.id === chapter.level_id);
+                          return lvl ? (
+                            <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded-md text-[9px] font-black uppercase tracking-wider text-indigo-500">
+                              {lvl.level_code || lvl.title || lvl.name}
+                            </span>
+                          ) : null;
+                        })()}
+                      </div>
                     </div>
                   </div>
                   <div className={`h-12 w-12 rounded-2xl border border-slate-100 flex items-center justify-center transition-all duration-500 ${isExpanded ? 'rotate-180 bg-slate-900 text-white border-slate-900' : 'text-slate-300'}`}>

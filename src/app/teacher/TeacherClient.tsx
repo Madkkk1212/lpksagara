@@ -334,12 +334,12 @@ export default function TeacherClient() {
         ) : activeTab === 'targets' ? (
           <WeeklyTargetManager
             teacher={teacherProfile!}
-            students={assignedStudentIds.length > 0 ? students.filter(s => assignedStudentIds.includes(s.id!)) : students}
+            students={assignedStudents}
           />
         ) : activeTab === 'grading' ? (
           <AssessmentManager
             teacher={teacherProfile!}
-            students={assignedStudentIds.length > 0 ? students.filter(s => assignedStudentIds.includes(s.id!)) : students}
+            students={assignedStudents}
             levels={levels}
           />
         ) : activeTab === 'quizzes' ? (

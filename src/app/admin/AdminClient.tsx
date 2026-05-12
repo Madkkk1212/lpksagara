@@ -384,8 +384,8 @@ export default function AdminClient() {
                {activeTab === "all-students-assessment" && <AllStudentsAssessment students={students} levels={studyLevels} />}
                {activeTab === "material-recap" && <MaterialRecap />}
                {activeTab === "video-manager" && <VideoManager />}
-               {activeTab === "quiz-access" && <QuizAccessManager teacher={userProfile!} />}
-               {activeTab === "exam-access" && <ExamAccessManager teacher={userProfile!} />}
+               {activeTab === "quiz-access" && <QuizAccessManager teacher={userProfile!} isSuperAdmin={true} />}
+               {activeTab === "exam-access" && <ExamAccessManager teacher={userProfile!} isSuperAdmin={true} />}
                {activeTab === "teacher-menu" && <TeacherMenuManager onConfigChange={fetchMenuConfig} />}
            </section>
         </div>
