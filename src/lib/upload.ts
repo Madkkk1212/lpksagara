@@ -4,11 +4,23 @@ export async function directUpload(
   file: File,
   onProgress?: (pct: number, loaded: number, total: number) => void
 ): Promise<string> {
+  let resolvedMime = file.type;
+  if (!resolvedMime || resolvedMime === "application/octet-stream") {
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    if (ext === "mp3") resolvedMime = "audio/mpeg";
+    else if (ext === "wav") resolvedMime = "audio/wav";
+    else if (ext === "ogg") resolvedMime = "audio/ogg";
+    else if (ext === "m4a") resolvedMime = "audio/mp4";
+    else if (ext === "webm") resolvedMime = "audio/webm";
+    else if (ext === "aac") resolvedMime = "audio/aac";
+    else resolvedMime = "application/octet-stream";
+  }
+
   // Step 1: Get upload params from server
   const presignRes = await fetch("/api/upload/presign", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sizeMB: file.size / 1024 / 1024, mimeType: file.type, filename: file.name }),
+    body: JSON.stringify({ sizeMB: file.size / 1024 / 1024, mimeType: resolvedMime, filename: file.name }),
   });
   
   if (!presignRes.ok) {
@@ -52,7 +64,7 @@ export async function directUpload(
     // Step 2b: R2 Direct
     else {
       xhr.open("PUT", presign.putUrl, true);
-      xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+      xhr.setRequestHeader("Content-Type", resolvedMime);
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable && onProgress) onProgress(Math.min(Math.round((e.loaded / e.total) * 98), 98), e.loaded, e.total);
       };

@@ -302,11 +302,163 @@ export async function getAllStudyMaterials(): Promise<StudyMaterial[]> {
 export async function getMaterialsWithVideos(): Promise<Partial<StudyMaterial>[]> {
   const { data, error } = await supabase
     .from('study_materials')
-    .select('id, title, chapter_id, material_type, video_url, image_url, file_size, storage_provider, created_at')
-    .not('video_url', 'is', null)
+    .select('id, title, chapter_id, material_type, video_url, image_url, file_size, storage_provider, created_at, content')
     .order('created_at', { ascending: false });
-  if (error) return [];
-  return data;
+  if (error || !data) return [];
+  
+  const extractVideo = (obj: any): string | null => {
+    if (!obj) return null;
+    if (typeof obj === 'string') {
+      const lower = obj.toLowerCase();
+      if (lower.trim() !== "" && !lower.includes('.mp3') && !lower.includes('.wav') && !lower.includes('.ogg') && !lower.includes('.m4a') && !lower.includes('.jpg') && !lower.includes('.jpeg') && !lower.includes('.png') && !lower.includes('.gif') && !lower.includes('.pdf') && !lower.includes('.ppt')) {
+        if (lower.includes('.mp4') || lower.includes('.webm') || lower.includes('.mkv') || lower.includes('youtube') || lower.includes('vimeo') || lower.includes('video') || lower.includes('r2.dev') || lower.startsWith('undefined/')) {
+          return obj;
+        }
+      }
+      return null;
+    }
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        const res = extractVideo(item);
+        if (res) return res;
+      }
+      return null;
+    }
+    if (typeof obj === 'object') {
+      if (obj.videoUrl && typeof obj.videoUrl === 'string' && obj.videoUrl.trim() !== "") return obj.videoUrl;
+      if (obj.video_url && typeof obj.video_url === 'string' && obj.video_url.trim() !== "") return obj.video_url;
+      if (obj.media?.video_url && typeof obj.media.video_url === 'string' && obj.media.video_url.trim() !== "") return obj.media.video_url;
+      for (const [key, val] of Object.entries(obj)) {
+        if (key.toLowerCase().includes('audio') || key.toLowerCase().includes('image') || key.toLowerCase().includes('img') || key.toLowerCase().includes('pdf') || key.toLowerCase().includes('ppt')) continue;
+        const res = extractVideo(val);
+        if (res) return res;
+      }
+    }
+    return null;
+  };
+
+  const results: Partial<StudyMaterial>[] = [];
+  for (const item of data) {
+    let c: any = {};
+    if (typeof item.content === 'string') {
+      try { c = JSON.parse(item.content); } catch (e) {}
+    } else if (item.content) {
+      c = item.content;
+    }
+    const foundVideo = (item.video_url && item.video_url.trim() !== "") ? item.video_url : extractVideo(c);
+    if (foundVideo && foundVideo.trim() !== "") {
+      results.push({ ...item, video_url: foundVideo });
+    }
+  }
+  return results;
+}
+
+export async function getMaterialsWithAudio(): Promise<Partial<StudyMaterial>[]> {
+  const { data, error } = await supabase
+    .from('study_materials')
+    .select('id, title, chapter_id, material_type, audio_url, image_url, file_size, storage_provider, created_at, content')
+    .order('created_at', { ascending: false });
+  if (error || !data) return [];
+
+  const extractAudio = (obj: any): string | null => {
+    if (!obj) return null;
+    if (typeof obj === 'string') {
+      const lower = obj.toLowerCase();
+      if (lower.trim() !== "" && !lower.includes('.mp4') && !lower.includes('.webm') && !lower.includes('.jpg') && !lower.includes('.jpeg') && !lower.includes('.png') && !lower.includes('.gif') && !lower.includes('.pdf') && !lower.includes('.ppt')) {
+        if (lower.includes('.mp3') || lower.includes('.wav') || lower.includes('.ogg') || lower.includes('.m4a') || lower.includes('audio') || lower.includes('r2.dev') || lower.startsWith('undefined/')) {
+          return obj;
+        }
+      }
+      return null;
+    }
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        const res = extractAudio(item);
+        if (res) return res;
+      }
+      return null;
+    }
+    if (typeof obj === 'object') {
+      if (obj.audioUrl && typeof obj.audioUrl === 'string' && obj.audioUrl.trim() !== "") return obj.audioUrl;
+      if (obj.audio_url && typeof obj.audio_url === 'string' && obj.audio_url.trim() !== "") return obj.audio_url;
+      if (obj.media?.audio_url && typeof obj.media.audio_url === 'string' && obj.media.audio_url.trim() !== "") return obj.media.audio_url;
+      for (const [key, val] of Object.entries(obj)) {
+        if (key.toLowerCase().includes('video') || key.toLowerCase().includes('image') || key.toLowerCase().includes('img') || key.toLowerCase().includes('pdf') || key.toLowerCase().includes('ppt')) continue;
+        const res = extractAudio(val);
+        if (res) return res;
+      }
+    }
+    return null;
+  };
+
+  const results: Partial<StudyMaterial>[] = [];
+  for (const item of data) {
+    let c: any = {};
+    if (typeof item.content === 'string') {
+      try { c = JSON.parse(item.content); } catch (e) {}
+    } else if (item.content) {
+      c = item.content;
+    }
+    const foundAudio = (item.audio_url && item.audio_url.trim() !== "") ? item.audio_url : extractAudio(c);
+    if (foundAudio && foundAudio.trim() !== "") {
+      results.push({ ...item, audio_url: foundAudio });
+    }
+  }
+  return results;
+}
+
+export async function getMaterialsWithImages(): Promise<Partial<StudyMaterial>[]> {
+  const { data, error } = await supabase
+    .from('study_materials')
+    .select('id, title, chapter_id, material_type, image_url, file_size, storage_provider, created_at, content')
+    .order('created_at', { ascending: false });
+  if (error || !data) return [];
+
+  const extractImage = (obj: any): string | null => {
+    if (!obj) return null;
+    if (typeof obj === 'string') {
+      const lower = obj.toLowerCase();
+      if (lower.trim() !== "" && !lower.includes('.mp3') && !lower.includes('.wav') && !lower.includes('.ogg') && !lower.includes('.mp4') && !lower.includes('.webm') && !lower.includes('.pdf') && !lower.includes('.ppt')) {
+        if (lower.includes('.jpg') || lower.includes('.jpeg') || lower.includes('.png') || lower.includes('.webp') || lower.includes('.gif') || lower.includes('cloudinary') || lower.includes('image') || lower.includes('img') || lower.includes('r2.dev') || lower.startsWith('undefined/')) {
+          return obj;
+        }
+      }
+      return null;
+    }
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        const res = extractImage(item);
+        if (res) return res;
+      }
+      return null;
+    }
+    if (typeof obj === 'object') {
+      if (obj.imageUrl && typeof obj.imageUrl === 'string' && obj.imageUrl.trim() !== "") return obj.imageUrl;
+      if (obj.image_url && typeof obj.image_url === 'string' && obj.image_url.trim() !== "") return obj.image_url;
+      if (obj.media?.image_url && typeof obj.media.image_url === 'string' && obj.media.image_url.trim() !== "") return obj.media.image_url;
+      for (const [key, val] of Object.entries(obj)) {
+        if (key.toLowerCase().includes('video') || key.toLowerCase().includes('audio') || key.toLowerCase().includes('pdf') || key.toLowerCase().includes('ppt')) continue;
+        const res = extractImage(val);
+        if (res) return res;
+      }
+    }
+    return null;
+  };
+
+  const results: Partial<StudyMaterial>[] = [];
+  for (const item of data) {
+    let c: any = {};
+    if (typeof item.content === 'string') {
+      try { c = JSON.parse(item.content); } catch (e) {}
+    } else if (item.content) {
+      c = item.content;
+    }
+    const foundImage = (item.image_url && item.image_url.trim() !== "") ? item.image_url : extractImage(c);
+    if (foundImage && foundImage.trim() !== "") {
+      results.push({ ...item, image_url: foundImage });
+    }
+  }
+  return results;
 }
 
 export async function getBasicStudyMaterials(chapterId?: string): Promise<Partial<StudyMaterial>[]> {

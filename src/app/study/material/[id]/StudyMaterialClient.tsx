@@ -277,6 +277,8 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
     }
   };
 
+  const fixUrl = (url?: string | null): string | undefined => typeof url === 'string' ? url.replace(/^undefined\//, "https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev/") : undefined;
+
   // Render standalone quiz using our brand-new ModernQuizPlayer
   if (materialData.material_type === 'quiz') {
     const normalizedQuestions: NormalizedQuestion[] = content.is_section_test
@@ -287,17 +289,17 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
             options: ex.options || [],
             correct_option: ex.answer !== undefined ? ex.answer : -1,
             explanation: ex.explanation || "Tidak ada pembahasan.",
-            audio_url: ex.audio_url,
-            image_url: ex.image_url,
-            video_url: ex.video_url,
+            audio_url: fixUrl(ex.audio_url),
+            image_url: fixUrl(ex.image_url),
+            video_url: fixUrl(ex.video_url),
             question_type: ex.question_type || (ex.options && ex.options.length > 0 ? "multiple_choice" : "essay"),
             section_title: sec.title,
             section_instructions: sec.instructions,
-            section_audio_url: sec.media?.audio_url || sec.media?.audio,
-            section_image_url: sec.media?.image_url || sec.media?.image,
-            section_pdf_url: sec.media?.pdf_url || sec.media?.pdf,
-            section_ppt_url: sec.media?.ppt_url || sec.media?.ppt,
-            section_video_url: sec.media?.video_url || sec.media?.video,
+            section_audio_url: fixUrl(sec.media?.audio_url || sec.media?.audio),
+            section_image_url: fixUrl(sec.media?.image_url || sec.media?.image),
+            section_pdf_url: fixUrl(sec.media?.pdf_url || sec.media?.pdf),
+            section_ppt_url: fixUrl(sec.media?.ppt_url || sec.media?.ppt),
+            section_video_url: fixUrl(sec.media?.video_url || sec.media?.video),
           }))
         )
       : (content.exercises || []).map((ex: any, idx: number) => ({
@@ -306,9 +308,9 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
           options: ex.options || [],
           correct_option: ex.answer !== undefined ? ex.answer : -1,
           explanation: ex.explanation || "Tidak ada pembahasan.",
-          audio_url: ex.audio_url,
-          image_url: ex.image_url,
-          video_url: ex.video_url,
+          audio_url: fixUrl(ex.audio_url),
+          image_url: fixUrl(ex.image_url),
+          video_url: fixUrl(ex.video_url),
           question_type: ex.options && ex.options.length > 0 ? "multiple_choice" : "essay"
         }));
 
@@ -378,8 +380,11 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
             <p className="text-sm font-bold text-teal-600 bg-teal-50 px-3 py-1 rounded-full inline-block">{item.id}</p>
             {item.example && <p className="text-sm text-slate-500 mt-4 italic">"{item.example}"</p>}
           </div>
-          {item.audioUrl && (
-            <button className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-xl hover:bg-slate-200 active:scale-95 transition-all">
+          {(item.audioUrl || item.audio_url) && (
+            <button 
+              onClick={() => new Audio(fixUrl(item.audioUrl || item.audio_url)).play().catch(err => alert("Gagal memutar audio: " + err.message))}
+              className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-xl hover:bg-slate-200 active:scale-95 transition-all"
+            >
               🔊
             </button>
           )}
@@ -443,8 +448,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
         </div>
         <h3 className="text-lg font-black text-slate-800 mb-6 tracking-wide">Audio Listening</h3>
         {(content?.audioUrl || content?.audio_url || materialData?.audio_url) ? (
-          <audio controls className="w-full">
-            <source src={content?.audioUrl || content?.audio_url || materialData?.audio_url} type="audio/mpeg" />
+          <audio controls className="w-full" src={fixUrl(content?.audioUrl || content?.audio_url || materialData?.audio_url)}>
             Browser Anda tidak mendukung tag audio.
           </audio>
         ) : (

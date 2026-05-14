@@ -22,6 +22,8 @@ import AssessmentTemplateManager from "./components/AssessmentTemplateManager";
 import AllStudentsAssessment from "./components/AllStudentsAssessment";
 import MaterialRecap from "./components/MaterialRecap";
 import VideoManager from "./components/VideoManager";
+import AudioManager from "./components/AudioManager";
+import PhotoManager from "./components/PhotoManager";
 import QuizAccessManager from "../teacher/components/QuizAccessManager";
 import ExamAccessManager from "../teacher/components/ExamAccessManager";
 import TeacherMenuManager from "./components/TeacherMenuManager";
@@ -29,7 +31,7 @@ import { supabase } from "@/lib/supabase";
 import { getAdminMenuConfig, getProfiles, getStudyLevels } from "@/lib/db";
 import { Profile, StudyLevel } from "@/lib/types";
 
-type AdminTab = "dashboard" | "reports" | "weekly-reports" | "announcements" | "bulk-import" | "theme" | "banners" | "icons" | "materials" | "exams" | "settings" | "users" | "proposals" | "menu-manager" | "profile-config" | "batches" | "teachers" | "assessment-templates" | "all-students-assessment" | "material-recap" | "video-manager" | "quiz-access" | "exam-access" | "teacher-menu";
+type AdminTab = "dashboard" | "reports" | "weekly-reports" | "announcements" | "bulk-import" | "theme" | "banners" | "icons" | "materials" | "exams" | "settings" | "users" | "proposals" | "menu-manager" | "profile-config" | "batches" | "teachers" | "assessment-templates" | "all-students-assessment" | "material-recap" | "video-manager" | "audio-manager" | "photo-manager" | "quiz-access" | "exam-access" | "teacher-menu";
 
 export default function AdminClient() {
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
@@ -144,6 +146,9 @@ export default function AdminClient() {
     { id: "banners", label: "Banners", icon: "V", is_active: true },
     { id: "materials", label: "Materials", icon: "M", is_active: true },
     { id: "material-recap", label: "Rekapan Materi", icon: "📋", is_active: true },
+    { id: "video-manager", label: "Video Manager", icon: "🎞️", is_active: true },
+    { id: "audio-manager", label: "Audio Manager", icon: "🎧", is_active: true },
+    { id: "photo-manager", label: "Foto Manager", icon: "🖼️", is_active: true },
     { id: "exams", label: "Exams", icon: "E", is_active: true },
     { id: "users", label: "Users", icon: "U", is_active: true },
     { id: "quiz-access", label: "Akses Quiz", icon: "⚡", is_active: true },
@@ -222,6 +227,18 @@ export default function AdminClient() {
     uniqueTabs.splice(insertAt, 0, { id: "video-manager", label: "Video Manager", icon: "🎞️", is_active: true } as any);
   }
 
+  if (!uniqueTabs.some(t => t.id === "audio-manager") && !rawBaseTabs.some(t => t.id === "audio-manager")) {
+    const targetIdx = uniqueTabs.findIndex(t => t.id === "video-manager");
+    const insertAt = targetIdx !== -1 ? targetIdx + 1 : uniqueTabs.length;
+    uniqueTabs.splice(insertAt, 0, { id: "audio-manager", label: "Audio Manager", icon: "🎧", is_active: true } as any);
+  }
+
+  if (!uniqueTabs.some(t => t.id === "photo-manager") && !rawBaseTabs.some(t => t.id === "photo-manager")) {
+    const targetIdx = uniqueTabs.findIndex(t => t.id === "audio-manager");
+    const insertAt = targetIdx !== -1 ? targetIdx + 1 : uniqueTabs.length;
+    uniqueTabs.splice(insertAt, 0, { id: "photo-manager", label: "Foto Manager", icon: "🖼️", is_active: true } as any);
+  }
+
   // 'teacher-menu' — ensure it appears in the menu
   if (!uniqueTabs.some(t => t.id === "teacher-menu") && !rawBaseTabs.some(t => t.id === "teacher-menu")) {
     const targetIdx = uniqueTabs.findIndex(t => t.id === "batches");
@@ -265,7 +282,7 @@ export default function AdminClient() {
             {
               title: "Konten Belajar",
               icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M9 4.804A7.993 7.993 0 002.151 8c.196 1.132.545 2.222 1.036 3.235a1 1 0 01.196.505V15a1 1 0 001 1h2a1 1 0 001-1v-2.31c.214.073.435.132.661.176l.16.03a1 1 0 01.794.794l.03.16c.044.226.103.447.176.661H13v2.31a1 1 0 001 1h2a1 1 0 001-1v-3.26a1 1 0 01.196-.505A7.993 7.993 0 0017.849 8a7.993 7.993 0 00-6.849-3.196V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v.196z" /></svg>,
-              items: ["materials", "exams", "video-manager", "material-recap", "bulk-import"]
+              items: ["materials", "exams", "video-manager", "audio-manager", "photo-manager", "material-recap", "bulk-import"]
             },
             {
               title: "Manajemen User",
@@ -384,6 +401,8 @@ export default function AdminClient() {
                {activeTab === "all-students-assessment" && <AllStudentsAssessment students={students} levels={studyLevels} />}
                {activeTab === "material-recap" && <MaterialRecap />}
                {activeTab === "video-manager" && <VideoManager />}
+               {activeTab === "audio-manager" && <AudioManager />}
+               {activeTab === "photo-manager" && <PhotoManager />}
                {activeTab === "quiz-access" && <QuizAccessManager teacher={userProfile!} isSuperAdmin={true} />}
                {activeTab === "exam-access" && <ExamAccessManager teacher={userProfile!} isSuperAdmin={true} />}
                {activeTab === "teacher-menu" && <TeacherMenuManager onConfigChange={fetchMenuConfig} />}

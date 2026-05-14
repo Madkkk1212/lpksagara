@@ -45,6 +45,8 @@ export default function ModernQuizPlayer({
   onClose,
   onProgressUpdate,
 }: ModernQuizPlayerProps) {
+  const fixUrl = (url?: string | null) => typeof url === 'string' ? url.replace(/^undefined\//, "https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev/") : url;
+
   // Navigation & States
   const [currentIdx, setCurrentIdx] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Record<string, any>>({});
@@ -237,7 +239,9 @@ export default function ModernQuizPlayer({
       audioRef.current.playbackRate = playbackRate;
       audioRef.current.play().then(() => {
         setAudioPlaying(true);
-      }).catch(() => {});
+      }).catch((err) => {
+        alert("Gagal memutar audio: " + err.message);
+      });
     }
   };
 
@@ -533,14 +537,14 @@ export default function ModernQuizPlayer({
                   {q.section_audio_url && (
                     <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
                       <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-2">🔊 Audio Section (Global)</p>
-                      <audio controls className="w-full h-8" src={q.section_audio_url} />
+                      <audio controls className="w-full h-8" src={fixUrl(q.section_audio_url)} />
                     </div>
                   )}
 
                   {/* Section Video */}
                   {q.section_video_url && (
                     <div className="rounded-2xl overflow-hidden border border-slate-100 bg-black aspect-video max-h-56 shadow-sm">
-                      <video controls className="w-full h-full object-contain" src={q.section_video_url} />
+                      <video controls className="w-full h-full object-contain" src={fixUrl(q.section_video_url)} />
                     </div>
                   )}
 
@@ -550,7 +554,7 @@ export default function ModernQuizPlayer({
                       <div className="flex items-center justify-between px-4 py-3 bg-indigo-50 border border-indigo-100 rounded-xl shadow-sm">
                         <span className="text-[10px] font-black text-indigo-600 uppercase tracking-wider">📄 PDF Document</span>
                         <a 
-                          href={q.section_pdf_url} 
+                          href={fixUrl(q.section_pdf_url)} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="text-[9px] font-black uppercase bg-teal-400 text-slate-900 px-3 py-1 rounded-lg"
@@ -559,7 +563,7 @@ export default function ModernQuizPlayer({
                         </a>
                       </div>
                       <iframe 
-                        src={`https://docs.google.com/gview?url=${encodeURIComponent(q.section_pdf_url)}&embedded=true`} 
+                        src={`https://docs.google.com/gview?url=${encodeURIComponent(fixUrl(q.section_pdf_url)!)}&embedded=true`} 
                         className="w-full h-64 rounded-xl border border-slate-100 shadow-sm"
                       />
                     </div>
@@ -571,7 +575,7 @@ export default function ModernQuizPlayer({
                       <div className="flex items-center justify-between px-4 py-3 bg-rose-50 border border-rose-100 rounded-xl shadow-sm">
                         <span className="text-[10px] font-black text-rose-600 uppercase tracking-wider">📊 Slide Presentation</span>
                         <a 
-                          href={q.section_ppt_url} 
+                          href={fixUrl(q.section_ppt_url)} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="text-[9px] font-black uppercase bg-teal-400 text-slate-900 px-3 py-1 rounded-lg"
@@ -580,7 +584,7 @@ export default function ModernQuizPlayer({
                         </a>
                       </div>
                       <iframe 
-                        src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(q.section_ppt_url)}`} 
+                        src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fixUrl(q.section_ppt_url)!)}`} 
                         className="w-full h-64 rounded-xl border border-slate-100 shadow-sm"
                       />
                     </div>
@@ -588,8 +592,8 @@ export default function ModernQuizPlayer({
 
                   {/* Section Image */}
                   {q.section_image_url && (
-                    <div className="rounded-2xl overflow-hidden border border-slate-100 max-h-52 bg-white flex items-center justify-center cursor-pointer shadow-sm" onClick={() => setZoomImage(q.section_image_url || null)}>
-                      <img src={q.section_image_url} alt="Global Section" className="object-contain max-h-52 w-full" />
+                    <div className="rounded-2xl overflow-hidden border border-slate-100 max-h-52 bg-white flex items-center justify-center cursor-pointer shadow-sm" onClick={() => setZoomImage(fixUrl(q.section_image_url) || null)}>
+                      <img src={fixUrl(q.section_image_url)} alt="Global Section" className="object-contain max-h-52 w-full" />
                     </div>
                   )}
 
@@ -616,12 +620,12 @@ export default function ModernQuizPlayer({
               {/* IMAGE ASSET WITH ZOOMABLE OVERLAY */}
               {q.image_url && (
                 <div 
-                  onClick={() => setZoomImage(q.image_url || null)}
+                  onClick={() => setZoomImage(fixUrl(q.image_url) || null)}
                   className="rounded-2xl overflow-hidden border border-slate-100 shadow-inner bg-slate-50 max-h-64 flex items-center justify-center cursor-pointer group relative overflow-hidden"
                   title="Klik untuk memperbesar"
                 >
                   <img 
-                    src={q.image_url} 
+                    src={fixUrl(q.image_url)} 
                     alt="Soal" 
                     className="object-contain max-h-64 w-full transition-transform duration-500 group-hover:scale-105" 
                   />
@@ -653,7 +657,7 @@ export default function ModernQuizPlayer({
 
                   <audio 
                     ref={audioRef} 
-                    src={q.audio_url}
+                    src={fixUrl(q.audio_url)}
                     onTimeUpdate={handleAudioTimeUpdate}
                     onEnded={() => setAudioPlaying(false)}
                   />
@@ -701,7 +705,7 @@ export default function ModernQuizPlayer({
               {/* VIDEO PLAYER ASSET */}
               {q.video_url && (
                 <div className="rounded-2xl overflow-hidden bg-black max-h-64 relative border border-slate-100 shadow-lg">
-                  <video controls className="w-full max-h-64" src={q.video_url} />
+                  <video controls className="w-full max-h-64" src={fixUrl(q.video_url)} />
                 </div>
               )}
             </div>

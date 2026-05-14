@@ -315,23 +315,26 @@ export default function MediaUploader({ label, mediaType, value, onChange, accep
       )}
 
       {/* Preview */}
-      {value && (
-        <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 animate-in fade-in zoom-in duration-300">
-          <div className="h-12 w-12 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-xl overflow-hidden shadow-sm shrink-0">
-            {mediaType === "image" ? (
-              <img src={value} className="h-full w-full object-cover" alt="preview" />
-            ) : mediaType === "video" ? "🎬" : mediaType === "document" ? "📄" : "🔊"}
+      {value && (() => {
+        const fixedValue = value.replace(/^undefined\//, "https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev/");
+        return (
+          <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 animate-in fade-in zoom-in duration-300">
+            <div className="h-12 w-12 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-xl overflow-hidden shadow-sm shrink-0">
+              {mediaType === "image" ? (
+                <img src={fixedValue} className="h-full w-full object-cover" alt="preview" />
+              ) : mediaType === "video" ? "🎬" : mediaType === "document" ? "📄" : "🔊"}
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5">✓ Uploaded</p>
+              <p className="text-[10px] font-bold text-slate-500 truncate">{fixedValue}</p>
+            </div>
+            <button
+              onClick={() => onChange(null as any)}
+              className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all shrink-0"
+            >✕</button>
           </div>
-          <div className="flex-1 overflow-hidden">
-            <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5">✓ Uploaded</p>
-            <p className="text-[10px] font-bold text-slate-500 truncate">{value}</p>
-          </div>
-          <button
-            onClick={() => onChange(null as any)}
-            className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all shrink-0"
-          >✕</button>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

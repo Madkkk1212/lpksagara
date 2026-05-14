@@ -70,8 +70,27 @@ export default function QuizCreatorDashboard({
 
   // Parse initial data into Section format with backward compatibility
   useEffect(() => {
+    const fixUrl = (url?: string | null) => typeof url === 'string' ? url.replace(/^undefined\//, "https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev/") : url;
+
     if (initialData?.is_section_test && Array.isArray(initialData.sections)) {
-      setSections(initialData.sections);
+      const sanitizedSections = initialData.sections.map((sec: any) => ({
+        ...sec,
+        media: sec.media ? {
+          ...sec.media,
+          audio_url: fixUrl(sec.media.audio_url),
+          image_url: fixUrl(sec.media.image_url),
+          pdf_url: fixUrl(sec.media.pdf_url),
+          ppt_url: fixUrl(sec.media.ppt_url),
+          video_url: fixUrl(sec.media.video_url),
+        } : {},
+        questions: (sec.questions || []).map((q: any) => ({
+          ...q,
+          audio_url: fixUrl(q.audio_url),
+          image_url: fixUrl(q.image_url),
+          video_url: fixUrl(q.video_url),
+        })),
+      }));
+      setSections(sanitizedSections);
     } else {
       // Backward compatibility wrap
       const flatExercises = initialData?.exercises || initialData?.questions || [];
@@ -82,9 +101,9 @@ export default function QuizCreatorDashboard({
         options: ex.options || (ex.option_a ? [ex.option_a, ex.option_b, ex.option_c, ex.option_d].filter(Boolean) : ["Opsi A", "Opsi B"]),
         answer: ex.answer !== undefined ? ex.answer : (ex.correct_option !== undefined ? ex.correct_option : 0),
         explanation: ex.explanation || "",
-        audio_url: ex.audio_url || null,
-        image_url: ex.image_url || null,
-        video_url: ex.video_url || null,
+        audio_url: fixUrl(ex.audio_url || null) as any,
+        image_url: fixUrl(ex.image_url || null) as any,
+        video_url: fixUrl(ex.video_url || null) as any,
       }));
 
       setSections([
@@ -93,8 +112,8 @@ export default function QuizCreatorDashboard({
           title: "Section Utama",
           instructions: "Silakan jawab pertanyaan-pertanyaan berikut.",
           media: {
-            audio_url: initialData?.audioUrl || initialData?.audio_url || "",
-            image_url: initialData?.image_url || "",
+            audio_url: fixUrl(initialData?.audioUrl || initialData?.audio_url || "") as any,
+            image_url: fixUrl(initialData?.image_url || "") as any,
           },
           questions: legacyQuestions,
         },

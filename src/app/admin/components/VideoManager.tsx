@@ -82,15 +82,18 @@ export default function VideoManager() {
       {/* Video Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {filteredVideos.map(video => {
-          const isCloudinary = video.video_url?.includes("cloudinary.com");
-          const isR2 = video.video_url?.includes("r2.dev") || video.video_url?.includes("r2.cloudflarestorage.com");
+          const fixUrl = (url?: string | null) => typeof url === 'string' ? url.replace(/^undefined\//, "https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev/") : url;
+          const fixedVideoUrl = fixUrl(video.video_url);
+          const fixedImageUrl = fixUrl(video.image_url);
+          const isCloudinary = fixedVideoUrl?.includes("cloudinary.com");
+          const isR2 = fixedVideoUrl?.includes("r2.dev") || fixedVideoUrl?.includes("r2.cloudflarestorage.com");
           
           return (
             <div key={video.id} className="bg-white border border-slate-200 rounded-[2rem] overflow-hidden shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 group">
               {/* Video Preview / Placeholder */}
               <div className="aspect-video bg-slate-900 relative flex items-center justify-center overflow-hidden">
-                {video.image_url ? (
-                  <img src={video.image_url} alt={video.title} className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity" />
+                {fixedImageUrl ? (
+                  <img src={fixedImageUrl} alt={video.title} className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity" />
                 ) : (
                   <div className="text-4xl opacity-20">🎬</div>
                 )}
@@ -121,7 +124,7 @@ export default function VideoManager() {
                       <p className="text-xs font-bold text-slate-700 italic">{formatMB(video.file_size)}</p>
                    </div>
                    <button 
-                     onClick={() => window.open(video.video_url!, '_blank')}
+                     onClick={() => window.open(fixedVideoUrl!, '_blank')}
                      className="px-4 py-2 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-600 transition-all shadow-lg shadow-slate-200"
                    >
                      Preview →
