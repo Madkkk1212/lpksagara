@@ -45,7 +45,7 @@ export default function ModernQuizPlayer({
   onClose,
   onProgressUpdate,
 }: ModernQuizPlayerProps) {
-  const fixUrl = (url?: string | null) => typeof url === 'string' ? url.replace(/^undefined\//, "https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev/") : url;
+  const fixUrl = (url?: string | null): string | undefined => typeof url === 'string' ? url.replace(/^undefined\//, "https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev/") : undefined;
 
   // Navigation & States
   const [currentIdx, setCurrentIdx] = useState(0);

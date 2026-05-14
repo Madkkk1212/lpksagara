@@ -77,7 +77,7 @@ export default function AudioManager() {
       {/* Audio Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {filteredAudios.map(audio => {
-          const fixUrl = (url?: string | null) => typeof url === 'string' ? url.replace(/^undefined\//, "https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev/") : url;
+          const fixUrl = (url?: string | null): string | undefined => typeof url === 'string' ? url.replace(/^undefined\//, "https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev/") : undefined;
           const fixedAudioUrl = fixUrl(audio.audio_url);
           const isCloudinary = fixedAudioUrl?.includes("cloudinary.com");
           const isR2 = fixedAudioUrl?.includes("r2.dev") || fixedAudioUrl?.includes("r2.cloudflarestorage.com");
