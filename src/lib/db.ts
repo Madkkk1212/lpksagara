@@ -228,10 +228,32 @@ export async function getStudyLevels(): Promise<StudyLevel[]> {
 }
 
 export async function getStudyLevelByCode(levelCode: string): Promise<StudyLevel | null> {
-  const { data, error } = await supabase.from('study_levels').select('*').eq('level_code', levelCode).single()
-  if (error) return null
-  return data
+  // Ensure the code is decoded from the URL
+  const decodedCode = decodeURIComponent(levelCode);
+  
+  // Try case-insensitive exact match with decoded code
+  const { data, error } = await supabase
+    .from('study_levels')
+    .select('*')
+    .ilike('level_code', decodedCode)
+    .maybeSingle();
+    
+  if (data) return data;
+
+  // Fallback: If no match, try the original raw levelCode
+  if (decodedCode !== levelCode) {
+    const { data: rawData } = await supabase
+      .from('study_levels')
+      .select('*')
+      .ilike('level_code', levelCode)
+      .maybeSingle();
+    return rawData;
+  }
+
+  return null;
 }
+
+
 
 export async function upsertStudyLevel(level: Partial<StudyLevel>) {
   const { data, error } = await supabase.from('study_levels').upsert(level).select()

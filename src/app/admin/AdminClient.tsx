@@ -27,11 +27,12 @@ import PhotoManager from "./components/PhotoManager";
 import QuizAccessManager from "../teacher/components/QuizAccessManager";
 import ExamAccessManager from "../teacher/components/ExamAccessManager";
 import TeacherMenuManager from "./components/TeacherMenuManager";
+import GitUpdateManager from "./components/GitUpdateManager";
 import { supabase } from "@/lib/supabase";
 import { getAdminMenuConfig, getProfiles, getStudyLevels } from "@/lib/db";
 import { Profile, StudyLevel } from "@/lib/types";
 
-type AdminTab = "dashboard" | "reports" | "weekly-reports" | "announcements" | "bulk-import" | "theme" | "banners" | "icons" | "materials" | "exams" | "settings" | "users" | "proposals" | "menu-manager" | "profile-config" | "batches" | "teachers" | "assessment-templates" | "all-students-assessment" | "material-recap" | "video-manager" | "audio-manager" | "photo-manager" | "quiz-access" | "exam-access" | "teacher-menu";
+type AdminTab = "dashboard" | "reports" | "weekly-reports" | "announcements" | "git-update" | "bulk-import" | "theme" | "banners" | "icons" | "materials" | "exams" | "settings" | "users" | "proposals" | "menu-manager" | "profile-config" | "batches" | "teachers" | "assessment-templates" | "all-students-assessment" | "material-recap" | "video-manager" | "audio-manager" | "photo-manager" | "quiz-access" | "exam-access" | "teacher-menu";
 
 export default function AdminClient() {
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
@@ -140,6 +141,7 @@ export default function AdminClient() {
     { id: "reports", label: "Statistik & Analisa", icon: "📊", is_active: true },
     { id: "weekly-reports", label: "Laporan Mingguan", icon: "📋", is_active: true },
     { id: "announcements", label: "Pengumuman", icon: "A", is_active: true },
+    { id: "git-update", label: "Git Update", icon: "🚀", is_active: true },
     { id: "bulk-import", label: "Bulk Import", icon: "I", is_active: true },
     { id: "icons", label: "Icons Gallery", icon: "S", is_active: true },
     { id: "theme", label: "Theme", icon: "T", is_active: true },
@@ -174,6 +176,23 @@ export default function AdminClient() {
 
   // Final safety check: ensure all tab IDs are unique to prevent React key errors
   const uniqueTabs = Array.from(new Map([...baseTabs].map(t => [t.id, t])).values());
+
+  // 'announcements' — ensure it appears in the menu
+  if (!uniqueTabs.some(t => t.id === "announcements")) {
+    const dashboardIdx = uniqueTabs.findIndex(t => t.id === "dashboard");
+    const insertAt = dashboardIdx !== -1 ? dashboardIdx + 1 : 0;
+    uniqueTabs.splice(insertAt, 0, { id: "announcements", label: "Pengumuman", icon: "📢", is_active: true } as any);
+  }
+
+  // 'git-update' — ensure it appears in the menu
+  if (!uniqueTabs.some(t => t.id === "git-update")) {
+    const annIdx = uniqueTabs.findIndex(t => t.id === "announcements");
+    const insertAt = annIdx !== -1 ? annIdx + 1 : 0;
+    uniqueTabs.splice(insertAt, 0, { id: "git-update", label: "Git Update", icon: "🚀", is_active: true } as any);
+  } else {
+    const gu = uniqueTabs.find(t => t.id === "git-update");
+    if (gu) gu.label = "Git Update";
+  }
 
   // Add Menu Manager if Super Admin and not already present
   if (userProfile?.is_super_admin && !uniqueTabs.some(t => t.id === "menu-manager")) {
@@ -277,7 +296,7 @@ export default function AdminClient() {
             {
               title: "Utama",
               icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" /></svg>,
-              items: ["dashboard", "reports", "weekly-reports", "announcements"]
+              items: ["dashboard", "reports", "weekly-reports", "announcements", "git-update"]
             },
             {
               title: "Konten Belajar",
@@ -384,6 +403,7 @@ export default function AdminClient() {
                { activeTab === "reports" && <ReportManager /> }
                { activeTab === "weekly-reports" && <WeeklyReportAdmin /> }
                { activeTab === "announcements" && <AnnouncementManager /> }
+               { activeTab === "git-update" && <GitUpdateManager /> }
                { activeTab === "bulk-import" && <BulkImporter /> }
                { activeTab === "icons" && <IconManager /> }
                { activeTab === "theme" && <ThemeManager /> }
