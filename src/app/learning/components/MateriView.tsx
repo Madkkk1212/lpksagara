@@ -221,6 +221,8 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
     </div>
   );
 
+  const fixUrl = (url?: string | null): string | undefined => typeof url === 'string' ? url.replace(/^undefined\//, "https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev/") : undefined;
+
   return (
     <div className="space-y-10">
       {/* Breadcrumbs / Back Navigation */}
@@ -292,14 +294,14 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                   {/* Media Banners */}
                   {selectedMaterial.video_url && (
                     <div className="mb-8 rounded-[2rem] overflow-hidden bg-black shadow-xl ring-1 ring-black/10 relative z-10">
-                      <video controls className="w-full max-h-80" src={selectedMaterial.video_url} poster={selectedMaterial.image_url || undefined}>
+                      <video controls className="w-full max-h-80" src={fixUrl(selectedMaterial.video_url)} poster={fixUrl(selectedMaterial.image_url) || undefined}>
                         Browser tidak mendukung video.
                       </video>
                     </div>
                   )}
                   {selectedMaterial.image_url && (
                     <div className="mb-8 rounded-[2rem] overflow-hidden shadow-md ring-1 ring-black/5 relative z-10">
-                      <img src={selectedMaterial.image_url} alt={selectedMaterial.title} className="w-full max-h-64 object-cover" />
+                      <img src={fixUrl(selectedMaterial.image_url)} alt={selectedMaterial.title} className="w-full max-h-64 object-cover" />
                     </div>
                   )}
 
@@ -321,7 +323,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                                 controls 
                                 controlsList="nodownload"
                                 className="w-full md:min-w-[300px] md:w-auto shrink-0 outline-none rounded-full" 
-                                src={content?.audioUrl || content?.audio_url || selectedMaterial?.audio_url}
+                                src={fixUrl(content?.audioUrl || content?.audio_url || selectedMaterial?.audio_url)}
                               >
                                 Browser Anda tidak mendukung elemen audio.
                               </audio>
@@ -340,7 +342,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                                   </div>
                                 </div>
                                 <a 
-                                  href={content.pdf_url || content.document_url} 
+                                  href={fixUrl(content.pdf_url || content.document_url)} 
                                   target="_blank" 
                                   rel="noreferrer"
                                   className="px-4 py-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 rounded-xl text-xs font-black transition-all"
@@ -349,7 +351,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                                 </a>
                               </div>
                               <iframe 
-                                src={`${content.pdf_url || content.document_url}#toolbar=0`} 
+                                src={`${fixUrl(content.pdf_url || content.document_url)}#toolbar=0`} 
                                 className="w-full h-[500px] rounded-2xl border border-slate-100 shadow-inner"
                                 title="PDF Viewer"
                               />
@@ -368,7 +370,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                                   </div>
                                 </div>
                                 <a 
-                                  href={content.ppt_url} 
+                                  href={fixUrl(content.ppt_url)} 
                                   target="_blank" 
                                   rel="noreferrer"
                                   className="px-4 py-2 bg-slate-100 hover:bg-amber-50 hover:text-amber-600 text-slate-600 rounded-xl text-xs font-black transition-all"
@@ -377,7 +379,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                                 </a>
                               </div>
                               <iframe 
-                                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(content.ppt_url)}`} 
+                                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fixUrl(content.ppt_url)!)}`} 
                                 className="w-full h-[500px] rounded-2xl border border-slate-100 shadow-inner"
                                 title="PPT Viewer"
                               />
@@ -461,7 +463,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                                    <div className="h-24 w-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-5xl mx-auto mb-8 shadow-inner ring-4 ring-white/10">🎧</div>
                                    <h3 className="text-white font-black text-3xl italic tracking-tight mb-8">Dengarkan Audio Berikut</h3>
                                    {(content?.audioUrl || content?.audio_url || selectedMaterial?.audio_url) ? (
-                                      <audio controls className="w-full" src={content?.audioUrl || content?.audio_url || selectedMaterial?.audio_url}></audio>
+                                      <audio controls className="w-full" src={fixUrl(content?.audioUrl || content?.audio_url || selectedMaterial?.audio_url)}></audio>
                                    ) : (
                                       <div className="bg-black/20 text-white rounded-2xl px-6 py-3 inline-block font-bold text-sm tracking-widest uppercase">Audio tidak tersedia</div>
                                    )}

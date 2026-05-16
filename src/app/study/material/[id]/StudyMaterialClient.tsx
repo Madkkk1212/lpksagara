@@ -486,8 +486,8 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                 <video
                   controls
                   className="w-full max-h-80"
-                  src={materialData.video_url}
-                  poster={materialData.image_url || undefined}
+                  src={fixUrl(materialData.video_url)}
+                  poster={fixUrl(materialData.image_url) || undefined}
                 >
                   Browser tidak mendukung video.
                 </video>
@@ -497,7 +497,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
             {materialData.image_url && (
               <div className="mb-8 rounded-[2rem] overflow-hidden shadow-md ring-1 ring-black/5">
                 <img
-                  src={materialData.image_url}
+                  src={fixUrl(materialData.image_url)}
                   alt={materialData.title}
                   className="w-full max-h-64 object-cover"
                 />
@@ -516,7 +516,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                   controls 
                   controlsList="nodownload"
                   className="w-full md:min-w-[300px] md:w-auto shrink-0 outline-none rounded-full" 
-                  src={content?.audioUrl || content?.audio_url || materialData?.audio_url}
+                  src={fixUrl(content?.audioUrl || content?.audio_url || materialData?.audio_url)}
                 >
                   Browser Anda tidak mendukung elemen audio.
                 </audio>
@@ -535,7 +535,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                     </div>
                   </div>
                   <a 
-                    href={content.pdf_url || content.document_url} 
+                    href={fixUrl(content.pdf_url || content.document_url)} 
                     target="_blank" 
                     rel="noreferrer"
                     className="px-4 py-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 rounded-xl text-xs font-black transition-all"
@@ -544,7 +544,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                   </a>
                 </div>
                 <iframe 
-                  src={`${content.pdf_url || content.document_url}#toolbar=0`} 
+                  src={`${fixUrl(content.pdf_url || content.document_url)}#toolbar=0`} 
                   className="w-full h-[600px] rounded-2xl border border-slate-100 shadow-inner"
                   title="PDF Viewer"
                 />
@@ -563,7 +563,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                     </div>
                   </div>
                   <a 
-                    href={content.ppt_url} 
+                    href={fixUrl(content.ppt_url)} 
                     target="_blank" 
                     rel="noreferrer"
                     className="px-4 py-2 bg-slate-100 hover:bg-amber-50 hover:text-amber-600 text-slate-600 rounded-xl text-xs font-black transition-all"
@@ -572,7 +572,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                   </a>
                 </div>
                 <iframe 
-                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(content.ppt_url)}`} 
+                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fixUrl(content.ppt_url)!)}`} 
                   className="w-full h-[600px] rounded-2xl border border-slate-100 shadow-inner"
                   title="PPT Viewer"
                 />
