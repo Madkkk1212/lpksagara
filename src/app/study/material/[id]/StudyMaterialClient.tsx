@@ -16,6 +16,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
   const [isFinishing, setIsFinishing] = useState(false);
   
   const [userEmail, setUserEmail] = useState("");
+  const [userName, setUserName] = useState("");
   const [isAlreadyCompleted, setIsAlreadyCompleted] = useState(false);
   const [alertData, setAlertData] = useState<{ title: string; message: string; type?: 'warning' | 'error' | 'success' } | null>(null);
   const [isAccessActive, setIsAccessActive] = useState(false);
@@ -31,6 +32,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
       try {
         const u = JSON.parse(sessionStr);
         if (u.email) setUserEmail(u.email);
+        if (u.full_name) setUserName(u.full_name);
         // Check if this material was already completed
         const unlocked: string[] = u.unlocked_materials || [];
         setIsAlreadyCompleted(unlocked.includes(materialData.id));
@@ -151,7 +153,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
             if (materialData.material_type === "quiz") {
               const { data: accessData } = await supabase
                 .from("quiz_access_controls")
-                .select("is_active, updated_at, created_at, is_remedial")
+                .select("is_active, updated_at, created_at, is_remedial, batch")
                 .eq("material_id", materialData.id)
                 .eq("student_id", profile.id)
                 .eq("is_active", true);
@@ -159,6 +161,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
               if (accessData && accessData.length > 0) {
                 const duration = (materialData.content as any)?.duration_minutes || 60;
                 const activeControl = accessData.find(control => {
+                  if (control.batch === 'PROGRESS:SELESAI') return false;
                   const openedTime = new Date(control.updated_at || control.created_at).getTime();
                   const expirationTime = openedTime + (duration * 60 * 1000);
                   return Date.now() <= expirationTime;
@@ -471,7 +474,13 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
     }
 
     return (
-      <KioskBarrier title={`Kuis Evaluasi Bab: ${materialData.title}`}>
+      <KioskBarrier 
+        title={`Kuis Evaluasi Bab: ${materialData.title}`}
+        userName={userName}
+        userEmail={userEmail}
+        testId={materialData.id}
+        testTitle={materialData.title}
+      >
         <ModernQuizPlayer
           title={materialData.title}
           questions={normalizedQuestions}

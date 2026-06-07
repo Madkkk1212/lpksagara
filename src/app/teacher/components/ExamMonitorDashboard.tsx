@@ -58,19 +58,8 @@ export default function ExamMonitorDashboard({ teacherEmail }: { teacherEmail: s
     bgMusic.volume = 0.3;
     audioRef.current = bgMusic;
 
-    // Play on first user interaction if not auto-started
-    const playMusic = async () => {
-      try {
-        if (musicEnabled) {
-          await bgMusic.play();
-        }
-      } catch (err) {
-        // Autoplay blocked by browser - will play on first interaction
-        console.log("Autoplay blocked, waiting for interaction");
-      }
-    };
-
-    playMusic();
+    // We do NOT autoplay music on mount anymore.
+    // It will only play when there's an active violation (newAlert).
 
     return () => {
       bgMusic.pause();
@@ -78,15 +67,16 @@ export default function ExamMonitorDashboard({ teacherEmail }: { teacherEmail: s
     };
   }, []);
 
-  // Toggle music
+  // Toggle music based on new violations
   useEffect(() => {
     if (!audioRef.current) return;
-    if (musicEnabled) {
+    if (musicEnabled && newAlert) {
+      audioRef.current.currentTime = 0; // Restart from beginning
       audioRef.current.play().catch(() => {});
     } else {
       audioRef.current.pause();
     }
-  }, [musicEnabled]);
+  }, [musicEnabled, newAlert]);
 
   // Load initial violations
   const loadViolations = useCallback(async () => {
@@ -155,7 +145,7 @@ export default function ExamMonitorDashboard({ teacherEmail }: { teacherEmail: s
             // Trigger alert
             setNewAlert(true);
             if (newAlertTimeoutRef.current) clearTimeout(newAlertTimeoutRef.current);
-            newAlertTimeoutRef.current = setTimeout(() => setNewAlert(false), 4000);
+            newAlertTimeoutRef.current = setTimeout(() => setNewAlert(false), 8000);
 
             // Mark student as alerted (red flash)
             setStudentStatuses((prev) => {

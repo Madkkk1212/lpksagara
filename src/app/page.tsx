@@ -118,8 +118,16 @@ export default function Home() {
   const retryFetchCategories = async () => {
     try {
       const { getMaterialCategories } = await import('@/lib/db');
-      const c = await getMaterialCategories();
-      setCategories((c || []).filter((cat: any) => cat.is_active !== false));
+      let retries = 5;
+      while (retries > 0) {
+        const c = await getMaterialCategories();
+        if (c && c.length > 0) {
+          setCategories(c.filter((cat: any) => cat.is_active !== false));
+          return;
+        }
+        retries--;
+        await new Promise(res => setTimeout(res, 1500));
+      }
     } catch (err) {
       console.error("Failed to retry fetch categories", err);
     }
