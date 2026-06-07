@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 export default function GitUpdateManager() {
-  const [version] = useState("v2.1.0 - Paling Baru");
+  const [version] = useState("v2.1.1 - Paling Baru");
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -25,8 +25,82 @@ export default function GitUpdateManager() {
         </div>
       </div>
 
-      {/* ── LATEST RELEASE: v2.1.0 ── */}
+      {/* ── LATEST RELEASE: v2.1.1 ── */}
       <div className="bg-white rounded-3xl p-8 border-2 border-indigo-100 shadow-xl shadow-indigo-50/50 space-y-6">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-2xl shadow-inner">
+              ⚡
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-slate-800">v2.1.1 — CBT Monitoring Sync & Anti-Screenshot Blur</h3>
+              <p className="text-xs font-bold text-slate-400">Dipublikasikan pada: 7 Juni 2026</p>
+            </div>
+          </div>
+          <span className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-black border border-indigo-100">
+            Latest 🔥
+          </span>
+        </div>
+
+        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
+          <div className="p-5 bg-indigo-50 rounded-2xl border border-indigo-100 space-y-2">
+            <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider text-indigo-600">📌 Ringkasan Pembaruan:</h4>
+            <p className="text-slate-700">
+              Sinkronisasi realtime data monitoring ujian antara siswa dan guru, penambahan efek sensor blur & fade-out layar instan saat screenshot/kehilangan fokus, pembersihan otomatis siswa keluar, serta perbaikan RLS database untuk akses masuk data anonim.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
+              <span className="text-emerald-500 text-lg shrink-0">✅</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Registrasi Sesi Siswa Otomatis</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Siswa kini otomatis terdaftar di layar pantau guru dengan status "Aman" (0 pelanggaran) sesaat setelah menekan tombol mulai kuis/ujian.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
+              <span className="text-emerald-500 text-lg shrink-0">✅</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Efek Sensor Blur & Fade Layar Instan</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Ketika tombol screenshot (Win+Shift+S / Mac shortcuts) ditekan atau browser blur, seluruh layar ujian langsung kabur (60px) & transparan (opacity 0.01) dalam milidetik sehingga tangkapan layar menjadi kosong/tidak terbaca.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
+              <span className="text-emerald-500 text-lg shrink-0">✅</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Auto-Cleanup Siswa Keluar</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Siswa yang menyelesaikan kuis atau menutup tab browser akan otomatis dihapus dari daftar monitoring aktif guru secara realtime.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
+              <span className="text-emerald-500 text-lg shrink-0">✅</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Perbaikan RLS & Database Constraints</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Memperbaiki database constraint RLS untuk akses masuk data anonim dan memetakan student_id dengan benar agar data sinkron tanpa error 23502.</p>
+              </div>
+            </div>
+
+          </div>
+
+          {/* SQL Migrations callout */}
+          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100 flex items-start gap-3">
+            <span className="text-amber-500 text-lg shrink-0">⚠️</span>
+            <div>
+              <p className="font-black text-xs text-amber-800 mb-1">Wajib Dijalankan di Supabase SQL Editor:</p>
+              <ul className="text-[11px] text-amber-700 space-y-1 list-disc ml-4">
+                <li><code className="bg-amber-100 px-1 rounded font-mono">051_fix_exam_violations_rls.sql</code> — Memperbaiki hak akses publik anonim & null constraint student_id.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── PREVIOUS RELEASE: v2.1.0 ── */}
+      <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-xl shadow-slate-100/50 space-y-6">
         <div className="flex items-center justify-between border-b border-slate-100 pb-6">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-2xl shadow-inner">
@@ -37,8 +111,8 @@ export default function GitUpdateManager() {
               <p className="text-xs font-bold text-slate-400">Dipublikasikan pada: 7 Juni 2026</p>
             </div>
           </div>
-          <span className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-black border border-indigo-100">
-            Latest 🔥
+          <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-black border border-emerald-100">
+            Stable Release
           </span>
         </div>
 

@@ -20,6 +20,7 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", u
   const [violationCount, setViolationCount] = useState(0);
   const [violationCooldown, setViolationCooldown] = useState(0);
   const [screenshotWarning, setScreenshotWarning] = useState(false);
+  const [isScreenHidden, setIsScreenHidden] = useState(false);
   const isLockedRef = useRef(false);
   const cooldownRef = useRef<NodeJS.Timeout | null>(null);
   const screenshotRef = useRef<NodeJS.Timeout | null>(null);
@@ -152,19 +153,36 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", u
 
     // ─── TAB / APP SWITCHING ──────────────────────────────────────
     const handleVisibilityChange = () => {
-      if (document.hidden) triggerViolation("tab_switch");
+      if (document.hidden) {
+        setIsScreenHidden(true);
+        triggerViolation("tab_switch");
+      }
     };
-    const handleBlur = () => triggerViolation("blur");
-    const handlePageHide = () => triggerViolation("page_hide");
+    const handleBlur = () => {
+      setIsScreenHidden(true);
+      triggerViolation("blur");
+    };
+    const handlePageHide = () => {
+      setIsScreenHidden(true);
+      triggerViolation("page_hide");
+    };
 
     // ─── SCREENSHOT DETECTION (best effort) ──────────────────────
-    // Detects PrintScreen key
+    // Detects PrintScreen key & OS Screenshot hotkeys
     const handleKeyDown = (e: KeyboardEvent) => {
       const key = e.key?.toLowerCase();
 
-      // Block PrintScreen
-      if (e.key === "PrintScreen" || key === "printscreen") {
+      // Block PrintScreen & OS Screenshot Combos
+      const isScreenshotCombo = 
+        e.key === "PrintScreen" || 
+        key === "printscreen" ||
+        (e.metaKey && e.shiftKey && key === "s") || // Win + Shift + S
+        (e.metaKey && e.shiftKey && (key === "3" || key === "4" || key === "5")); // Mac Cmd + Shift + 3/4/5
+
+      if (isScreenshotCombo) {
         e.preventDefault();
+        e.stopPropagation();
+        setIsScreenHidden(true);
         triggerScreenshotWarning();
         return;
       }
@@ -261,6 +279,7 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", u
   const dismissViolation = () => {
     if (violationCooldown > 0) return;
     setViolation(false);
+    setIsScreenHidden(false);
     // Re-request fullscreen after violation
     try {
       const el = document.documentElement;
@@ -345,7 +364,10 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", u
         }
       `}</style>
 
-      <div className="kiosk-active h-screen w-screen overflow-hidden bg-slate-50 flex flex-col relative">
+      <div 
+        className="kiosk-active h-screen w-screen overflow-hidden bg-slate-50 flex flex-col relative transition-all duration-75"
+        style={isScreenHidden ? { filter: 'blur(60px)', opacity: 0.01, transform: 'scale(0.95)' } : undefined}
+      >
         {children}
 
         {/* Watermark overlay - traced if screenshot is taken */}
