@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { getProfiles, getTeacherStudents, getStudyLevels, getCompletedMaterialsWithDetails, getAdminMenuConfig } from "@/lib/db";
-import { Profile, StudyLevel } from "@/lib/types";
+import { getProfiles, getTeacherStudents, getStudyLevels, getCompletedMaterialsWithDetails, getAdminMenuConfig, getMaterialCategories } from "@/lib/db";
+import { Profile, StudyLevel, MaterialCategory } from "@/lib/types";
 
 type TeacherTab = 'students' | 'targets' | 'grading' | 'reports' | 'profile' | string;
 
@@ -11,7 +11,8 @@ import WeeklyReportManager from "./components/WeeklyReportManager";
 import AssessmentManager from "./components/AssessmentManager";
 import QuizAccessManager from "./components/QuizAccessManager";
 import ExamAccessManager from "./components/ExamAccessManager";
-import { User, LogOut, LayoutDashboard, Target, FileText, ClipboardCheck, MessageSquarePlus, Zap, ChevronRight, CheckCircle2, Trophy } from "lucide-react";
+import ExamMonitorDashboard from "./components/ExamMonitorDashboard";
+import { User, LogOut, LayoutDashboard, Target, FileText, ClipboardCheck, MessageSquarePlus, Zap, ChevronRight, CheckCircle2, Trophy, Monitor } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 
@@ -31,6 +32,7 @@ export default function TeacherClient() {
   const [loadingProgress, setLoadingProgress] = useState(false);
   const [assignedStudentIds, setAssignedStudentIds] = useState<string[]>([]);
   const [totalMaterialsCount, setTotalMaterialsCount] = useState<number>(0);
+  const [categories, setCategories] = useState<MaterialCategory[]>([]);
 
   // Proposals
   const [proposals, setProposals] = useState<any[]>([]);
@@ -108,8 +110,8 @@ export default function TeacherClient() {
         const { data: missingData } = await sb
           .from('study_materials')
           .select(`
-            id, title, material_type, chapter_id,
-            study_chapters(id, title, study_levels(id, title, level_code))
+            id, title, material_type, chapter_id, content,
+            study_chapters(id, title, study_levels(id, title, level_code, category_id))
           `)
           .in('id', missingIds);
 
@@ -137,11 +139,12 @@ export default function TeacherClient() {
     setLoading(true);
     try {
       const { getTotalStudyMaterialsCount } = await import('@/lib/db');
-      const [allProfiles, assignedIds, allLevels, totalCount] = await Promise.all([
+      const [allProfiles, assignedIds, allLevels, totalCount, allCats] = await Promise.all([
         getProfiles(),
         getTeacherStudents(teacherId),
         getStudyLevels(),
-        getTotalStudyMaterialsCount()
+        getTotalStudyMaterialsCount(),
+        getMaterialCategories()
       ]);
 
       const onlyStudents = allProfiles.filter(p => !p.is_teacher && !p.is_admin);
@@ -149,6 +152,7 @@ export default function TeacherClient() {
       setAssignedStudentIds(assignedIds);
       setLevels(allLevels);
       setTotalMaterialsCount(totalCount);
+      setCategories(allCats);
     } catch (err) {
       console.error(err);
     } finally {
@@ -247,6 +251,7 @@ export default function TeacherClient() {
               { id: 'grading', label: 'Penilaian Siswa', icon: <ClipboardCheck className="w-4 h-4" /> },
               { id: 'quizzes', label: 'Akses Quiz', icon: <Zap className="w-4 h-4" /> },
               { id: 'exams', label: 'Akses Exam', icon: <Trophy className="w-4 h-4" /> },
+              { id: 'monitor', label: 'Monitor Ujian', icon: <Monitor className="w-4 h-4" /> },
               { id: 'reports', label: 'Riwayat Laporan', icon: <FileText className="w-4 h-4" /> },
               { id: 'proposals', label: 'Usul Konten', icon: <MessageSquarePlus className="w-4 h-4" /> },
               { id: 'profile', label: 'Profil Saya', icon: <User className="w-4 h-4" /> },
@@ -346,6 +351,8 @@ export default function TeacherClient() {
           <QuizAccessManager teacher={teacherProfile!} assignedStudentIds={assignedStudentIds} />
         ) : activeTab === 'exams' ? (
           <ExamAccessManager teacher={teacherProfile!} assignedStudentIds={assignedStudentIds} />
+        ) : activeTab === 'monitor' ? (
+          <ExamMonitorDashboard teacherEmail={teacherProfile?.email || ''} />
         ) : activeTab === 'reports' ? (
           <WeeklyReportManager teacher={teacherProfile!} />
         ) : activeTab === 'profile' ? (
@@ -551,7 +558,23 @@ export default function TeacherClient() {
                               </span>
                               <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md whitespace-nowrap ${item.study_materials?.material_type === 'quiz' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
                                 }`}>
-                                {item.study_materials?.material_type || 'Materi'}
+                                {(() => {
+                                  const c = (typeof item.study_materials?.content === 'string' ? JSON.parse(item.study_materials.content) : item.study_materials?.content) || {};
+                                  if (c.custom_type_name) return c.custom_type_name;
+                                  
+                                  const lvlCategoryId = item.study_materials?.study_chapters?.study_levels?.category_id;
+                                  const cat = categories.find(ct => ct.id === lvlCategoryId);
+                                  const catCustomNames = cat?.custom_type_names || {};
+                                  if (catCustomNames[item.study_materials?.material_type]) {
+                                    return catCustomNames[item.study_materials?.material_type];
+                                  }
+
+                                  const t = item.study_materials?.material_type;
+                                  if (t === 'bunpou') return 'tata bahasa';
+                                  if (t === 'dokkai') return 'reading';
+                                  if (t === 'choukai') return 'listening';
+                                  return t ? t.replace('_', ' ') : 'Materi';
+                                })()}
                               </span>
                             </div>
                             <p className="text-xs font-bold text-slate-800 uppercase tracking-tight truncate">

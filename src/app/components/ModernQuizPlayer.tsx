@@ -46,6 +46,12 @@ export default function ModernQuizPlayer({
   onProgressUpdate,
 }: ModernQuizPlayerProps) {
   const fixUrl = (url?: string | null): string | undefined => typeof url === 'string' ? url.replace(/^undefined\//, "https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev/") : undefined;
+  const isNonEmpty = (str: any) => {
+    if (!str) return false;
+    if (typeof str !== 'string') return true;
+    const trimmed = str.trim();
+    return trimmed !== "" && trimmed !== "null" && trimmed !== "undefined";
+  };
 
   // Navigation & States
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -70,6 +76,9 @@ export default function ModernQuizPlayer({
  
   // Image Zoom Lightbox
   const [zoomImage, setZoomImage] = useState<string | null>(null);
+  
+  // Mobile Nav Drawer
+  const [showMobileNav, setShowMobileNav] = useState(false);
  
   // Auto-Save: Load initial answers on mount
   useEffect(() => {
@@ -151,9 +160,8 @@ export default function ModernQuizPlayer({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isFinished) return;
       const q = questions[currentIdx];
-      if (!q || !q.options || q.options.length === 0) return; // ignore essay on shortcut
+      if (!q || !q.options || q.options.length === 0) return;
 
-      // Latihan mode locks answering once checked
       const isChecked = checkedQuestions[q.id] === true;
       if (mode === "latihan" && isChecked) return;
 
@@ -173,6 +181,37 @@ export default function ModernQuizPlayer({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentIdx, questions, userAnswers, isFinished, mode]);
+
+  // Anti-cheat: Extra protection for ujian mode
+  useEffect(() => {
+    if (mode !== "ujian") return;
+
+    // Block context menu inside quiz
+    const blockCtx = (e: MouseEvent) => e.preventDefault();
+    // Block drag
+    const blockDrag = (e: DragEvent) => e.preventDefault();
+    // Detect PrintScreen
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "PrintScreen") {
+        e.preventDefault();
+        // Flash screen black briefly as visual deterrent
+        const overlay = document.createElement("div");
+        overlay.style.cssText = "position:fixed;inset:0;background:black;z-index:99999;pointer-events:none;";
+        document.body.appendChild(overlay);
+        setTimeout(() => overlay.remove(), 1500);
+      }
+    };
+
+    document.addEventListener("contextmenu", blockCtx, { capture: true });
+    document.addEventListener("dragstart", blockDrag, { capture: true });
+    document.addEventListener("keydown", handleKey, { capture: true });
+
+    return () => {
+      document.removeEventListener("contextmenu", blockCtx, { capture: true });
+      document.removeEventListener("dragstart", blockDrag, { capture: true });
+      document.removeEventListener("keydown", handleKey, { capture: true });
+    };
+  }, [mode]);
 
   const handleSaveAnswer = (qid: string, val: any) => {
     setUserAnswers((prev) => ({ ...prev, [qid]: val }));
@@ -360,73 +399,149 @@ export default function ModernQuizPlayer({
                 const chosen = userAnswers[item.id];
                 const isCorrect = isMCQ && chosen === item.correct_option;
 
+                const showSectionHeader = index === 0 || 
+                  questions[index - 1].section_title !== item.section_title ||
+                  questions[index - 1].section_instructions !== item.section_instructions ||
+                  questions[index - 1].section_audio_url !== item.section_audio_url;
+
+                const hasSecMedia = !!(
+                  isNonEmpty(item.section_title) ||
+                  isNonEmpty(item.section_instructions) ||
+                  isNonEmpty(item.section_audio_url) ||
+                  isNonEmpty(item.section_image_url) ||
+                  isNonEmpty(item.section_pdf_url) ||
+                  isNonEmpty(item.section_ppt_url) ||
+                  isNonEmpty(item.section_video_url)
+                );
+
                 return (
-                  <div key={item.id} className="bg-slate-900 rounded-3xl p-6 md:p-8 ring-1 ring-white/10 space-y-5">
-                    <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Soal {index + 1}</span>
+                  <div key={item.id} className="space-y-4">
+                    {showSectionHeader && hasSecMedia && (
+                      <div className="bg-slate-900 border border-white/10 rounded-[2rem] p-6 space-y-4">
+                        {item.section_title && (
+                          <h4 className="text-lg font-black italic text-teal-400">{item.section_title}</h4>
+                        )}
+                        {item.section_instructions && (
+                          <p className="text-slate-300 text-xs font-semibold leading-relaxed whitespace-pre-line p-4 bg-white/5 rounded-2xl border border-white/5">
+                            📖 {item.section_instructions}
+                          </p>
+                        )}
+                        
+                        {/* Section Media */}
+                        <div className="grid grid-cols-1 gap-4">
+                          {item.section_audio_url && (
+                            <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">🔊 Audio Section (Global)</p>
+                              <audio controls className="w-full" src={fixUrl(item.section_audio_url)} />
+                            </div>
+                          )}
+                          {item.section_video_url && (
+                            <div className="rounded-2xl overflow-hidden border border-white/5 bg-black aspect-video max-h-56">
+                              <video controls className="w-full h-full object-contain" src={fixUrl(item.section_video_url)} />
+                            </div>
+                          )}
+                          {item.section_pdf_url && (
+                            <div className="flex items-center justify-between px-4 py-3 bg-indigo-950/40 border border-indigo-900/50 rounded-xl">
+                              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-wider">📄 PDF Document</span>
+                              <a 
+                                href={fixUrl(item.section_pdf_url)} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-[9px] font-black uppercase bg-teal-400 text-slate-900 px-3 py-1 rounded-lg"
+                              >
+                                Buka PDF ↗
+                              </a>
+                            </div>
+                          )}
+                          {item.section_ppt_url && (
+                            <div className="flex items-center justify-between px-4 py-3 bg-rose-950/40 border border-rose-900/50 rounded-xl">
+                              <span className="text-[10px] font-black text-rose-400 uppercase tracking-wider">📊 Slide Presentation</span>
+                              <a 
+                                href={fixUrl(item.section_ppt_url)} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-[9px] font-black uppercase bg-teal-400 text-slate-900 px-3 py-1 rounded-lg"
+                              >
+                                Buka Slide ↗
+                              </a>
+                            </div>
+                          )}
+                          {item.section_image_url && (
+                            <div className="rounded-2xl overflow-hidden border border-white/5 max-h-52 bg-white/5 flex items-center justify-center cursor-pointer" onClick={() => setZoomImage(fixUrl(item.section_image_url) || null)}>
+                              <img src={fixUrl(item.section_image_url)} alt="Global Section" className="object-contain max-h-52 w-full" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="bg-slate-900 rounded-3xl p-6 md:p-8 ring-1 ring-white/10 space-y-5">
+                      <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Soal {index + 1}</span>
+                        {isMCQ ? (
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isCorrect ? 'bg-teal-500/20 text-teal-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                            {isCorrect ? "✓ Benar" : "✗ Salah"}
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-slate-800 text-slate-400">
+                            ✏ Essay / Teks Bebas
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Question Assets */}
+                      {item.image_url && (
+                        <div className="max-w-md rounded-2xl overflow-hidden border border-white/10">
+                          <img src={fixUrl(item.image_url)} alt="asset" className="w-full h-auto object-cover max-h-60" />
+                        </div>
+                      )}
+                      
+                      {item.audio_url && (
+                        <div className="max-w-md p-4 bg-white/5 rounded-2xl ring-1 ring-white/10">
+                          <audio controls className="w-full" src={fixUrl(item.audio_url)}></audio>
+                        </div>
+                      )}
+
+                      <h4 className="text-lg font-bold text-white leading-relaxed">{item.question_text}</h4>
+
+                      {/* Render Options for MCQ review */}
                       {isMCQ ? (
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isCorrect ? 'bg-teal-500/20 text-teal-400' : 'bg-rose-500/20 text-rose-400'}`}>
-                          {isCorrect ? "✓ Benar" : "✗ Salah"}
-                        </span>
+                        <div className="grid gap-2">
+                          {item.options.map((opt, optIdx) => {
+                            const isChosen = chosen === optIdx;
+                            const isCorrectOpt = optIdx === item.correct_option;
+                            let cardClass = "bg-white/5 border border-white/5 text-slate-300";
+
+                            if (isCorrectOpt) {
+                              cardClass = "bg-teal-500/20 border-teal-500/40 text-teal-300 font-bold";
+                            } else if (isChosen) {
+                              cardClass = "bg-rose-500/20 border-rose-500/40 text-rose-300 font-bold";
+                            }
+
+                            return (
+                              <div key={optIdx} className={`p-4 rounded-xl flex items-center justify-between text-sm ${cardClass}`}>
+                                <span>{String.fromCharCode(65 + optIdx)}. {opt}</span>
+                                {isCorrectOpt && <span>✓ Jawaban Benar</span>}
+                                {isChosen && !isCorrectOpt && <span>✗ Pilihan Anda</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
                       ) : (
-                        <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-slate-800 text-slate-400">
-                          ✏ Essay / Teks Bebas
-                        </span>
+                        <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                          <p className="text-xs font-black uppercase text-slate-400 mb-1">Jawaban Anda:</p>
+                          <p className="text-sm italic text-slate-200">{chosen || "(Tidak diisi)"}</p>
+                        </div>
+                      )}
+
+                      {/* Detailed Explanation */}
+                      {item.explanation && (
+                        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-200 text-xs leading-relaxed whitespace-pre-wrap">
+                          <p className="font-black uppercase text-[10px] tracking-wider mb-1 text-amber-400">Pembahasan & Arti:</p>
+                          {item.explanation}
+                        </div>
                       )}
                     </div>
-
-                    {/* Question Assets */}
-                    {item.image_url && (
-                      <div className="max-w-md rounded-2xl overflow-hidden border border-white/10">
-                        <img src={item.image_url} alt="asset" className="w-full h-auto object-cover max-h-60" />
-                      </div>
-                    )}
-                    
-                    {item.audio_url && (
-                      <div className="max-w-md p-4 bg-white/5 rounded-2xl ring-1 ring-white/10">
-                        <audio controls className="w-full" src={item.audio_url}></audio>
-                      </div>
-                    )}
-
-                    <h4 className="text-lg font-bold text-white leading-relaxed">{item.question_text}</h4>
-
-                    {/* Render Options for MCQ review */}
-                    {isMCQ ? (
-                      <div className="grid gap-2">
-                        {item.options.map((opt, optIdx) => {
-                          const isChosen = chosen === optIdx;
-                          const isCorrectOpt = optIdx === item.correct_option;
-                          let cardClass = "bg-white/5 border border-white/5 text-slate-300";
-
-                          if (isCorrectOpt) {
-                            cardClass = "bg-teal-500/20 border-teal-500/40 text-teal-300 font-bold";
-                          } else if (isChosen) {
-                            cardClass = "bg-rose-500/20 border-rose-500/40 text-rose-300 font-bold";
-                          }
-
-                          return (
-                            <div key={optIdx} className={`p-4 rounded-xl flex items-center justify-between text-sm ${cardClass}`}>
-                              <span>{String.fromCharCode(65 + optIdx)}. {opt}</span>
-                              {isCorrectOpt && <span>✓ Jawaban Benar</span>}
-                              {isChosen && !isCorrectOpt && <span>✗ Pilihan Anda</span>}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="bg-white/5 p-4 rounded-xl border border-white/5">
-                        <p className="text-xs font-black uppercase text-slate-400 mb-1">Jawaban Anda:</p>
-                        <p className="text-sm italic text-slate-200">{chosen || "(Tidak diisi)"}</p>
-                      </div>
-                    )}
-
-                    {/* Detailed Explanation */}
-                    {item.explanation && (
-                      <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-200 text-xs leading-relaxed whitespace-pre-wrap">
-                        <p className="font-black uppercase text-[10px] tracking-wider mb-1 text-amber-400">Pembahasan & Arti:</p>
-                        {item.explanation}
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -440,12 +555,6 @@ export default function ModernQuizPlayer({
   const isMCQ = q && q.options && q.options.length > 0;
   const isAnswered = userAnswers[q?.id] !== undefined;
   const isChecked = q && checkedQuestions[q.id] === true;
-  const isNonEmpty = (str: any) => {
-    if (!str) return false;
-    if (typeof str !== 'string') return true;
-    const trimmed = str.trim();
-    return trimmed !== "" && trimmed !== "null" && trimmed !== "undefined";
-  };
 
   const hasSectionMedia = q && !!(
     isNonEmpty(q.section_instructions) ||
@@ -511,9 +620,9 @@ export default function ModernQuizPlayer({
       </header>
 
       {/* Main Split Screen Area - Responsive Layout */}
-      <div className="flex-1 overflow-hidden flex flex-col md:flex-row max-w-6xl w-full mx-auto">
+      <div className="flex-1 overflow-y-auto md:overflow-hidden flex flex-col md:flex-row max-w-6xl w-full mx-auto">
         {/* Left column (Scrollable) - Question Context Assets */}
-        <div className="flex-1 overflow-y-auto border-r border-slate-100 px-6 py-8 flex flex-col gap-6 custom-scrollbar bg-slate-50">
+        <div className="w-full md:flex-1 md:overflow-y-auto border-b md:border-b-0 md:border-r border-slate-100 px-4 py-6 md:px-6 md:py-8 flex flex-col gap-6 custom-scrollbar bg-slate-50">
           
           {/* GLOBAL SECTION PANEL */}
           {hasSectionMedia && (
@@ -537,7 +646,7 @@ export default function ModernQuizPlayer({
                   {q.section_audio_url && (
                     <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
                       <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-2">🔊 Audio Section (Global)</p>
-                      <audio controls className="w-full h-8" src={fixUrl(q.section_audio_url)} />
+                      <audio controls className="w-full" src={fixUrl(q.section_audio_url)} />
                     </div>
                   )}
 
@@ -718,7 +827,7 @@ export default function ModernQuizPlayer({
         </div>
 
         {/* Right column (Scrollable) - Answer Submission and Navigation */}
-        <div className="w-full md:w-[380px] shrink-0 overflow-y-auto border-l border-slate-100 bg-white px-6 py-8 flex flex-col gap-8 custom-scrollbar">
+        <div className="w-full md:w-[380px] md:overflow-y-auto border-t md:border-t-0 md:border-l border-slate-100 bg-white px-4 py-6 md:px-6 md:py-8 flex flex-col gap-8 custom-scrollbar">
           
           {/* ANSWER INPUT SECTION */}
           <div className="space-y-4">
@@ -771,7 +880,7 @@ export default function ModernQuizPlayer({
           </div>
 
           {/* QUESTION DIRECT GRID NAVIGATOR */}
-          <div className="space-y-4 pt-4 border-t border-slate-100">
+          <div className="hidden md:block space-y-4 pt-4 border-t border-slate-100">
             <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Navigasi Lembar Soal</h3>
             <div className="grid grid-cols-5 gap-2.5">
               {questions.map((item, index) => {
@@ -827,9 +936,17 @@ export default function ModernQuizPlayer({
             ← Kembali
           </button>
 
-          <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
-            Soal {currentIdx + 1} dari {questions.length}
-          </span>
+          <button
+            onClick={() => setShowMobileNav(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-slate-50 transition active:scale-95 md:pointer-events-none"
+          >
+            <span className="text-xs font-black text-slate-800 uppercase tracking-widest">
+              Soal {currentIdx + 1} / {questions.length}
+            </span>
+            <div className="md:hidden h-7 w-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs shadow-sm">
+              📑
+            </div>
+          </button>
 
           <button
             onClick={() => setCurrentIdx((p) => Math.min(questions.length - 1, p + 1))}
@@ -860,6 +977,79 @@ export default function ModernQuizPlayer({
               className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
             />
             <button className="absolute top-6 right-6 h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-xl backdrop-blur-sm">✕</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MOBILE NAV OVERLAY */}
+      <AnimatePresence>
+        {showMobileNav && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[300] bg-slate-950/60 backdrop-blur-md flex items-end justify-center md:hidden"
+            onClick={() => setShowMobileNav(false)}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-white w-full rounded-t-[2.5rem] p-6 pb-12 max-h-[85vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-black italic uppercase text-slate-800 tracking-tight">Navigasi Soal</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Pilih nomor untuk melompat</p>
+                </div>
+                <button onClick={() => setShowMobileNav(false)} className="h-10 w-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold transition">✕</button>
+              </div>
+              
+              <div className="grid grid-cols-5 gap-3">
+                {questions.map((item, index) => {
+                  const isItemAnswered = userAnswers[item.id] !== undefined;
+                  const isItemFlagged = flaggedQuestions[index] === true;
+                  const isCurrent = index === currentIdx;
+
+                  let btnBg = "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 shadow-sm";
+                  if (isCurrent) {
+                    btnBg = "bg-slate-900 text-white ring-2 ring-offset-2 ring-slate-900 font-black shadow-lg";
+                  } else if (isItemFlagged) {
+                    btnBg = "bg-amber-100 text-amber-700 border border-amber-300 font-bold shadow-sm";
+                  } else if (isItemAnswered) {
+                    btnBg = "bg-teal-500 text-white font-bold border border-teal-600 shadow-sm";
+                  }
+
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setCurrentIdx(index);
+                        setShowMobileNav(false);
+                      }}
+                      className={`h-12 rounded-xl text-sm flex items-center justify-center gap-1 transition active:scale-90 ${btnBg}`}
+                    >
+                      <span>{index + 1}</span>
+                      {isItemAnswered && <span className="text-[10px] font-black">✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              <div className="flex gap-4 flex-wrap pt-8 justify-center text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full bg-teal-500 shadow-sm" /> Terjawab
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full bg-amber-400 shadow-sm" /> Ragu
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full bg-slate-200 shadow-inner" /> Belum
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { Profile, AppTheme, StudyMaterial } from "@/lib/types";
-import { getLeaderboard, getUserLastProgressDetails, getStudentWeeklyTargets, getCompletedMaterials, getBasicStudyMaterials } from "@/lib/db";
+import { getLeaderboard, getUserLastProgressDetails, getStudentWeeklyTargets, getCompletedMaterials, getBasicStudyMaterials, getMaterialCategories, getStudyLevels } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import AISenseiChat from "./AISenseiChat";
 import { Flame, Trophy, Zap, CheckCircle2, Circle, BookOpen, Link2 } from "lucide-react";
@@ -16,6 +16,9 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
   const [weeklyTargets, setWeeklyTargets] = useState<WeeklyTarget[]>([]);
   const [completedMaterials, setCompletedMaterials] = useState<string[]>([]);
   const [allMaterials, setAllMaterials] = useState<StudyMaterial[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [chapters, setChapters] = useState<any[]>([]);
+  const [studyLevels, setStudyLevels] = useState<any[]>([]);
   const [isLeaderboardOpen, setLeaderboardOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAnnouncement, setShowAnnouncement] = useState(false);
@@ -48,14 +51,20 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
       setAchievements(ach || []);
 
       // 3. Fetch Leaderboard, Weekly Targets & All Materials
-      const [lb, targets, mats] = await Promise.all([
+      const [lb, targets, mats, cats, chapsRes, lvls] = await Promise.all([
         getLeaderboard(),
         getStudentWeeklyTargets(user.email, user.batch),
-        getBasicStudyMaterials()
+        getBasicStudyMaterials(),
+        getMaterialCategories(),
+        supabase.from('study_chapters').select('id, level_id'),
+        getStudyLevels()
       ]);
       setLeaderboard(lb.filter(p => !p.is_admin && !p.is_teacher));
       setWeeklyTargets(targets);
       setAllMaterials(mats as StudyMaterial[]);
+      setCategories(cats);
+      setChapters(chapsRes.data || []);
+      setStudyLevels(lvls);
 
       // 4. Fetch Progress via Server API (Bypass RLS)
       try {
@@ -79,6 +88,26 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
       value: Math.floor(Math.random() * 60) + 20 + (i === 6 ? 20 : 0)
     }));
   }, []);
+
+  const getMaterialTypeDisplayName = (mat: any) => {
+    if (!mat) return "";
+    const c = (typeof mat.content === 'string' ? JSON.parse(mat.content) : mat.content) || {};
+    if (c.custom_type_name) return c.custom_type_name;
+    
+    const chap = chapters.find(ch => ch.id === mat.chapter_id);
+    const lvl = studyLevels.find(l => l.id === chap?.level_id);
+    const cat = categories.find(ct => ct.id === lvl?.category_id);
+    const catCustomNames = cat?.custom_type_names || {};
+    
+    if (catCustomNames[mat.material_type]) {
+      return catCustomNames[mat.material_type];
+    }
+    
+    if (mat.material_type === 'bunpou') return 'tata bahasa';
+    if (mat.material_type === 'dokkai') return 'reading';
+    if (mat.material_type === 'choukai') return 'listening';
+    return (mat.material_type || "").replace('_', ' ');
+  };
 
   return (
     <div className="space-y-12 pb-20">
@@ -289,7 +318,7 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
                                      mat.material_type === 'choukai' ? 'bg-rose-50 text-rose-500' :
                                      'bg-slate-100 text-slate-400'
                                    }`}>
-                                     {(() => { const c = (typeof mat.content === 'string' ? JSON.parse(mat.content) : mat.content) || {}; return c.custom_type_name || mat.material_type; })()}
+                                      {getMaterialTypeDisplayName(mat)}
                                    </span>
                                  )}
                                </div>
@@ -337,7 +366,11 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
                   </h4>
                   {lastProgress[0]?.study_materials && (
                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
-                      {(() => { const sm = lastProgress[0]?.study_materials; if (!sm) return ''; const c = (typeof sm.content === 'string' ? JSON.parse(sm.content) : sm.content) || {}; return c.custom_type_name || sm.material_type || ''; })()} 
+                      {(() => {
+                        const sm = lastProgress[0]?.study_materials;
+                        if (!sm) return '';
+                        return getMaterialTypeDisplayName(sm);
+                      })()} 
                       {lastProgress[0]?.study_materials?.study_chapters?.title ? ` · ${lastProgress[0]?.study_materials?.study_chapters?.title}` : ''}
                     </p>
                   )}

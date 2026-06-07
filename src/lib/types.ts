@@ -63,6 +63,8 @@ export interface MaterialCategory {
   sort_order: number
   created_at: string
   updated_at: string
+  custom_type_names?: Record<string, string> | null
+  is_active?: boolean
 }
 
 export interface Material {

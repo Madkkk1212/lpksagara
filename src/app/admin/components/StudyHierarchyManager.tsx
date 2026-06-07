@@ -186,7 +186,7 @@ export default function StudyHierarchyManager() {
     if (!editingMaterial || !selectedChapter) return;
     try {
       const finalContent = { ...formContent };
-      if (!useCustomTypeName) {
+      if (!finalContent.custom_type_name || finalContent.custom_type_name.trim() === "") {
         finalContent.custom_type_name = null;
       }
       await upsertStudyMaterial({ ...editingMaterial, chapter_id: selectedChapter.id, content: finalContent });
@@ -654,7 +654,12 @@ export default function StudyHierarchyManager() {
                       )}
                       <div>
                         <p className={`text-[10px] font-black uppercase tracking-widest ${mat.material_type === 'quiz' ? 'text-rose-500' : mat.material_type === 'latihan' ? 'text-amber-500' : 'text-teal-600'}`}>
-                          {mat.material_type}
+                          {(() => {
+                            if (mat.material_type === 'bunpou') return 'tata bahasa';
+                            if (mat.material_type === 'dokkai') return 'reading';
+                            if (mat.material_type === 'choukai') return 'listening';
+                            return mat.material_type || '';
+                          })()}
                           {(() => {
                             const c = (typeof mat.content === 'string' ? JSON.parse(mat.content) : mat.content) || {};
                             return c.custom_type_name ? ` (${c.custom_type_name})` : '';
@@ -678,7 +683,6 @@ export default function StudyHierarchyManager() {
                              disabled={idx === arr.length - 1}
                              onClick={() => moveMaterial(idx, 'down')}
                              className="p-1.5 bg-slate-100 rounded-lg text-[10px] hover:bg-teal-500 hover:text-white disabled:opacity-30 transition-all"
-                             title="Move Down"
                            >
                              ▼
                            </button>
@@ -876,33 +880,22 @@ export default function StudyHierarchyManager() {
                          className="w-full px-4 py-3 rounded-xl bg-slate-50 font-bold appearance-none outline-none border focus:border-teal-500"
                       >
                          <option value="moji_goi">Moji / Goi</option>
-                         <option value="bunpou">Bunpou</option>
-                         <option value="dokkai">Dokkai</option>
-                         <option value="choukai">Choukai</option>
+                         <option value="bunpou">Tata Bahasa (Bunpou)</option>
+                         <option value="dokkai">Reading (Dokkai)</option>
+                         <option value="choukai">Listening (Choukai)</option>
                          <option value="quiz">Quiz 🎯</option>
                           <option value="latihan">Latihan 📝</option>
                       </select>
-                       <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
-                         <input 
-                           type="checkbox" 
-                           checked={useCustomTypeName} 
-                           onChange={e => setUseCustomTypeName(e.target.checked)}
-                           className="rounded text-teal-600 focus:ring-teal-500 h-4 w-4"
-                         />
-                         <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Kustom Nama Tipe</span>
-                       </label>
                     </div>
-                    {useCustomTypeName && (
-                      <div className="animate-in fade-in duration-300">
-                        <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Custom Nama Tipe</label>
-                        <input 
-                          placeholder="Contoh: Kosakata, Tata Bahasa" 
-                          value={formContent.custom_type_name || ""} 
-                          onChange={e => setFormContent({...formContent, custom_type_name: e.target.value})} 
-                          className="w-full px-4 py-3 rounded-xl bg-slate-50 border font-bold focus:border-teal-500 focus:outline-none" 
-                        />
-                      </div>
-                    )}
+                    <div>
+                      <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Custom Nama Tipe (Opsional)</label>
+                      <input 
+                        placeholder="Contoh: Kosakata, Tata Bahasa" 
+                        value={formContent.custom_type_name || ""} 
+                        onChange={e => setFormContent({...formContent, custom_type_name: e.target.value})} 
+                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border font-bold focus:border-teal-500 focus:outline-none" 
+                      />
+                    </div>
                     <div>
                       <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Title</label>
                       <input value={editingMaterial.title || ""} onChange={e => setEditingMaterial({...editingMaterial, title: e.target.value})} className="w-full px-4 py-3 rounded-xl bg-slate-50 border font-bold" />

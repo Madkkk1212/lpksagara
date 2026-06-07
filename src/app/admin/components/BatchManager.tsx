@@ -32,8 +32,16 @@ export default function BatchManager({ user: userProfile }: { user: Profile }) {
         getStudentBatches(),
         getProfiles()
       ]);
+      const filteredProfiles = pData.filter(p => {
+        if (!userProfile.is_super_admin) {
+          if (p.email === "siswa.super@lpksagara.com" || p.email === "guru.super@lpksagara.com") {
+            return false;
+          }
+        }
+        return true;
+      });
       setBatches(bData);
-      setProfiles(pData);
+      setProfiles(filteredProfiles);
     } catch (err) {
       console.error(err);
     } finally {

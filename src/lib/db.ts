@@ -604,6 +604,7 @@ export async function getCompletedMaterialsWithDetails(userEmail: string): Promi
       title,
       material_type,
       chapter_id,
+      content,
       study_chapters (
         id,
         title,
@@ -682,6 +683,7 @@ export async function getUserLastProgressDetails(userEmail: string): Promise<any
         title, 
         material_type, 
         chapter_id,
+        content,
         study_chapters (
           id,
           title

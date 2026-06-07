@@ -21,6 +21,7 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
   const [expandedChapter, setExpandedChapter] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [completedMaterials, setCompletedMaterials] = useState<string[]>([]);
+  const [categoryCustomTypeNames, setCategoryCustomTypeNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const savedProfile = localStorage.getItem("luma-user-profile");
@@ -42,6 +43,21 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
         updateProgress();
         const sortedChaps = [...chaps].sort((a, b) => a.sort_order - b.sort_order);
         setChapters(sortedChaps);
+
+        if (levelData.category_id) {
+          try {
+            const { data: catData } = await supabase
+              .from('material_categories')
+              .select('custom_type_names')
+              .eq('id', levelData.category_id)
+              .single();
+            if (catData?.custom_type_names) {
+              setCategoryCustomTypeNames(catData.custom_type_names);
+            }
+          } catch (e) {
+            console.error("Failed to fetch category custom names:", e);
+          }
+        }
         
         let completed: string[] = [];
         let quizAccessIds: string[] = [];
@@ -74,7 +90,7 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
         if (chapterIds.length > 0) {
           const { data: mats } = await supabase
             .from('study_materials')
-            .select('id, title, chapter_id, material_type, is_locked, sort_order, icon_url, video_url, image_url')
+            .select('id, title, chapter_id, material_type, is_locked, sort_order, icon_url, video_url, image_url, content')
             .in('chapter_id', chapterIds)
             .order('sort_order', { ascending: true });
           
@@ -119,12 +135,22 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
     return mats.every(m => m.id ? completedMaterials.includes(m.id) : false);
   };
 
-  // Semua chapter sekarang terbuka, tidak ada lock berurutan
   const isChapterUnlocked = (chapId: string) => {
-    return true; 
+    const isStaff = userProfile?.is_admin || userProfile?.is_super_admin || userProfile?.is_teacher;
+    if (isStaff) return true;
+    
+    const idx = chapters.findIndex(c => c.id === chapId);
+    if (idx <= 0) return true; // first chapter is always unlocked
+    
+    const prevChap = chapters[idx - 1];
+    return isChapterCompleted(prevChap.id);
   };
 
   const toggleChapter = (chap: StudyChapter) => {
+    if (!isChapterUnlocked(chap.id)) {
+      alert("Selesaikan bab sebelumnya terlebih dahulu! 🔒");
+      return;
+    }
     setExpandedChapter(prev => prev === chap.id ? null : chap.id);
   };
 
@@ -193,25 +219,29 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
           const studyMaterials = mats.filter(m => m.material_type !== 'quiz' && m.material_type !== 'latihan');
           const allStudyCompleted = studyMaterials.length > 0 && studyMaterials.every(m => m.id ? completedMaterials.includes(m.id) : false);
           
+          const unlocked = isChapterUnlocked(chap.id);
+          
           return (
-            <div key={chap.id} className="bg-white rounded-[2rem] shadow-sm ring-1 ring-slate-100 overflow-hidden transition-all duration-300">
+            <div key={chap.id} className={`bg-white rounded-[2rem] shadow-sm ring-1 ring-slate-100 overflow-hidden transition-all duration-300 ${!unlocked ? 'opacity-60 saturate-50' : ''}`}>
               <button 
                 onClick={() => toggleChapter(chap)}
-                className="w-full flex items-center justify-between p-6 text-left transition hover:bg-slate-50/50"
+                className={`w-full flex items-center justify-between p-6 text-left transition hover:bg-slate-50/50 ${!unlocked ? 'cursor-not-allowed' : ''}`}
               >
                 <div className="flex items-center gap-4">
-                  <div className={`h-12 w-12 rounded-2xl flex items-center justify-center font-black text-sm overflow-hidden shadow-sm ring-1 ring-black/5 ${isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
-                    {isCompleted ? '✓' : (chap.icon_url ? <img src={chap.icon_url || undefined} alt="chap" className="w-full h-full object-cover" /> : (idx + 1))}
+                  <div className={`h-12 w-12 rounded-2xl flex items-center justify-center font-black text-sm overflow-hidden shadow-sm ring-1 ring-black/5 ${!unlocked ? 'bg-slate-200 text-slate-400' : isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                    {!unlocked ? '🔒' : isCompleted ? '✓' : (chap.icon_url ? <img src={chap.icon_url || undefined} alt="chap" className="w-full h-full object-cover" /> : (idx + 1))}
                   </div>
                   <div>
-                    <h3 className="text-lg font-black italic tracking-tight text-slate-800">{chap.title}</h3>
+                    <h3 className={`text-lg font-black italic tracking-tight ${unlocked ? 'text-slate-800' : 'text-slate-400'}`}>{chap.title}</h3>
                     <div className="flex items-center gap-2">
-                       <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">{mats.length} Materi</p>
+                       <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">
+                         {!unlocked ? 'Masih Terkunci' : isCompleted ? 'Selesai' : `${mats.length} Materi`}
+                       </p>
                     </div>
                   </div>
                 </div>
                 <div className={`text-slate-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
-                  ▼
+                  {unlocked ? '▼' : '🔒'}
                 </div>
               </button>
 
@@ -227,10 +257,11 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
                       // Materi dan Latihan sekarang bebas diakses, tidak dikunci berurutan.
                       // Kuis dikunci KECUALI jika ada di activeQuizzes (dibuka guru).
                       const isLatihanLocked = false; 
+                      const isChapLocked = !unlocked;
                       const isStaff = userProfile?.is_admin || userProfile?.is_super_admin || userProfile?.is_teacher;
                       const isExpired = expiredQuizzes.includes(mat.id!);
                       const isQuizLocked = isQuiz && !activeQuizzes.includes(mat.id!) && !isStaff;
-                      const disableClick = (isQuizLocked || isLatihanLocked) && !isStaff;
+                      const disableClick = (isQuizLocked || isLatihanLocked || isChapLocked) && !isStaff;
 
                       return (
                         <Link 
@@ -239,7 +270,9 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
                           onClick={(e) => {
                             if (disableClick) {
                               e.preventDefault();
-                              if (isExpired) {
+                              if (isChapLocked) {
+                                alert("Selesaikan bab sebelumnya terlebih dahulu! 🔒");
+                              } else if (isExpired) {
                                 alert("Waktu akses kuis ini telah habis ⏰. Harap hubungi guru Anda jika memerlukan akses tambahan.");
                               } else if (isQuizLocked) {
                                 alert("Quiz ini belum dibuka oleh Guru Anda. Harap tunggu sesi ujian dimulai 🎯.");
@@ -251,8 +284,9 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
                           className={`group flex flex-col items-center justify-center p-6 bg-slate-50 rounded-[1.5rem] active:scale-95 transition-all relative overflow-hidden ${disableClick ? 'opacity-60 grayscale border border-slate-200 bg-slate-50/50' : 'hover:bg-white hover:shadow-xl hover:ring-1 ring-teal-500/20 shadow-sm'}`}
                         >
                           {isComplete && <div className="absolute top-3 right-3 flex items-center justify-center p-1 bg-teal-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg">✓</div>}
-                          {isQuizLocked && <div className="absolute top-3 left-3 flex items-center justify-center p-1 bg-rose-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg" title={isExpired ? "Akses Kuis Ditutup" : "Menunggu Guru Membuka Akses"}>{isExpired ? "⏰" : "🔒"}</div>}
-                          {isLatihanLocked && <div className="absolute top-3 left-3 flex items-center justify-center p-1 bg-amber-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg" title="Selesaikan materi untuk membuka">🔒</div>}
+                          {isChapLocked && <div className="absolute top-3 left-3 flex items-center justify-center p-1 bg-slate-400 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg" title="Selesaikan bab sebelumnya untuk membuka">🔒</div>}
+                          {isQuizLocked && !isChapLocked && <div className="absolute top-3 left-3 flex items-center justify-center p-1 bg-rose-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg" title={isExpired ? "Akses Kuis Ditutup" : "Menunggu Guru Membuka Akses"}>{isExpired ? "⏰" : "🔒"}</div>}
+                          {isLatihanLocked && !isChapLocked && <div className="absolute top-3 left-3 flex items-center justify-center p-1 bg-amber-500 text-white rounded-full text-[10px] w-6 h-6 z-10 shadow-lg" title="Selesaikan materi untuk membuka">🔒</div>}
                           {isQuiz && !isQuizLocked && (
                             <div className="absolute top-3 right-3 flex items-center gap-1 bg-emerald-500 text-white px-2 py-1 rounded-full text-[9px] font-black tracking-tight shadow-md animate-pulse z-10">
                               <span>⏳</span>
@@ -283,7 +317,17 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
                             </div>
                           )}
                           <span className={`text-xs font-black uppercase tracking-widest text-center ${isQuiz ? 'text-rose-500' : isLatihan ? 'text-amber-500' : 'text-slate-800'}`}>
-                            {(mat.material_type || "").replace('_', ' ')}
+                            {(() => {
+                              const c = (typeof mat.content === 'string' ? JSON.parse(mat.content) : mat.content) || {};
+                              if (c.custom_type_name) return c.custom_type_name;
+                              if (categoryCustomTypeNames[mat.material_type || ""]) {
+                                return categoryCustomTypeNames[mat.material_type || ""];
+                              }
+                              if (mat.material_type === 'bunpou') return 'tata bahasa';
+                              if (mat.material_type === 'dokkai') return 'reading';
+                              if (mat.material_type === 'choukai') return 'listening';
+                              return (mat.material_type || "").replace('_', ' ');
+                            })()}
                           </span>
                           <span className="text-[10px] text-slate-400 mt-1 line-clamp-1 text-center">{mat.title || ''}</span>
                           

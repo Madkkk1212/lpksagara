@@ -49,9 +49,31 @@ export default function WeeklyReportAdmin() {
         getStudentBatches(),
         getProfiles()
       ]);
-      setReports(reportData as any);
+
+      const rawProfile = typeof window !== 'undefined' ? localStorage.getItem("luma-user-profile") : null;
+      const user = rawProfile ? JSON.parse(rawProfile) : null;
+      const isSuperAdmin = user?.is_super_admin === true;
+
+      const filteredProfiles = profiles.filter(p => {
+        if (!isSuperAdmin) {
+          if (p.email === "siswa.super@lpksagara.com" || p.email === "guru.super@lpksagara.com") {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      const filteredReports = (reportData as any[]).filter(r => {
+        if (!isSuperAdmin) {
+          const teacher = profiles.find(p => p.id === r.teacher_id);
+          if (teacher?.email === "guru.super@lpksagara.com") return false;
+        }
+        return true;
+      });
+
+      setReports(filteredReports);
       setAllBatches(batchData);
-      setAllTeachers(profiles.filter(p => p.is_teacher));
+      setAllTeachers(filteredProfiles.filter(p => p.is_teacher));
     } catch (err) {
       console.error("Failed to fetch reports:", err);
     } finally {

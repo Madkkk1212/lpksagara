@@ -101,9 +101,9 @@ export default function QuizCreatorDashboard({
         options: ex.options || (ex.option_a ? [ex.option_a, ex.option_b, ex.option_c, ex.option_d].filter(Boolean) : ["Opsi A", "Opsi B"]),
         answer: ex.answer !== undefined ? ex.answer : (ex.correct_option !== undefined ? ex.correct_option : 0),
         explanation: ex.explanation || "",
-        audio_url: fixUrl(ex.audio_url || null) as any,
-        image_url: fixUrl(ex.image_url || null) as any,
-        video_url: fixUrl(ex.video_url || null) as any,
+        audio_url: fixUrl(ex.audio_url || ex.audioUrl || ex.audio || null) as any,
+        image_url: fixUrl(ex.image_url || ex.imageUrl || ex.image || null) as any,
+        video_url: fixUrl(ex.video_url || ex.videoUrl || ex.video || null) as any,
       }));
 
       setSections([

@@ -45,8 +45,20 @@ export default function TeacherAssignmentManager({ user: userProfile }: { user: 
         getStudentBatches(),
         getStudyLevels()
       ]);
-      setTeachers(profiles.filter(p => p.is_teacher));
-      setStudents(profiles.filter(p => p.is_student));
+      const HIDDEN_EMAILS = [
+        'siswa.khusus@lpksagara.com',
+        'guru.khusus@lpksagara.com',
+        'siswa.super@lpksagara.com',
+        'guru.super@lpksagara.com',
+      ];
+      const filteredProfiles = profiles.filter(p => {
+        if (!userProfile.is_super_admin) {
+          if (HIDDEN_EMAILS.includes(p.email)) return false;
+        }
+        return true;
+      });
+      setTeachers(filteredProfiles.filter(p => p.is_teacher));
+      setStudents(filteredProfiles.filter(p => p.is_student));
       setBatches(batchData);
       setLevels(levelData);
     } catch (err) {

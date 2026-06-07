@@ -18,8 +18,30 @@ export default function AllStudentsAssessment({ students, levels }: { students: 
   const [templateLoading, setTemplateLoading] = useState(false);
   const [matrix, setMatrix] = useState<Record<string, Record<string, Record<string, string>>>>({});
 
-  // Derived batches from ALL students in the system
-  const availableBatches = Array.from(new Set(students.map(s => s.batch).filter(Boolean))) as string[];
+  // Determine if super admin
+  let isSuperAdmin = false;
+  try {
+    const rawProfile = typeof window !== "undefined" ? localStorage.getItem("luma-user-profile") : null;
+    if (rawProfile) {
+      isSuperAdmin = JSON.parse(rawProfile).is_super_admin || false;
+    }
+  } catch (e) {}
+
+  const HIDDEN_EMAILS = [
+    'siswa.khusus@lpksagara.com',
+    'guru.khusus@lpksagara.com',
+    'siswa.super@lpksagara.com',
+    'guru.super@lpksagara.com',
+  ];
+
+  // Filter students based on role
+  const visibleStudents = useMemo(() => {
+    if (isSuperAdmin) return students;
+    return students.filter(s => !HIDDEN_EMAILS.includes(s.email));
+  }, [students, isSuperAdmin]);
+
+  // Derived batches from visible students
+  const availableBatches = Array.from(new Set(visibleStudents.map(s => s.batch).filter(Boolean))) as string[];
 
   const fetchTemplatesAndSettings = useCallback(async (levelId: string) => {
     setTemplateLoading(true);
@@ -42,8 +64,8 @@ export default function AllStudentsAssessment({ students, levels }: { students: 
     setLoading(true);
     try {
       const currentBatchStudents = selectedBatchId === "ALL" 
-        ? students 
-        : students.filter(s => s.batch === selectedBatchId);
+        ? visibleStudents 
+        : visibleStudents.filter(s => s.batch === selectedBatchId);
       const studentEmails = currentBatchStudents.map(s => s.email.trim().toLowerCase());
 
       if (studentEmails.length === 0) {
@@ -122,8 +144,8 @@ export default function AllStudentsAssessment({ students, levels }: { students: 
   }, [selectedBatchId, selectedLevelId, templates, fetchGradesForBatch]);
 
   const filteredStudents = selectedBatchId === "ALL" 
-    ? students 
-    : students.filter(s => s.batch === selectedBatchId);
+    ? visibleStudents 
+    : visibleStudents.filter(s => s.batch === selectedBatchId);
 
   const getBaseName = (name: string) => name.replace(/\s*[\(\d].*$/, '').trim();
 

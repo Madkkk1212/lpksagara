@@ -24,6 +24,7 @@ import MaterialRecap from "./components/MaterialRecap";
 import VideoManager from "./components/VideoManager";
 import AudioManager from "./components/AudioManager";
 import PhotoManager from "./components/PhotoManager";
+import CategoryCustomizer from "./components/CategoryCustomizer";
 import QuizAccessManager from "../teacher/components/QuizAccessManager";
 import ExamAccessManager from "../teacher/components/ExamAccessManager";
 import TeacherMenuManager from "./components/TeacherMenuManager";
@@ -32,7 +33,85 @@ import { supabase } from "@/lib/supabase";
 import { getAdminMenuConfig, getProfiles, getStudyLevels } from "@/lib/db";
 import { Profile, StudyLevel } from "@/lib/types";
 
-type AdminTab = "dashboard" | "reports" | "weekly-reports" | "announcements" | "git-update" | "bulk-import" | "theme" | "banners" | "icons" | "materials" | "exams" | "settings" | "users" | "proposals" | "menu-manager" | "profile-config" | "batches" | "teachers" | "assessment-templates" | "all-students-assessment" | "material-recap" | "video-manager" | "audio-manager" | "photo-manager" | "quiz-access" | "exam-access" | "teacher-menu";
+type AdminTab = "dashboard" | "reports" | "weekly-reports" | "announcements" | "git-update" | "bulk-import" | "theme" | "banners" | "icons" | "materials" | "info-konten" | "exams" | "settings" | "users" | "proposals" | "menu-manager" | "profile-config" | "batches" | "teachers" | "assessment-templates" | "all-students-assessment" | "material-recap" | "video-manager" | "audio-manager" | "photo-manager" | "quiz-access" | "exam-access" | "teacher-menu" | "custom-names";
+
+type SidebarInsightItem = {
+  id: string;
+  title: string;
+  context: string;
+  created_at: string | null;
+  kind: "material" | "exam" | "question";
+};
+
+type SidebarInsights = {
+  materialCount: number;
+  examCount: number;
+  questionCount: number;
+  items: SidebarInsightItem[];
+};
+
+type SidebarLevelRelation = {
+  title: string | null;
+  level_code: string | null;
+};
+
+type SidebarChapterRelation = {
+  title: string | null;
+  study_levels?: SidebarLevelRelation | SidebarLevelRelation[] | null;
+};
+
+type SidebarExamRelation = {
+  title: string | null;
+  category?: string | null;
+  exam_levels?: SidebarLevelRelation | SidebarLevelRelation[] | null;
+};
+
+type RecentStudyMaterialRow = {
+  id: string;
+  title: string | null;
+  material_type: string | null;
+  created_at: string | null;
+  study_chapters?: SidebarChapterRelation | SidebarChapterRelation[] | null;
+};
+
+type RecentExamRow = {
+  id: string;
+  title: string | null;
+  category: string | null;
+  created_at: string | null;
+  exam_levels?: SidebarLevelRelation | SidebarLevelRelation[] | null;
+};
+
+type RecentQuestionRow = {
+  id: string;
+  question_text: string | null;
+  question_type: string | null;
+  created_at: string | null;
+  exam_tests?: SidebarExamRelation | SidebarExamRelation[] | null;
+};
+
+const emptySidebarInsights: SidebarInsights = {
+  materialCount: 0,
+  examCount: 0,
+  questionCount: 0,
+  items: [],
+};
+
+function getRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function formatInsightDate(value: string | null) {
+  if (!value) return "Belum ada tanggal";
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
 
 export default function AdminClient() {
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
@@ -45,6 +124,7 @@ export default function AdminClient() {
   const [students, setStudents] = useState<Profile[]>([]);
   const [studyLevels, setStudyLevels] = useState<StudyLevel[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(false);
+  const [sidebarInsights, setSidebarInsights] = useState<SidebarInsights>(emptySidebarInsights);
 
   const fetchMenuConfig = async () => {
     try {
@@ -64,12 +144,127 @@ export default function AdminClient() {
     }
   };
 
-  useEffect(() => {
-    fetchMenuConfig();
-    fetchAllData();
-  }, []);
+  async function fetchSidebarInsights() {
+    try {
+      const [
+        { count: materialCount },
+        { count: examCount },
+        { count: questionCount },
+        { data: recentMaterials },
+        { data: recentExams },
+        { data: recentQuestions },
+      ] = await Promise.all([
+        supabase.from("study_materials").select("*", { count: "exact", head: true }),
+        supabase.from("exam_tests").select("*", { count: "exact", head: true }),
+        supabase.from("questions").select("*", { count: "exact", head: true }),
+        supabase
+          .from("study_materials")
+          .select(`
+            id,
+            title,
+            material_type,
+            created_at,
+            study_chapters (
+              title,
+              study_levels (
+                title,
+                level_code
+              )
+            )
+          `)
+          .order("created_at", { ascending: false })
+          .limit(3),
+        supabase
+          .from("exam_tests")
+          .select(`
+            id,
+            title,
+            category,
+            created_at,
+            exam_levels (
+              title,
+              level_code
+            )
+          `)
+          .order("created_at", { ascending: false })
+          .limit(2),
+        supabase
+          .from("questions")
+          .select(`
+            id,
+            question_text,
+            question_type,
+            created_at,
+            exam_tests (
+              title,
+              exam_levels (
+                title,
+                level_code
+              )
+            )
+          `)
+          .order("created_at", { ascending: false })
+          .limit(2),
+      ]);
 
-  const fetchAllData = async () => {
+      const materialItems: SidebarInsightItem[] = ((recentMaterials || []) as RecentStudyMaterialRow[]).map((item) => {
+        const chapter = getRelation(item.study_chapters);
+        const level = getRelation(chapter?.study_levels);
+        const levelLabel = level?.level_code ? String(level.level_code).toUpperCase() : "Level";
+        const chapterLabel = chapter?.title || "Tanpa bab";
+
+        return {
+          id: item.id,
+          title: item.title || "Materi tanpa judul",
+          context: `${levelLabel} - ${chapterLabel} - ${item.material_type || "materi"}`,
+          created_at: item.created_at,
+          kind: "material",
+        };
+      });
+
+      const examItems: SidebarInsightItem[] = ((recentExams || []) as RecentExamRow[]).map((item) => {
+        const level = getRelation(item.exam_levels);
+        const levelLabel = level?.level_code ? String(level.level_code).toUpperCase() : "Exam";
+
+        return {
+          id: item.id,
+          title: item.title || "Ujian tanpa judul",
+          context: `${levelLabel} - ${item.category || "test"}`,
+          created_at: item.created_at,
+          kind: "exam",
+        };
+      });
+
+      const questionItems: SidebarInsightItem[] = ((recentQuestions || []) as RecentQuestionRow[]).map((item) => {
+        const test = getRelation(item.exam_tests);
+        const level = getRelation(test?.exam_levels);
+        const levelLabel = level?.level_code ? String(level.level_code).toUpperCase() : "Soal";
+        const questionPreview = (item.question_text || "Soal tanpa teks").slice(0, 64);
+
+        return {
+          id: item.id,
+          title: questionPreview,
+          context: `${levelLabel} - ${test?.title || item.question_type || "test"}`,
+          created_at: item.created_at,
+          kind: "question",
+        };
+      });
+
+      setSidebarInsights({
+        materialCount: materialCount || 0,
+        examCount: examCount || 0,
+        questionCount: questionCount || 0,
+        items: [...materialItems, ...examItems, ...questionItems]
+          .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+          .slice(0, 5),
+      });
+    } catch (err) {
+      console.error("Failed to fetch sidebar content insights", err);
+      setSidebarInsights(emptySidebarInsights);
+    }
+  }
+
+  async function fetchAllData() {
     setIsDataLoading(true);
     try {
       const [allProfiles, allLevels] = await Promise.all([
@@ -83,7 +278,13 @@ export default function AdminClient() {
     } finally {
       setIsDataLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    fetchMenuConfig();
+    fetchAllData();
+    fetchSidebarInsights();
+  }, []);
 
   useEffect(() => {
     const authStatus = localStorage.getItem("luma-auth");
@@ -146,7 +347,9 @@ export default function AdminClient() {
     { id: "icons", label: "Icons Gallery", icon: "S", is_active: true },
     { id: "theme", label: "Theme", icon: "T", is_active: true },
     { id: "banners", label: "Banners", icon: "V", is_active: true },
+    { id: "custom-names", label: "Custom Nama-Nama", icon: "🏷️", is_active: false },
     { id: "materials", label: "Materials", icon: "M", is_active: true },
+    { id: "info-konten", label: "Info Konten", icon: "I", is_active: true },
     { id: "material-recap", label: "Rekapan Materi", icon: "📋", is_active: true },
     { id: "video-manager", label: "Video Manager", icon: "🎞️", is_active: true },
     { id: "audio-manager", label: "Audio Manager", icon: "🎧", is_active: true },
@@ -192,6 +395,18 @@ export default function AdminClient() {
   } else {
     const gu = uniqueTabs.find(t => t.id === "git-update");
     if (gu) gu.label = "Git Update";
+  }
+
+  if (userProfile?.is_super_admin && !uniqueTabs.some(t => t.id === "custom-names")) {
+    const materialsIdx = uniqueTabs.findIndex(t => t.id === "materials");
+    const insertAt = materialsIdx !== -1 ? materialsIdx : uniqueTabs.length;
+    uniqueTabs.splice(insertAt, 0, { id: "custom-names", label: "Custom Nama-Nama", icon: "🏷️", is_active: true } as any);
+  }
+
+  if (userProfile?.is_super_admin && !uniqueTabs.some(t => t.id === "info-konten")) {
+    const materialsIdx = uniqueTabs.findIndex(t => t.id === "materials");
+    const insertAt = materialsIdx !== -1 ? materialsIdx + 1 : uniqueTabs.length;
+    uniqueTabs.splice(insertAt, 0, { id: "info-konten", label: "Info Konten", icon: "I", is_active: true } as any);
   }
 
   // Add Menu Manager if Super Admin and not already present
@@ -265,7 +480,9 @@ export default function AdminClient() {
     uniqueTabs.splice(insertAt, 0, { id: "teacher-menu", label: "Menu Guru", icon: "👨‍🏫", is_active: true } as any);
   }
 
-  const tabs = uniqueTabs;
+  const tabs = userProfile?.is_super_admin
+    ? uniqueTabs
+    : uniqueTabs.filter(t => t.id !== "info-konten" && t.id !== "custom-names");
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 text-sm">
@@ -301,7 +518,7 @@ export default function AdminClient() {
             {
               title: "Konten Belajar",
               icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M9 4.804A7.993 7.993 0 002.151 8c.196 1.132.545 2.222 1.036 3.235a1 1 0 01.196.505V15a1 1 0 001 1h2a1 1 0 001-1v-2.31c.214.073.435.132.661.176l.16.03a1 1 0 01.794.794l.03.16c.044.226.103.447.176.661H13v2.31a1 1 0 001 1h2a1 1 0 001-1v-3.26a1 1 0 01.196-.505A7.993 7.993 0 0017.849 8a7.993 7.993 0 00-6.849-3.196V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v.196z" /></svg>,
-              items: ["materials", "exams", "video-manager", "audio-manager", "photo-manager", "material-recap", "bulk-import"]
+              items: ["custom-names", "materials", "info-konten", "exams", "video-manager", "audio-manager", "photo-manager", "material-recap", "bulk-import"]
             },
             {
               title: "Manajemen User",
@@ -408,7 +625,79 @@ export default function AdminClient() {
                { activeTab === "icons" && <IconManager /> }
                { activeTab === "theme" && <ThemeManager /> }
                { activeTab === "banners" && <BannerManager /> }
+               { activeTab === "custom-names" && <CategoryCustomizer /> }
                { activeTab === "materials" && <StudyHierarchyManager /> }
+               { activeTab === "info-konten" && (
+                <div className="space-y-8">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <h3 className="text-2xl font-bold text-slate-900">Info Konten</h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Pantau materi, ujian, dan soal terbaru yang sudah dimasukkan ke sistem.
+                      </p>
+                    </div>
+                    <button
+                      onClick={fetchSidebarInsights}
+                      className="w-full rounded-xl bg-indigo-600 px-5 py-3 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 md:w-auto"
+                    >
+                      Refresh Data
+                    </button>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                      <p className="text-xs font-semibold text-slate-500">Total Materi</p>
+                      <p className="mt-3 text-3xl font-bold text-slate-900">{sidebarInsights.materialCount}</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                      <p className="text-xs font-semibold text-slate-500">Total Ujian</p>
+                      <p className="mt-3 text-3xl font-bold text-slate-900">{sidebarInsights.examCount}</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                      <p className="text-xs font-semibold text-slate-500">Total Soal</p>
+                      <p className="mt-3 text-3xl font-bold text-slate-900">{sidebarInsights.questionCount}</p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-hidden rounded-2xl border border-slate-200">
+                    <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                      <p className="text-sm font-bold text-slate-900">Aktivitas Input Terbaru</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Contoh: level JLPT, bab yang dipilih, judul materi, dan waktu input.
+                      </p>
+                    </div>
+
+                    {sidebarInsights.items.length === 0 ? (
+                      <div className="p-8 text-center text-sm font-medium text-slate-400">
+                        Belum ada materi atau ujian yang tercatat.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-100">
+                        {sidebarInsights.items.map((item) => (
+                          <div key={`${item.kind}-${item.id}`} className="grid gap-3 px-5 py-4 md:grid-cols-[120px_1fr_190px] md:items-center">
+                            <span className={`w-fit rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest ${
+                              item.kind === "material"
+                                ? "bg-teal-50 text-teal-600"
+                                : item.kind === "exam"
+                                ? "bg-amber-50 text-amber-600"
+                                : "bg-slate-100 text-slate-500"
+                            }`}>
+                              {item.kind === "material" ? "Materi" : item.kind === "exam" ? "Ujian" : "Soal"}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-bold text-slate-900">{item.title}</p>
+                              <p className="mt-1 truncate text-xs font-medium text-slate-500">{item.context}</p>
+                            </div>
+                            <p className="text-xs font-semibold text-slate-500 md:text-right">
+                              {formatInsightDate(item.created_at)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+               ) }
                { activeTab === "exams" && <ExamManager /> }
                { activeTab === "users" && <UserManager user={userProfile!} /> }
                { activeTab === "batches" && <BatchManager user={userProfile!} /> }

@@ -22,6 +22,8 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
   const [isRemedialAccess, setIsRemedialAccess] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [studentProfileId, setStudentProfileId] = useState<string | null>(null);
+  const [categoryCustomTypeNames, setCategoryCustomTypeNames] = useState<Record<string, string>>({});
+  const [isChapterLocked, setIsChapterLocked] = useState(false);
 
   useEffect(() => {
     const sessionStr = localStorage.getItem('luma-user-profile');
@@ -35,6 +37,44 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
       } catch(e){}
     }
   }, [materialData.id]);
+
+  useEffect(() => {
+    const fetchCategoryCustomTypeNames = async () => {
+      try {
+        const { data: chapterData } = await supabase
+          .from('study_chapters')
+          .select('level_id')
+          .eq('id', materialData.chapter_id)
+          .single();
+        
+        if (chapterData?.level_id) {
+          const { data: levelData } = await supabase
+            .from('study_levels')
+            .select('category_id')
+            .eq('id', chapterData.level_id)
+            .single();
+          
+          if (levelData?.category_id) {
+            const { data: catData } = await supabase
+              .from('material_categories')
+              .select('custom_type_names')
+              .eq('id', levelData.category_id)
+              .single();
+            
+            if (catData?.custom_type_names) {
+              setCategoryCustomTypeNames(catData.custom_type_names);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch parent category custom names:", e);
+      }
+    };
+
+    if (materialData.chapter_id) {
+      fetchCategoryCustomTypeNames();
+    }
+  }, [materialData.chapter_id]);
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -52,30 +92,83 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
         if (profile) {
           setStudentProfileId(profile.id);
           
-          // Admins, Super Admins, and Teachers have automatic access to all quizzes
-          if (profile.is_admin || profile.is_super_admin || profile.is_teacher) {
+          // Admins, Super Admins, and Teachers have automatic access to all materials and quizzes
+          const isStaff = profile.is_admin || profile.is_super_admin || profile.is_teacher;
+          if (isStaff) {
             setIsAccessActive(true);
             setIsRemedialAccess(false);
+            setIsChapterLocked(false);
           } else {
-            const { data: accessData } = await supabase
-              .from("quiz_access_controls")
-              .select("is_active, updated_at, created_at, is_remedial")
-              .eq("material_id", materialData.id)
-              .eq("student_id", profile.id)
-              .eq("is_active", true);
+            // Check sequential chapter locking first
+            const { data: chapterInfo } = await supabase
+              .from('study_chapters')
+              .select('level_id')
+              .eq('id', materialData.chapter_id)
+              .single();
             
-            if (accessData && accessData.length > 0) {
-              const duration = (materialData.content as any)?.duration_minutes || 60;
-              const activeControl = accessData.find(control => {
-                const openedTime = new Date(control.updated_at || control.created_at).getTime();
-                const expirationTime = openedTime + (duration * 60 * 1000);
-                return Date.now() <= expirationTime;
-              });
-              setIsAccessActive(!!activeControl);
-              setIsRemedialAccess(!!(activeControl?.is_remedial));
-            } else {
-              setIsAccessActive(false);
-              setIsRemedialAccess(false);
+            if (chapterInfo?.level_id) {
+              const { data: siblingChapters } = await supabase
+                .from('study_chapters')
+                .select('id, sort_order')
+                .eq('level_id', chapterInfo.level_id)
+                .order('sort_order', { ascending: true });
+              
+              if (siblingChapters) {
+                const curIndex = siblingChapters.findIndex(c => c.id === materialData.chapter_id);
+                if (curIndex > 0) {
+                  // Must check all previous chapters
+                  const prevChapters = siblingChapters.slice(0, curIndex);
+                  const prevChapterIds = prevChapters.map(c => c.id);
+                  
+                  // Get all materials for these previous chapters
+                  const { data: prevMaterials } = await supabase
+                    .from('study_materials')
+                    .select('id, chapter_id')
+                    .in('chapter_id', prevChapterIds);
+                  
+                  if (prevMaterials && prevMaterials.length > 0) {
+                    // Get completed materials for the student
+                    const { data: completedRows } = await supabase
+                      .from('user_material_progress')
+                      .select('material_id')
+                      .eq('user_email', userEmail.trim().toLowerCase());
+                    
+                    const completedIds = new Set((completedRows || []).map(r => r.material_id));
+                    
+                    // Verify if each previous chapter is completed
+                    for (const prevCh of prevChapters) {
+                      const chMats = prevMaterials.filter(m => m.chapter_id === prevCh.id);
+                      if (chMats.length > 0 && !chMats.every(m => completedIds.has(m.id))) {
+                        setIsChapterLocked(true);
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+            if (materialData.material_type === "quiz") {
+              const { data: accessData } = await supabase
+                .from("quiz_access_controls")
+                .select("is_active, updated_at, created_at, is_remedial")
+                .eq("material_id", materialData.id)
+                .eq("student_id", profile.id)
+                .eq("is_active", true);
+              
+              if (accessData && accessData.length > 0) {
+                const duration = (materialData.content as any)?.duration_minutes || 60;
+                const activeControl = accessData.find(control => {
+                  const openedTime = new Date(control.updated_at || control.created_at).getTime();
+                  const expirationTime = openedTime + (duration * 60 * 1000);
+                  return Date.now() <= expirationTime;
+                });
+                setIsAccessActive(!!activeControl);
+                setIsRemedialAccess(!!(activeControl?.is_remedial));
+              } else {
+                setIsAccessActive(false);
+                setIsRemedialAccess(false);
+              }
             }
           }
         }
@@ -86,12 +179,12 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
       }
     };
 
-    if (userEmail && materialData.material_type === "quiz") {
+    if (userEmail) {
       checkAccess();
     } else {
       setCheckingAccess(false);
     }
-  }, [userEmail, materialData.id]);
+  }, [userEmail, materialData.id, materialData.chapter_id]);
 
   const handleLiveProgressUpdate = async (answeredCount: number, totalCount: number) => {
     if (!studentProfileId) return;
@@ -289,17 +382,17 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
             options: ex.options || [],
             correct_option: ex.answer !== undefined ? ex.answer : -1,
             explanation: ex.explanation || "Tidak ada pembahasan.",
-            audio_url: fixUrl(ex.audio_url),
-            image_url: fixUrl(ex.image_url),
-            video_url: fixUrl(ex.video_url),
+            audio_url: fixUrl(ex.audio_url || ex.audioUrl || ex.audio),
+            image_url: fixUrl(ex.image_url || ex.imageUrl || ex.image),
+            video_url: fixUrl(ex.video_url || ex.videoUrl || ex.video),
             question_type: ex.question_type || (ex.options && ex.options.length > 0 ? "multiple_choice" : "essay"),
             section_title: sec.title,
             section_instructions: sec.instructions,
-            section_audio_url: fixUrl(sec.media?.audio_url || sec.media?.audio),
-            section_image_url: fixUrl(sec.media?.image_url || sec.media?.image),
-            section_pdf_url: fixUrl(sec.media?.pdf_url || sec.media?.pdf),
-            section_ppt_url: fixUrl(sec.media?.ppt_url || sec.media?.ppt),
-            section_video_url: fixUrl(sec.media?.video_url || sec.media?.video),
+            section_audio_url: fixUrl(sec.media?.audio_url || sec.media?.audioUrl || sec.media?.audio),
+            section_image_url: fixUrl(sec.media?.image_url || sec.media?.imageUrl || sec.media?.image),
+            section_pdf_url: fixUrl(sec.media?.pdf_url || sec.media?.pdfUrl || sec.media?.pdf),
+            section_ppt_url: fixUrl(sec.media?.ppt_url || sec.media?.pptUrl || sec.media?.ppt),
+            section_video_url: fixUrl(sec.media?.video_url || sec.media?.videoUrl || sec.media?.video),
           }))
         )
       : (content.exercises || []).map((ex: any, idx: number) => ({
@@ -308,10 +401,15 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
           options: ex.options || [],
           correct_option: ex.answer !== undefined ? ex.answer : -1,
           explanation: ex.explanation || "Tidak ada pembahasan.",
-          audio_url: fixUrl(ex.audio_url),
-          image_url: fixUrl(ex.image_url),
-          video_url: fixUrl(ex.video_url),
-          question_type: ex.options && ex.options.length > 0 ? "multiple_choice" : "essay"
+          audio_url: fixUrl(ex.audio_url || ex.audioUrl || ex.audio),
+          image_url: fixUrl(ex.image_url || ex.imageUrl || ex.image),
+          video_url: fixUrl(ex.video_url || ex.videoUrl || ex.video),
+          question_type: ex.options && ex.options.length > 0 ? "multiple_choice" : "essay",
+          section_title: "Evaluasi Utama",
+          section_instructions: content.instructions || "Silakan jawab pertanyaan berikut dengan saksama.",
+          section_audio_url: fixUrl(content.audio_url || content.audioUrl || content.audio || materialData.audio_url),
+          section_image_url: fixUrl(content.image_url || content.imageUrl || content.image || materialData.image_url),
+          section_video_url: fixUrl(content.video_url || content.videoUrl || content.video || materialData.video_url)
         }));
 
     // Jika akses remedial aktif → izinkan mengerjakan meskipun sudah selesai sebelumnya
@@ -322,7 +420,29 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
           <div className="flex flex-col items-center gap-4">
             <div className="w-12 h-12 border-4 border-slate-900 border-t-transparent rounded-full animate-spin" />
-            <p className="text-slate-500 text-sm font-semibold">Memverifikasi akses kuis...</p>
+            <p className="text-slate-500 text-sm font-semibold">Memverifikasi akses...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (isChapterLocked) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
+          <div className="bg-white rounded-[2.5rem] p-10 max-w-md w-full shadow-2xl border border-slate-100 text-center space-y-6 animate-in zoom-in-95 duration-300">
+            <div className="text-6xl animate-bounce">🔒</div>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-black text-slate-800 tracking-tight italic">Bab Masih Terkunci!</h1>
+              <p className="text-slate-500 text-sm font-semibold leading-relaxed">
+                Anda harus menyelesaikan semua materi di bab sebelumnya terlebih dahulu sebelum dapat mengakses materi di bab ini.
+              </p>
+            </div>
+            <button 
+              onClick={() => router.back()}
+              className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-black uppercase tracking-widest text-xs rounded-2xl transition shadow-lg active:scale-95"
+            >
+              Kembali ke Pembelajaran
+            </button>
           </div>
         </div>
       );
@@ -467,7 +587,18 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
             <button onClick={() => router.back()} className="h-10 w-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-500 hover:bg-slate-100 transition">
               ←
             </button>
-            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">{materialData.material_type.replace('_', ' ')}</div>
+            <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+              {(() => {
+                if (content?.custom_type_name) return content.custom_type_name;
+                if (categoryCustomTypeNames[materialData.material_type]) {
+                  return categoryCustomTypeNames[materialData.material_type];
+                }
+                if (materialData.material_type === 'bunpou') return 'tata bahasa';
+                if (materialData.material_type === 'dokkai') return 'reading';
+                if (materialData.material_type === 'choukai') return 'listening';
+                return materialData.material_type.replace('_', ' ');
+              })()}
+            </div>
           </div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight italic">
             {materialData.title}
@@ -635,17 +766,17 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                     options: ex.options || [],
                     correct_option: ex.answer !== undefined ? ex.answer : -1,
                     explanation: ex.explanation,
-                    audio_url: ex.audio_url,
-                    image_url: ex.image_url,
-                    video_url: ex.video_url,
+                    audio_url: fixUrl(ex.audio_url || ex.audioUrl || ex.audio),
+                    image_url: fixUrl(ex.image_url || ex.imageUrl || ex.image),
+                    video_url: fixUrl(ex.video_url || ex.videoUrl || ex.video),
                     question_type: ex.question_type || (ex.options && ex.options.length > 0 ? "multiple_choice" : "essay"),
                     section_title: sec.title,
                     section_instructions: sec.instructions,
-                    section_audio_url: sec.media?.audio_url || sec.media?.audio,
-                    section_image_url: sec.media?.image_url || sec.media?.image,
-                    section_pdf_url: sec.media?.pdf_url || sec.media?.pdf,
-                    section_ppt_url: sec.media?.ppt_url || sec.media?.ppt,
-                    section_video_url: sec.media?.video_url || sec.media?.video,
+                    section_audio_url: fixUrl(sec.media?.audio_url || sec.media?.audioUrl || sec.media?.audio),
+                    section_image_url: fixUrl(sec.media?.image_url || sec.media?.imageUrl || sec.media?.image),
+                    section_pdf_url: fixUrl(sec.media?.pdf_url || sec.media?.pdfUrl || sec.media?.pdf),
+                    section_ppt_url: fixUrl(sec.media?.ppt_url || sec.media?.pptUrl || sec.media?.ppt),
+                    section_video_url: fixUrl(sec.media?.video_url || sec.media?.videoUrl || sec.media?.video),
                   }))
                 )
               : (content.exercises || []).map((ex: any, idx: number) => ({
@@ -654,10 +785,15 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                   options: ex.options || [],
                   correct_option: ex.answer !== undefined ? ex.answer : -1,
                   explanation: ex.explanation,
-                  audio_url: ex.audio_url,
-                  image_url: ex.image_url,
-                  video_url: ex.video_url,
-                  question_type: ex.options && ex.options.length > 0 ? "multiple_choice" : "essay"
+                  audio_url: fixUrl(ex.audio_url || ex.audioUrl || ex.audio),
+                  image_url: fixUrl(ex.image_url || ex.imageUrl || ex.image),
+                  video_url: fixUrl(ex.video_url || ex.videoUrl || ex.video),
+                  question_type: ex.options && ex.options.length > 0 ? "multiple_choice" : "essay",
+                  section_title: "Evaluasi Utama",
+                  section_instructions: content.instructions || "Silakan jawab pertanyaan berikut dengan saksama.",
+                  section_audio_url: fixUrl(content.audio_url || content.audioUrl || content.audio || materialData.audio_url),
+                  section_image_url: fixUrl(content.image_url || content.imageUrl || content.image || materialData.image_url),
+                  section_video_url: fixUrl(content.video_url || content.videoUrl || content.video || materialData.video_url)
                 }))}
             mode="latihan"
             localStorageKey={`practice_quiz_${materialData.id}`}

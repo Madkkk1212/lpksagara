@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Profile, MaterialCategory, StudyLevel, StudyChapter, StudyMaterial, AppTheme } from "@/lib/types";
-import { getMaterialCategories, getStudyLevels, getStudyChapters, getStudyMaterials, upsertProfile, getCompletedMaterials, markMaterialCompleted } from "@/lib/db";
+import { getMaterialCategories, getStudyLevels, getStudyChapters, getStudyMaterials, upsertProfile, getCompletedMaterials, markMaterialCompleted, getAllStudyChapters, getBasicStudyMaterials } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { Lock, CheckCircle2, Trophy, Star } from "lucide-react";
 import { calculateChapterXPDistribution } from "@/lib/GamificationUtils";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface MateriViewProps {
   user: Profile;
@@ -28,21 +29,31 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
   // New states for progression
   const [completedMaterials, setCompletedMaterials] = useState<string[]>([]);
   const [allLevelMaterials, setAllLevelMaterials] = useState<StudyMaterial[]>([]);
+  const [allChaps, setAllChaps] = useState<StudyChapter[]>([]);
+  const [globalMats, setGlobalMats] = useState<Partial<StudyMaterial>[]>([]);
   const [completing, setCompleting] = useState(false);
   const [activeQuizzes, setActiveQuizzes] = useState<string[]>([]);
+  const [lockedMessage, setLockedMessage] = useState<string | null>(null);
+
+  const isLevelCompleted = (levelId: string) => {
+     const levelChaps = allChaps.filter(c => c.level_id === levelId);
+     const levelMats = globalMats.filter(m => levelChaps.some(c => c.id === m.chapter_id));
+     if (levelMats.length === 0) return false;
+     return levelMats.every(m => m.id && completedMaterials.includes(m.id));
+  };
 
   const isLevelUnlocked = (lvlId: string) => {
-    if (user.is_admin || user.is_super_admin || user.is_premium) return true;
+    if (user.is_admin || user.is_super_admin || user.is_teacher) return true;
+    
     const sameCatLevels = levels
       .filter(l => l.category_id === activeCategory)
       .sort((a, b) => a.sort_order - b.sort_order);
     
-    const unlocked = user.unlocked_levels || [];
+    const idx = sameCatLevels.findIndex(l => l.id === lvlId);
+    if (idx <= 0) return true; // first level is always unlocked
     
-    // Default: First level is always unlocked
-    if (sameCatLevels.length > 0 && lvlId === sameCatLevels[0].id) return true;
-    
-    return unlocked.includes(lvlId);
+    const prevLvl = sameCatLevels[idx - 1];
+    return isLevelCompleted(prevLvl.id);
   };
 
   // Progression Logic
@@ -53,7 +64,11 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
   };
 
   const isChapterUnlocked = (chapterId: string) => {
-    return true; // Semua chapter terbuka
+    if (user.is_admin || user.is_super_admin || user.is_teacher) return true;
+    const idx = chapters.findIndex(c => c.id === chapterId);
+    if (idx <= 0) return true; // first chapter is always unlocked
+    const prevChap = chapters[idx - 1];
+    return isChapterCompleted(prevChap.id);
   };
 
   const isMaterialCompleted = (materialId: string) => {
@@ -61,6 +76,8 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
   };
 
   const isMaterialUnlocked = (chapterId: string, materialId: string) => {
+    if (!isChapterUnlocked(chapterId)) return false;
+
     const mats = chapterMaterials[chapterId];
     if (!mats) return false;
     
@@ -85,14 +102,19 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
 
   useEffect(() => {
     async function loadInitial() {
-      const [cats, lvls, completed] = await Promise.all([
+      const [cats, lvls, completed, chaps, mats] = await Promise.all([
         getMaterialCategories(),
         getStudyLevels(),
-        user.email ? getCompletedMaterials(user.email) : Promise.resolve([])
+        user.email ? getCompletedMaterials(user.email) : Promise.resolve([]),
+        getAllStudyChapters(),
+        getBasicStudyMaterials()
       ]);
-      setCategories(cats);
+      const activeCats = cats.filter((cat: any) => cat.is_active !== false);
+      setCategories(activeCats);
       setLevels(lvls);
       setCompletedMaterials(completed);
+      setAllChaps(chaps);
+      setGlobalMats(mats);
       
       if (user.id) {
           let query = supabase.from('quiz_access_controls').select('material_id').eq('is_active', true);
@@ -103,11 +125,11 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
           }
           const { data: accessData } = await query;
           if (accessData) {
-             setActiveQuizzes(accessData.map((a: any) => a.material_id));
+              setActiveQuizzes(accessData.map((a: any) => a.material_id));
           }
       }
 
-      if (cats.length > 0) setActiveCategory(cats[0].id);
+      if (activeCats.length > 0) setActiveCategory(activeCats[0].id);
       setLoading(false);
     }
     loadInitial();
@@ -280,9 +302,26 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                   </div>
                   
                   <div className="flex items-center gap-4 mb-8 relative z-10">
-                     <span className="px-4 py-1.5 bg-teal-50 text-teal-600 rounded-full text-[10px] font-black uppercase tracking-widest">
-                       {selectedMaterial.material_type.replace('_', ' ')}
-                     </span>
+                      <span className="px-4 py-1.5 bg-teal-50 text-teal-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+                        {(() => {
+                          const content = (typeof selectedMaterial.content === 'string' 
+                              ? JSON.parse(selectedMaterial.content) 
+                              : selectedMaterial.content) || {};
+                          if (content.custom_type_name) return content.custom_type_name;
+                          
+                          // Category-level custom type name mapping
+                          const cat = categories.find(c => c.id === activeCategory);
+                          const catCustomNames = cat?.custom_type_names || {};
+                          if (catCustomNames[selectedMaterial.material_type]) {
+                            return catCustomNames[selectedMaterial.material_type];
+                          }
+                          
+                          if (selectedMaterial.material_type === 'bunpou') return 'tata bahasa';
+                          if (selectedMaterial.material_type === 'dokkai') return 'reading';
+                          if (selectedMaterial.material_type === 'choukai') return 'listening';
+                          return selectedMaterial.material_type.replace('_', ' ');
+                        })()}
+                      </span>
                      {isMaterialCompleted(selectedMaterial.id) && (
                         <span className="flex items-center gap-2 px-4 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest">
                            <CheckCircle2 size={12} /> SUDAH SELESAI
@@ -523,8 +562,15 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                      
                      return (
                       <div key={chapter.id} className={`bg-white/60 backdrop-blur-md rounded-[2.5rem] border border-white/80 shadow-sm overflow-hidden transition-all duration-500 ${!unlocked ? 'opacity-60 saturate-50' : ''}`}>
-                         <div 
-                            className={`w-full p-8 flex items-center justify-between border-b border-slate-100/50 ${!unlocked ? 'cursor-not-allowed' : ''}`}
+                         <button 
+                            onClick={() => {
+                               if (!unlocked) {
+                                  setLockedMessage("Selesaikan bab sebelumnya terlebih dahulu untuk membuka materi ini!");
+                               } else {
+                                  toggleChapter(chapter.id);
+                               }
+                            }}
+                            className={`w-full p-8 flex items-center justify-between border-b border-slate-100/50 ${!unlocked ? 'cursor-pointer' : 'cursor-pointer hover:bg-white/50'} transition-colors`}
                           >
                              <div className="flex items-center gap-6 text-left">
                                 <div className={`h-16 w-16 rounded-[1.2rem] flex items-center justify-center p-3.5 shadow-sm ring-1 ring-slate-100 ${!unlocked ? 'bg-slate-200' : completed ? 'bg-emerald-50 text-emerald-600 ring-emerald-100' : 'bg-indigo-50'}`}>
@@ -544,10 +590,13 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                              {!unlocked && (
                                  <div className="h-10 w-10 flex items-center justify-center text-slate-300">🔒</div>
                              )}
-                          </div>
+                             {unlocked && (
+                                 <div className={`h-10 w-10 flex items-center justify-center text-slate-400 transition-transform duration-300 ${expandedChapter === chapter.id ? 'rotate-180' : ''}`}>▼</div>
+                             )}
+                          </button>
 
-                         {unlocked && (
-                           <div className="px-8 pb-8 space-y-3 animate-in fade-in slide-in-from-top-4 duration-500">
+                         {expandedChapter === chapter.id && (
+                           <div className="px-8 pt-6 pb-8 space-y-3 animate-in fade-in slide-in-from-top-4 duration-500">
                               {chapterMaterials[chapter.id]?.map((mat) => {
                                 const matDone = isMaterialCompleted(mat.id);
                                 const matUnlocked = isMaterialUnlocked(chapter.id, mat.id);
@@ -615,9 +664,21 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                      return (
                         <div key={level.id} className="relative">
                           <button 
-                            disabled={!unlocked}
-                            onClick={() => unlocked && setActiveLevel(level)}
-                            className={`w-full group p-10 rounded-[3.5rem] border transition-all duration-700 text-left relative overflow-hidden ${unlocked ? 'bg-white border-white/80 shadow-[0_20px_60px_rgba(0,0,0,0.02)] hover:shadow-2xl hover:translate-y-[-10px]' : 'bg-slate-900/5 border-transparent grayscale opacity-50 cursor-not-allowed'}`}
+                            onClick={() => {
+                               if (unlocked) {
+                                  setActiveLevel(level);
+                               } else {
+                                  const sameCatLevels = levels.filter(l => l.category_id === activeCategory).sort((a, b) => a.sort_order - b.sort_order);
+                                  const idx = sameCatLevels.findIndex(l => l.id === level.id);
+                                  if (idx > 0) {
+                                      const prevLvl = sameCatLevels[idx - 1];
+                                      setLockedMessage(`Kamu belum menyelesaikan level ${prevLvl.title} terlebih dahulu!`);
+                                  } else {
+                                      setLockedMessage("Level ini masih terkunci.");
+                                  }
+                               }
+                            }}
+                            className={`w-full group p-10 rounded-[3.5rem] border transition-all duration-700 text-left relative overflow-hidden ${unlocked ? 'bg-white border-white/80 shadow-[0_20px_60px_rgba(0,0,0,0.02)] hover:shadow-2xl hover:translate-y-[-10px]' : 'bg-slate-900/5 border-transparent grayscale opacity-50 cursor-pointer hover:opacity-70'}`}
                           >
                              <div className={`absolute -top-12 -right-12 h-40 w-40 rounded-full transition-all duration-1000 ${unlocked ? 'bg-slate-50 group-hover:bg-teal-50' : 'bg-slate-200/20'}`} />
                              <div className="relative z-10">
@@ -629,9 +690,9 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                                    <div>
                                       <h4 className={`text-2xl font-black italic mb-2 tracking-tight transition-colors ${unlocked ? 'text-slate-800' : 'text-slate-400'}`}>{level.title}</h4>
                                       <div className="flex items-center gap-2">
-                                         <div className={`h-1.5 w-1.5 rounded-full ${unlocked ? 'bg-teal-500 animate-pulse' : 'bg-slate-300'}`} />
+                                         <div className={`h-1.5 w-1.5 rounded-full ${unlocked ? 'bg-teal-500 animate-pulse' : 'bg-slate-400'}`} />
                                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
-                                           {unlocked ? 'Ready to Learn' : 'Premium Access Required'}
+                                           {unlocked ? 'Ready to Learn' : 'Locked Access'}
                                          </p>
                                       </div>
                                    </div>
@@ -639,15 +700,6 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                                 </div>
                              </div>
                           </button>
-                          
-                            <div className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-slate-900/5 backdrop-blur-[2px] rounded-[3.5rem] opacity-0 hover:opacity-100 transition-opacity duration-500 pointer-events-none group-hover:pointer-events-auto">
-                              <button 
-                                onClick={() => onUpgrade?.(`Halo Admin, saya ${user.full_name} ingin membuka akses ke ${level.title} di ${theme?.app_name || 'Sagara'}`)}
-                                className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:bg-teal-600 transition-colors pointer-events-auto"
-                              >
-                                Buka Level Sekarang →
-                              </button>
-                            </div>
                         </div>
                      );
                    })}
@@ -667,6 +719,20 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
            )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {lockedMessage && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/30 backdrop-blur-md" onClick={() => setLockedMessage(null)} />
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative bg-white rounded-[3rem] p-10 max-w-sm w-full text-center shadow-2xl border border-white">
+                <div className="w-24 h-24 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-6 text-5xl shadow-inner ring-4 ring-rose-50/50">🔒</div>
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-3">Akses Terkunci</h3>
+                <p className="text-sm text-slate-500 font-medium leading-relaxed mb-8">{lockedMessage}</p>
+                <button onClick={() => setLockedMessage(null)} className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] transition-all active:scale-95 shadow-lg shadow-slate-900/20">Mengerti</button>
+             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

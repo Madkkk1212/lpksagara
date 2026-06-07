@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 export default function GitUpdateManager() {
-  const [version] = useState("v2.0.1 - Paling Baru");
+  const [version] = useState("v2.1.0 - Paling Baru");
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -25,7 +25,130 @@ export default function GitUpdateManager() {
         </div>
       </div>
 
-      {/* Main Release Card */}
+      {/* ── LATEST RELEASE: v2.1.0 ── */}
+      <div className="bg-white rounded-3xl p-8 border-2 border-indigo-100 shadow-xl shadow-indigo-50/50 space-y-6">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-2xl shadow-inner">
+              🛡️
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-slate-800">v2.1.0 — CBT Security & Real-time Monitor</h3>
+              <p className="text-xs font-bold text-slate-400">Dipublikasikan pada: 7 Juni 2026</p>
+            </div>
+          </div>
+          <span className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-black border border-indigo-100">
+            Latest 🔥
+          </span>
+        </div>
+
+        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
+          <div className="p-5 bg-indigo-50 rounded-2xl border border-indigo-100 space-y-2">
+            <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider text-indigo-600">📌 Ringkasan Pembaruan:</h4>
+            <p className="text-slate-700">
+              Peningkatan besar-besaran pada sistem keamanan ujian CBT, penambahan fitur monitoring ujian real-time untuk guru, perbaikan popup level terkunci dengan desain glassmorphism, watermark nama siswa otomatis, serta penguatan akun monitoring super tersembunyi.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
+              <span className="text-emerald-500 text-lg shrink-0">✅</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Popup Level Terkunci (Glassmorphism)</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Alert bawaan browser diganti modal premium di halaman utama & halaman belajar. Ikon gembok animasi, tidak mengarah ke WhatsApp lagi.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
+              <span className="text-emerald-500 text-lg shrink-0">✅</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">KioskBarrier Anti-Cheat — Total Overhaul</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Fullscreen cross-device (iOS/Android), blokir PrintScreen + flash hitam, Ctrl+C/V/P/S diblokir, deteksi tab switch & blur, countdown 10 detik saat pelanggaran.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
+              <span className="text-emerald-500 text-lg shrink-0">✅</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Watermark Dinamis Nama Siswa</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Nama siswa + tanggal ujian muncul diagonal di seluruh layar saat ujian berlangsung. Screenshot bisa ditelusuri ke pelakunya.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
+              <span className="text-emerald-500 text-lg shrink-0">✅</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Monitor Ujian Real-time (Tab Guru)</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Tab baru "Monitor Ujian" di dashboard guru. Kartu siswa berkedip merah saat pelanggaran. Musik latar otomatis aktif (mbg-guru.mp3). Data via Supabase Realtime.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
+              <span className="text-emerald-500 text-lg shrink-0">✅</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Tabel exam_violations (Database Baru)</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Mencatat semua insiden: tab_switch, screenshot, blur, fullscreen_exit, page_hide. Realtime subscription aktif untuk update instan ke guru.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
+              <span className="text-emerald-500 text-lg shrink-0">✅</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Laporan Pelanggaran Langsung ke Supabase</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">KioskBarrier kini langsung INSERT/UPDATE ke tabel exam_violations saat terjadi pelanggaran, lengkap dengan jenis, jumlah, dan identitas siswa.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
+              <span className="text-emerald-500 text-lg shrink-0">✅</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Akun Monitoring Super (guru.super & siswa.super)</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Dua akun khusus pengawasan yang hanya terlihat Super Admin. guru.super otomatis terhubung ke siswa.super untuk simulasi dan testing monitoring.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
+              <span className="text-emerald-500 text-lg shrink-0">✅</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Filter Akun Tersembunyi Diperkuat</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">UserManager, TeacherAssignmentManager, AllStudentsAssessment — semua kini menyembunyikan 4 akun monitoring dari admin biasa.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
+              <span className="text-emerald-500 text-lg shrink-0">✅</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Anti-Cheat Tambahan di ModernQuizPlayer</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Mode ujian: blokir drag & drop konten soal, blokir klik kanan, flash hitam saat PrintScreen. Berlapis dengan KioskBarrier.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
+              <span className="text-emerald-500 text-lg shrink-0">✅</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Fix framer-motion di MateriView</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Import AnimatePresence & motion ditambahkan di MateriView.tsx untuk mendukung animasi popup level terkunci yang baru.</p>
+              </div>
+            </div>
+
+          </div>
+
+          {/* SQL Migrations callout */}
+          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100 flex items-start gap-3">
+            <span className="text-amber-500 text-lg shrink-0">⚠️</span>
+            <div>
+              <p className="font-black text-xs text-amber-800 mb-1">Wajib Dijalankan di Supabase SQL Editor:</p>
+              <ul className="text-[11px] text-amber-700 space-y-1 list-disc ml-4">
+                <li><code className="bg-amber-100 px-1 rounded font-mono">049_exam_violations.sql</code> — Tabel pelanggaran + realtime subscription</li>
+                <li><code className="bg-amber-100 px-1 rounded font-mono">050_assign_super_monitoring_accounts.sql</code> — Akun guru.super & siswa.super + assignment</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── PREVIOUS RELEASE: v2.0.1 ── */}
       <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-xl shadow-slate-100/50 space-y-6">
         <div className="flex items-center justify-between border-b border-slate-100 pb-6">
           <div className="flex items-center gap-4">
@@ -33,7 +156,7 @@ export default function GitUpdateManager() {
               ✨
             </div>
             <div>
-              <h3 className="text-xl font-black text-slate-800">Pak Ijal Makan Paku v2</h3>
+              <h3 className="text-xl font-black text-slate-800">v2.0.1 — Media & CBT Stability</h3>
               <p className="text-xs font-bold text-slate-400">Dipublikasikan pada: Mei 2026</p>
             </div>
           </div>
@@ -44,17 +167,17 @@ export default function GitUpdateManager() {
 
         <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
           <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
-             <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider text-indigo-600">📌 Keterangan Rilis & Catatan Pembaruan:</h4>
-             <p className="text-slate-700">
-               Pembaruan arsitektur sistem penyimpanan media, stabilisasi pemutar audio CBT, serta penambahan pemindai rekursif (Deep Recursive Media Scanner). Seluruh berkas kuis, latihan mendengarkan (Choukai), dan kosakata (Moji-Goi) telah tersinkronisasi 100% dengan Cloudflare R2.
-             </p>
+            <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider text-indigo-600">📌 Keterangan Rilis &amp; Catatan Pembaruan:</h4>
+            <p className="text-slate-700">
+              Pembaruan arsitektur sistem penyimpanan media, stabilisasi pemutar audio CBT, serta penambahan pemindai rekursif (Deep Recursive Media Scanner). Seluruh berkas kuis, latihan mendengarkan (Choukai), dan kosakata (Moji-Goi) telah tersinkronisasi 100% dengan Cloudflare R2.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
               <span className="text-emerald-500 text-lg">✅</span>
               <div>
-                <p className="font-black text-xs text-slate-800">CBT Audio & Video Resolved</p>
+                <p className="font-black text-xs text-slate-800">CBT Audio &amp; Video Resolved</p>
                 <p className="text-[11px] text-slate-500 mt-0.5">MIME type dan pemisahan file audio/video terlindungi ketat.</p>
               </div>
             </div>

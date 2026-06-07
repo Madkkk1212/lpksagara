@@ -326,7 +326,10 @@ export default function MediaUploader({ label, mediaType, value, onChange, accep
             </div>
             <div className="flex-1 overflow-hidden">
               <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5">✓ Uploaded</p>
-              <p className="text-[10px] font-bold text-slate-500 truncate">{fixedValue}</p>
+              <p className="text-[10px] font-bold text-slate-500 truncate mb-1">{fixedValue}</p>
+              {mediaType === "audio" && (
+                <audio controls className="w-full h-8 scale-90 origin-left" src={fixedValue} />
+              )}
             </div>
             <button
               onClick={() => onChange(null as any)}

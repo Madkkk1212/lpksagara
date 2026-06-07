@@ -306,27 +306,35 @@ export default function ExamLevelClient({ level }: { level: string }) {
 
   // 3. ACTIVE EXAM & RESULT REVIEW
   if (activeView === "exam" && selectedTest) {
+    const fixUrl = (url?: string | null): string | undefined => typeof url === 'string' ? url.replace(/^undefined\//, "https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev/") : undefined;
+
     const normalizedQuestions: NormalizedQuestion[] = selectedTest.questions.map((q, idx) => ({
       id: q.id,
       question_text: q.question_text,
       options: [q.option_a, q.option_b, q.option_c, q.option_d].filter(Boolean),
       correct_option: q.correct_option !== undefined ? q.correct_option : -1,
       explanation: q.explanation || "Tidak ada pembahasan.",
-      audio_url: q.audio_url,
-      image_url: q.image_url,
-      video_url: q.video_url,
+      audio_url: fixUrl(q.audio_url),
+      image_url: fixUrl(q.image_url),
+      video_url: fixUrl(q.video_url),
       question_type: q.question_type || 'multiple_choice',
       section_title: q.section_title,
       section_instructions: q.section_instructions,
-      section_audio_url: q.section_audio_url,
-      section_image_url: q.section_image_url,
-      section_pdf_url: q.section_pdf_url,
-      section_ppt_url: q.section_ppt_url,
-      section_video_url: q.section_video_url,
+      section_audio_url: fixUrl(q.section_audio_url),
+      section_image_url: fixUrl(q.section_image_url),
+      section_pdf_url: fixUrl(q.section_pdf_url),
+      section_ppt_url: fixUrl(q.section_ppt_url),
+      section_video_url: fixUrl(q.section_video_url),
     }));
 
     return (
-      <KioskBarrier title={`Mode Ujian: ${selectedTest.title}`}>
+      <KioskBarrier 
+        title={`Mode Ujian: ${selectedTest.title}`} 
+        userName={userProfile?.full_name || userProfile?.email || undefined}
+        userEmail={userProfile?.email || undefined}
+        testId={selectedTest.id}
+        testTitle={selectedTest.title}
+      >
         <ModernQuizPlayer
           title={selectedTest.title}
           questions={normalizedQuestions}

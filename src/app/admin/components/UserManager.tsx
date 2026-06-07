@@ -32,6 +32,8 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
   const [viewingProfile, setViewingProfile] = useState<Profile | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
 
+  const supabase = null;
+
   useEffect(() => {
     fetchProfiles();
     getProfileFields('all').then(setDynamicFields);
@@ -42,8 +44,20 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
     setLoading(true);
     try {
       const data = await getProfiles();
-      setProfiles(data);
-    } catch (err) {
+      
+      let fetchedUsers = data || [];
+      if (!userProfile.is_super_admin) {
+         const HIDDEN_EMAILS = [
+           'siswa.khusus@lpksagara.com',
+           'guru.khusus@lpksagara.com',
+           'siswa.super@lpksagara.com',
+           'guru.super@lpksagara.com',
+         ];
+         fetchedUsers = fetchedUsers.filter(u => !HIDDEN_EMAILS.includes(u.email));
+      }
+      
+      setProfiles(fetchedUsers);
+    } catch (err: any) {
       console.error(err);
     } finally {
       setLoading(false);
@@ -128,8 +142,13 @@ export default function UserManager({ user: userProfile }: { user: Profile }) {
   };
 
   const filtered = profiles.filter(p => {
-    if (!userProfile.is_super_admin && (p.is_admin || p.is_super_admin)) {
-      if (p.email !== userProfile.email) return false;
+    if (!userProfile.is_super_admin) {
+      if (p.is_admin || p.is_super_admin) {
+        if (p.email !== userProfile.email) return false;
+      }
+      if (p.email === "siswa.super@lpksagara.com" || p.email === "guru.super@lpksagara.com") {
+        return false;
+      }
     }
 
     const matchesSearch = 

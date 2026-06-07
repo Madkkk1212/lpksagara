@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
         title,
         material_type,
         chapter_id,
+        content,
         study_chapters (
           id,
           title,
@@ -55,7 +56,8 @@ export async function GET(req: NextRequest) {
           study_levels (
             id,
             title,
-            level_code
+            level_code,
+            category_id
           )
         )
       `)

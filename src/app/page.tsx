@@ -77,6 +77,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
   const [loggedIn, setLoggedIn] = useState(false);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
+  const [lockedMessage, setLockedMessage] = useState<string | null>(null);
   const [completedMaterials, setCompletedMaterials] = useState<string[]>([]);
   const [examProgress, setExamProgress] = useState<any>({});
   const [selectedStudyCategory, setSelectedStudyCategory] = useState<string | null>(null);
@@ -188,7 +189,7 @@ export default function Home() {
         // Apply global data
         setTheme(t);
         setBanners(b || []);
-        setCategories(c || []);
+        setCategories((c || []).filter((cat: any) => cat.is_active !== false));
         setPublicMaterials(m as any || []);
         setLevels(l || []);
         setStudyLevels(sl || []);
@@ -674,7 +675,7 @@ export default function Home() {
                         {studyLevels.filter(sl => sl.category_id === selectedStudyCategory).length > 0 ? studyLevels.filter(sl => sl.category_id === selectedStudyCategory).map(sl => (
                           <Link key={sl.id} href="#" onClick={(e) => { e.preventDefault(); if (!loggedIn) { router.push(`/login?redirect=materi`); return; }
                               const isUnlocked = userProfile?.is_admin || userProfile?.is_premium || (userProfile?.unlocked_levels || []).includes(sl.id) || sl.sort_order === 1;
-                              if (!isUnlocked) { const msg = `Halo Admin, saya ${userProfile?.full_name} ingin membuka akses ke ${sl.title} di ${theme?.app_name || 'Sagara'}`; window.open(`https://wa.me/6281273010793?text=${encodeURIComponent(msg)}`, '_blank'); return; }
+                              if (!isUnlocked) { setLockedMessage("Selesaikan level sebelumnya terlebih dahulu untuk membuka akses ke level ini!"); return; }
                               router.push(`/study/level/${sl.level_code}`); }}
                             className={`group relative bg-white rounded-[2.5rem] p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] ring-1 ring-slate-100 hover:shadow-2xl hover:-translate-y-2 active:scale-95 transition-all duration-500 overflow-hidden flex flex-col ${!(userProfile?.is_admin || userProfile?.is_premium || (userProfile?.unlocked_levels || []).includes(sl.id) || sl.sort_order === 1) ? 'opacity-70 grayscale' : ''}`} >
                              <div className="flex items-start justify-between mb-8">
@@ -875,6 +876,20 @@ export default function Home() {
         </nav>
         </div>
       )}
+
+      <AnimatePresence>
+        {lockedMessage && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/30 backdrop-blur-md" onClick={() => setLockedMessage(null)} />
+             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative bg-white rounded-[3rem] p-10 max-w-sm w-full text-center shadow-2xl border border-white">
+                <div className="w-24 h-24 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-6 text-5xl shadow-inner ring-4 ring-rose-50/50">🔒</div>
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-3">Akses Terkunci</h3>
+                <p className="text-sm text-slate-500 font-medium leading-relaxed mb-8">{lockedMessage}</p>
+                <button onClick={() => setLockedMessage(null)} className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] transition-all active:scale-95 shadow-lg shadow-slate-900/20">Mengerti</button>
+             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }
