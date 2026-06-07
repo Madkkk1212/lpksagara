@@ -58,6 +58,15 @@ export default function ModernQuizPlayer({
   const [userAnswers, setUserAnswers] = useState<Record<string, any>>({});
   const [flaggedQuestions, setFlaggedQuestions] = useState<Record<string, boolean>>({});
   const [checkedQuestions, setCheckedQuestions] = useState<Record<string, boolean>>({});
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem('luma-user-profile') || '{}');
+      if (p.is_super_admin) setIsSuperAdmin(true);
+    } catch(e) {}
+  }, []);
+
   const [isFinished, setIsFinished] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [unansweredWarningCount, setUnansweredWarningCount] = useState(0);
@@ -571,13 +580,15 @@ export default function ModernQuizPlayer({
       <header className="shrink-0 bg-white border-b border-slate-100 shadow-sm relative z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button 
-              onClick={onClose} 
-              className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-50 hover:bg-slate-100 transition"
-              title="Keluar"
-            >
-              ✕
-            </button>
+            {(isSuperAdmin || mode === 'latihan') && (
+              <button 
+                onClick={onClose} 
+                className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-50 hover:bg-slate-100 transition"
+                title="Keluar"
+              >
+                ✕
+              </button>
+            )}
             <div>
               <h1 className="text-base font-black text-slate-800 tracking-tight italic leading-tight">{title}</h1>
               <div className="flex items-center gap-3">
