@@ -81,6 +81,7 @@ export default function Home() {
   const [completedMaterials, setCompletedMaterials] = useState<string[]>([]);
   const [examProgress, setExamProgress] = useState<any>({});
   const [selectedStudyCategory, setSelectedStudyCategory] = useState<string | null>(null);
+  const [levelMaterialIds, setLevelMaterialIds] = useState<Record<string, string[]>>({});
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   
@@ -114,6 +115,22 @@ export default function Home() {
   const [isFetching, setIsFetching] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
 
+  const retryFetchCategories = async () => {
+    try {
+      const { getMaterialCategories } = await import('@/lib/db');
+      const c = await getMaterialCategories();
+      setCategories((c || []).filter((cat: any) => cat.is_active !== false));
+    } catch (err) {
+      console.error("Failed to retry fetch categories", err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'materi' && categories.length === 0 && !isFetching) {
+      retryFetchCategories();
+    }
+  }, [activeTab, categories.length, isFetching]);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
@@ -125,6 +142,54 @@ export default function Home() {
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showProfileMenu]);
+
+  // Fetch material IDs per level when a category is selected (for locking logic)
+  useEffect(() => {
+    if (!selectedStudyCategory || !loggedIn) return;
+    const fetchLevelMaterials = async () => {
+      try {
+        const { supabase: sb } = await import('@/lib/supabase');
+        // Get all chapters for levels in this category, with their material IDs
+        const levelsInCat = studyLevels.filter(sl => sl.category_id === selectedStudyCategory);
+        if (levelsInCat.length === 0) return;
+        const levelIds = levelsInCat.map(sl => sl.id);
+
+        // Fetch chapters with level_id
+        const { data: chapters } = await sb
+          .from('study_chapters')
+          .select('id, level_id')
+          .in('level_id', levelIds);
+
+        if (!chapters || chapters.length === 0) return;
+        const chapterIds = chapters.map((c: any) => c.id);
+
+        // Fetch materials for these chapters
+        const { data: mats } = await sb
+          .from('study_materials')
+          .select('id, chapter_id')
+          .in('chapter_id', chapterIds);
+
+        if (!mats) return;
+
+        // Build map: level_id -> material_ids[]
+        const chapterToLevel: Record<string, string> = {};
+        chapters.forEach((c: any) => { chapterToLevel[c.id] = c.level_id; });
+
+        const map: Record<string, string[]> = {};
+        mats.forEach((m: any) => {
+          const lvlId = chapterToLevel[m.chapter_id];
+          if (lvlId) {
+            if (!map[lvlId]) map[lvlId] = [];
+            map[lvlId].push(m.id);
+          }
+        });
+        setLevelMaterialIds(map);
+      } catch (err) {
+        console.error('Failed to fetch level material ids:', err);
+      }
+    };
+    fetchLevelMaterials();
+  }, [selectedStudyCategory, studyLevels, loggedIn]);
 
   useEffect(() => {
     // 🛡️ EMERGENCY FALLBACK: Force dismiss splash after 5 seconds no matter what
@@ -659,7 +724,14 @@ export default function Home() {
                              <div className="absolute -bottom-20 -right-20 h-64 w-64 rounded-full opacity-10 group-hover:opacity-20 transition-opacity" style={{ background: `radial-gradient(circle, ${cat.badge_color || '#14b8a6'} 0%, transparent 70%)` }} />
                           </button>
                         ))}
-                        {categories.length === 0 && <div className="col-span-full py-10 text-center text-slate-400 italic font-bold">Kategori belum tersedia.</div>}
+                        {categories.length === 0 && (
+                          <div className="col-span-full py-10 flex flex-col items-center gap-4">
+                            <p className="text-slate-400 italic font-bold text-center">Kategori belum tersedia atau lambat dimuat.</p>
+                            <button onClick={retryFetchCategories} className="px-6 py-2 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all">
+                              Muat Ulang
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-8">
@@ -672,27 +744,69 @@ export default function Home() {
                            </div>
                         </div>
                         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {studyLevels.filter(sl => sl.category_id === selectedStudyCategory).length > 0 ? studyLevels.filter(sl => sl.category_id === selectedStudyCategory).map(sl => (
-                          <Link key={sl.id} href="#" onClick={(e) => { e.preventDefault(); if (!loggedIn) { router.push(`/login?redirect=materi`); return; }
-                              const isUnlocked = userProfile?.is_admin || userProfile?.is_premium || (userProfile?.unlocked_levels || []).includes(sl.id) || sl.sort_order === 1;
-                              if (!isUnlocked) { setLockedMessage("Selesaikan level sebelumnya terlebih dahulu untuk membuka akses ke level ini!"); return; }
-                              router.push(`/study/level/${sl.level_code}`); }}
-                            className={`group relative bg-white rounded-[2.5rem] p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] ring-1 ring-slate-100 hover:shadow-2xl hover:-translate-y-2 active:scale-95 transition-all duration-500 overflow-hidden flex flex-col ${!(userProfile?.is_admin || userProfile?.is_premium || (userProfile?.unlocked_levels || []).includes(sl.id) || sl.sort_order === 1) ? 'opacity-70 grayscale' : ''}`} >
+                        {studyLevels.filter(sl => sl.category_id === selectedStudyCategory).length > 0 ? studyLevels.filter(sl => sl.category_id === selectedStudyCategory).map((sl, slIdx, catLevels) => {
+                           // Admins & super-admins bypass all locks
+                           if (userProfile?.is_admin || userProfile?.is_super_admin) {
+                             const isUnlocked = true;
+                             return (
+                               <Link key={sl.id} href="#" onClick={(e) => { e.preventDefault(); router.push(`/study/level/${sl.level_code}`); }}
+                                 className="group relative bg-white rounded-[2.5rem] p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] ring-1 ring-slate-100 hover:shadow-2xl hover:-translate-y-2 active:scale-95 transition-all duration-500 overflow-hidden flex flex-col">
+                                 <div className="flex items-start justify-between mb-8">
+                                   <div className="h-16 w-16 rounded-3xl flex items-center justify-center text-2xl font-black text-white shadow-lg overflow-hidden group-hover:scale-110 transition-transform duration-500" style={{ backgroundColor: sl.icon_url ? 'transparent' : (sl.badge_color || '#14b8a6') }}>
+                                     {sl.icon_url ? (<img src={sl.icon_url || undefined} alt={sl.level_code} className="w-full h-full object-cover" />) : (sl.level_code.toUpperCase())}
+                                   </div>
+                                 </div>
+                                 <h4 className="text-2xl font-black text-slate-800 italic leading-tight mb-3 group-hover:text-teal-600 transition-colors">{sl.title}</h4>
+                                 <p className="text-sm text-slate-400 font-medium leading-relaxed mb-8 flex-1">{sl.description || 'Pelajari materi lengkap untuk level ini.'}</p>
+                                 <div className="flex items-center justify-between pt-4 border-t border-slate-50 mt-auto">
+                                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400"> Pilih Level </span>
+                                   <span className="text-teal-500 font-bold opacity-0 group-hover:opacity-100 translate-x-[-10px] group-hover:translate-x-0 transition-all">→</span>
+                                 </div>
+                                 <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full opacity-10 group-hover:opacity-20 transition-opacity" style={{ background: `radial-gradient(circle, ${sl.badge_color || '#14b8a6'} 0%, transparent 70%)` }} />
+                               </Link>
+                             );
+                           }
+
+                           // Level 1 (sort_order === 1 within category) is always accessible
+                           const isFirstLevel = slIdx === 0;
+
+                           // For subsequent levels: check if all materials in the PREVIOUS level are completed
+                           let isUnlocked = isFirstLevel;
+                           if (!isFirstLevel) {
+                             const prevLevel = catLevels[slIdx - 1];
+                             const prevLevelMats = levelMaterialIds[prevLevel.id] || [];
+                             const prevCompleted = prevLevelMats.length > 0 && prevLevelMats.every(id => completedMaterials.includes(id));
+                             isUnlocked = prevCompleted;
+                           }
+
+                           return (
+                             <Link key={sl.id} href="#" onClick={(e) => {
+                               e.preventDefault();
+                               if (!loggedIn) { router.push(`/login?redirect=materi`); return; }
+                               if (!isUnlocked) {
+                                 const prevLevel = slIdx > 0 ? catLevels[slIdx - 1] : null;
+                                 setLockedMessage(`Selesaikan semua materi ${prevLevel?.title || 'level sebelumnya'} terlebih dahulu untuk membuka ${sl.title}! 🔒`);
+                                 return;
+                               }
+                               router.push(`/study/level/${sl.level_code}`);
+                             }}
+                               className={`group relative bg-white rounded-[2.5rem] p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] ring-1 ring-slate-100 hover:shadow-2xl hover:-translate-y-2 active:scale-95 transition-all duration-500 overflow-hidden flex flex-col ${!isUnlocked ? 'opacity-70 grayscale cursor-not-allowed' : ''}`}>
                              <div className="flex items-start justify-between mb-8">
-                                <div className="h-16 w-16 rounded-3xl flex items-center justify-center text-2xl font-black text-white shadow-lg overflow-hidden group-hover:scale-110 transition-transform duration-500" style={{ backgroundColor: sl.icon_url ? 'transparent' : (sl.badge_color || '#14b8a6') }} >
-                                    {sl.icon_url ? ( <img src={sl.icon_url || undefined} alt={sl.level_code} className="w-full h-full object-cover" /> ) : ( sl.level_code.toUpperCase() )}
+                                <div className="h-16 w-16 rounded-3xl flex items-center justify-center text-2xl font-black text-white shadow-lg overflow-hidden group-hover:scale-110 transition-transform duration-500" style={{ backgroundColor: sl.icon_url ? 'transparent' : (sl.badge_color || '#14b8a6') }}>
+                                    {sl.icon_url ? (<img src={sl.icon_url || undefined} alt={sl.level_code} className="w-full h-full object-cover" />) : (sl.level_code.toUpperCase())}
                                 </div>
-                                {!(userProfile?.is_admin || userProfile?.is_premium || (userProfile?.unlocked_levels || []).includes(sl.id) || sl.sort_order === 1) && ( <div className="h-10 w-10 bg-slate-900/5 rounded-xl flex items-center justify-center text-xl">🔒</div> )}
+                                {!isUnlocked && (<div className="h-10 w-10 bg-slate-900/5 rounded-xl flex items-center justify-center text-xl">🔒</div>)}
                              </div>
                              <h4 className="text-2xl font-black text-slate-800 italic leading-tight mb-3 group-hover:text-teal-600 transition-colors">{sl.title}</h4>
                              <p className="text-sm text-slate-400 font-medium leading-relaxed mb-8 flex-1">{sl.description || 'Pelajari materi lengkap untuk level ini.'}</p>
                              <div className="flex items-center justify-between pt-4 border-t border-slate-50 mt-auto">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400"> Pilih Level </span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400"> {isUnlocked ? 'Pilih Level' : 'Terkunci 🔒'} </span>
                                 <span className="text-teal-500 font-bold opacity-0 group-hover:opacity-100 translate-x-[-10px] group-hover:translate-x-0 transition-all">→</span>
                              </div>
                              <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full opacity-10 group-hover:opacity-20 transition-opacity" style={{ background: `radial-gradient(circle, ${sl.badge_color || '#14b8a6'} 0%, transparent 70%)` }} />
                           </Link>
-                        )) : ( <div className="col-span-full py-10 text-center font-bold text-slate-400 italic">Level materi untuk kategori ini belum tersedia.</div> )}
+                         );
+                        }) : ( <div className="col-span-full py-10 text-center font-bold text-slate-400 italic">Level materi untuk kategori ini belum tersedia.</div> )}
                       </div>
                     </div>
                     )}
