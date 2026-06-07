@@ -79,6 +79,7 @@ export default function ExamMonitorDashboard({ teacherEmail }: { teacherEmail: s
   }, [musicEnabled, newAlert]);
 
   // Load initial violations
+  // Load initial violations
   const loadViolations = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -107,15 +108,19 @@ export default function ExamMonitorDashboard({ teacherEmail }: { teacherEmail: s
           };
         }
         grouped[v.student_email].total_violations += v.violation_count;
-        grouped[v.student_email].violations.push(v);
+        if (v.violation_type !== "none") {
+          grouped[v.student_email].violations.push(v);
+        }
         if (new Date(v.updated_at) > new Date(grouped[v.student_email].last_seen)) {
           grouped[v.student_email].last_seen = v.updated_at;
-          grouped[v.student_email].latest_violation_type = v.violation_type;
+          if (v.violation_type !== "none" || grouped[v.student_email].latest_violation_type === "none") {
+            grouped[v.student_email].latest_violation_type = v.violation_type;
+          }
         }
       });
 
       setStudentStatuses(grouped);
-      setTotalActive(Object.keys(grouped).length);
+      setTotalActive(Object.values(grouped).filter(s => s.is_active).length);
       setLoading(false);
     } catch (err) {
       console.error("Failed to load violations:", err);
@@ -141,11 +146,14 @@ export default function ExamMonitorDashboard({ teacherEmail }: { teacherEmail: s
         (payload) => {
           if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
             const v = payload.new as ExamViolation;
+            const isRealViolation = v.violation_type !== "none";
 
-            // Trigger alert
-            setNewAlert(true);
-            if (newAlertTimeoutRef.current) clearTimeout(newAlertTimeoutRef.current);
-            newAlertTimeoutRef.current = setTimeout(() => setNewAlert(false), 8000);
+            // Trigger alert ONLY IF it is an active real violation
+            if (isRealViolation && v.is_active) {
+              setNewAlert(true);
+              if (newAlertTimeoutRef.current) clearTimeout(newAlertTimeoutRef.current);
+              newAlertTimeoutRef.current = setTimeout(() => setNewAlert(false), 8000);
+            }
 
             // Mark student as alerted (red flash)
             setStudentStatuses((prev) => {
@@ -161,23 +169,34 @@ export default function ExamMonitorDashboard({ teacherEmail }: { teacherEmail: s
                 isAlerted: false,
               };
 
+              const filteredViolations = existing.violations.filter((ev) => ev.id !== v.id);
+              const newViolations = isRealViolation ? [...filteredViolations, v] : filteredViolations;
+              
+              // Recalculate total_violations from all real violations in history
+              const total_violations = newViolations.reduce((sum, ev) => sum + ev.violation_count, 0);
+
               const updated = {
                 ...existing,
-                total_violations: v.violation_count,
-                latest_violation_type: v.violation_type,
+                total_violations,
+                latest_violation_type: isRealViolation ? v.violation_type : existing.latest_violation_type,
                 last_seen: v.updated_at,
                 is_active: v.is_active,
-                isAlerted: true,
-                violations: [...existing.violations.filter((ev) => ev.id !== v.id), v],
+                isAlerted: isRealViolation && v.is_active,
+                violations: newViolations,
               };
 
               // Auto-clear red flash after 3 seconds
-              setTimeout(() => {
-                setStudentStatuses((prev2) => ({
-                  ...prev2,
-                  [v.student_email]: { ...prev2[v.student_email], isAlerted: false },
-                }));
-              }, 3000);
+              if (isRealViolation && v.is_active) {
+                setTimeout(() => {
+                  setStudentStatuses((prev2) => {
+                    if (!prev2[v.student_email]) return prev2;
+                    return {
+                      ...prev2,
+                      [v.student_email]: { ...prev2[v.student_email], isAlerted: false }
+                    };
+                  });
+                }, 3000);
+              }
 
               return { ...prev, [v.student_email]: updated };
             });
@@ -204,7 +223,7 @@ export default function ExamMonitorDashboard({ teacherEmail }: { teacherEmail: s
     return `${Math.floor(sec / 3600)}j lalu`;
   };
 
-  const allStudents = Object.values(studentStatuses);
+  const allStudents = Object.values(studentStatuses).filter((s) => s.is_active);
   const alertedStudents = allStudents.filter((s) => s.total_violations > 0);
 
   if (loading) {

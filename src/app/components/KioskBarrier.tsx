@@ -8,12 +8,13 @@ interface KioskBarrierProps {
   title?: string;
   userName?: string;
   userEmail?: string;
+  studentId?: string;
   testId?: string;
   testTitle?: string;
   onViolationForceExit?: () => void;
 }
 
-export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", userName, userEmail, testId, testTitle, onViolationForceExit }: KioskBarrierProps) {
+export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", userName, userEmail, studentId, testId, testTitle, onViolationForceExit }: KioskBarrierProps) {
   const [isLocked, setIsLocked] = useState(false);
   const [violation, setViolation] = useState(false);
   const [violationCount, setViolationCount] = useState(0);
@@ -44,21 +45,27 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", u
     if (!userEmail) return;
     try {
       const key = type;
-      violationCounterRef.current[key] = (violationCounterRef.current[key] || 0) + 1;
-      const count = violationCounterRef.current[key];
+      const count = type === "none" ? 0 : (violationCounterRef.current[key] || 0) + 1;
+      if (type !== "none") {
+        violationCounterRef.current[key] = count;
+      }
       const existingId = violationRecordIdRef.current[key];
 
       if (existingId) {
         // Update existing record
-        await supabase
+        const { error } = await supabase
           .from("exam_violations")
-          .update({ violation_count: count, updated_at: new Date().toISOString() })
+          .update({ violation_count: count, is_active: true, updated_at: new Date().toISOString() })
           .eq("id", existingId);
+        if (error) {
+          console.error("Failed to update violation in Supabase:", error);
+        }
       } else {
         // Insert new record
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("exam_violations")
           .insert({
+            student_id: studentId || userEmail || "unknown",
             student_email: userEmail,
             student_name: userName || userEmail,
             test_id: testId || null,
@@ -69,12 +76,44 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", u
           })
           .select("id")
           .single();
+        
+        if (error) {
+          console.error("Failed to insert violation in Supabase:", error);
+        }
         if (data?.id) violationRecordIdRef.current[key] = data.id;
       }
     } catch (err) {
       console.error("Failed to report violation:", err);
     }
-  }, [userEmail, userName, testId, testTitle, title]);
+  }, [userEmail, userName, studentId, testId, testTitle, title]);
+
+  // Register the student as active immediately upon locking the screen
+  useEffect(() => {
+    if (isLocked) {
+      reportViolation("none");
+    }
+  }, [isLocked, reportViolation]);
+
+  // Clean up student status to inactive when they leave/refresh/close the tab
+  useEffect(() => {
+    const handleUnload = () => {
+      if (isLockedRef.current && userEmail && testId) {
+        supabase
+          .from("exam_violations")
+          .update({ is_active: false })
+          .eq("student_email", userEmail)
+          .eq("test_id", testId)
+          .then(() => {});
+      }
+    };
+
+    window.addEventListener("beforeunload", handleUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleUnload);
+      handleUnload();
+    };
+  }, [userEmail, testId]);
 
   // Trigger violation
   const triggerViolation = useCallback((type: string = "tab_switch") => {

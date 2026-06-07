@@ -478,6 +478,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
         title={`Kuis Evaluasi Bab: ${materialData.title}`}
         userName={userName}
         userEmail={userEmail}
+        studentId={studentProfileId || undefined}
         testId={materialData.id}
         testTitle={materialData.title}
       >

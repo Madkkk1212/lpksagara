@@ -332,6 +332,7 @@ export default function ExamLevelClient({ level }: { level: string }) {
         title={`Mode Ujian: ${selectedTest.title}`} 
         userName={userProfile?.full_name || userProfile?.email || undefined}
         userEmail={userProfile?.email || undefined}
+        studentId={userProfile?.id || undefined}
         testId={selectedTest.id}
         testTitle={selectedTest.title}
       >
