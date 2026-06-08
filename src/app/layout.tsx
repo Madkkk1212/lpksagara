@@ -50,6 +50,7 @@ export const viewport = {
 
 import SmoothScroll from "@/app/components/SmoothScroll";
 import PageTransition from "@/app/components/PageTransition";
+import ErrorMonitor from "@/app/components/ErrorMonitor";
 
 export default function RootLayout({
   children,
@@ -62,6 +63,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <ErrorMonitor />
         <SmoothScroll />
         <PageTransition>
           {children}
@@ -69,7 +71,13 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: `
           if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
-              navigator.serviceWorker.register('/sw.js');
+              navigator.serviceWorker.register('/sw.js')
+                .then(function(reg) {
+                  // Registration successful
+                })
+                .catch(function(err) {
+                  console.warn('ServiceWorker registration skipped or denied:', err);
+                });
             });
           }
         `}} />

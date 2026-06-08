@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { detectBrowser, detectDevice } from "@/lib/error-monitoring";
 
 interface KioskBarrierProps {
   children: React.ReactNode;
@@ -52,11 +53,22 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", u
       }
       const existingId = violationRecordIdRef.current[key];
 
+      const userAgent = typeof window !== "undefined" ? window.navigator.userAgent : "";
+      const browser = userAgent ? detectBrowser(userAgent) : null;
+      const device = userAgent ? detectDevice(userAgent) : null;
+
       if (existingId) {
         // Update existing record
         const { error } = await supabase
           .from("exam_violations")
-          .update({ violation_count: count, is_active: true, updated_at: new Date().toISOString() })
+          .update({ 
+            violation_count: count, 
+            is_active: true, 
+            updated_at: new Date().toISOString(),
+            browser,
+            device,
+            user_agent: userAgent
+          })
           .eq("id", existingId);
         if (error) {
           console.error("Failed to update violation in Supabase:", error);
@@ -74,6 +86,9 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", u
             violation_type: type,
             violation_count: count,
             is_active: true,
+            browser,
+            device,
+            user_agent: userAgent
           })
           .select("id")
           .single();

@@ -28,11 +28,18 @@ export async function getAllBanners(): Promise<BannerSlide[]> {
 }
 
 // Material Categories
-export async function getMaterialCategories(): Promise<MaterialCategory[]> {
-  const { data, error } = await supabase.from('material_categories').select('*').order('sort_order', { ascending: true })
-  if (error) return []
-  return data
+export async function getMaterialCategories(includeIcon = false): Promise<MaterialCategory[]> {
+  if (includeIcon) {
+    const { data, error } = await supabase.from('material_categories').select('id, name, description, badge_color, sort_order, created_at, updated_at, custom_type_names, is_active, icon_url').order('sort_order', { ascending: true })
+    if (error) return []
+    return data as any[]
+  } else {
+    const { data, error } = await supabase.from('material_categories').select('id, name, description, badge_color, sort_order, created_at, updated_at, custom_type_names, is_active').order('sort_order', { ascending: true })
+    if (error) return []
+    return data as any[]
+  }
 }
+
 
 // Materials
 export async function getMaterials(): Promise<Material[]> {
@@ -484,11 +491,23 @@ export async function getMaterialsWithImages(): Promise<Partial<StudyMaterial>[]
 }
 
 export async function getBasicStudyMaterials(chapterId?: string): Promise<Partial<StudyMaterial>[]> {
-  let query = supabase.from('study_materials').select('id, title, chapter_id, material_type, is_locked, sort_order, icon_url, video_url, image_url, content');
+  let query = supabase.from('study_materials').select('id, title, chapter_id, material_type, is_locked, sort_order, icon_url, video_url, audio_url, image_url, file_size, storage_provider, created_at, updated_at');
   if (chapterId) query = query.eq('chapter_id', chapterId);
   const { data, error } = await query.order('sort_order', { ascending: true });
   if (error) return []
   return data
+}
+
+export async function getMaterialsByIds(ids: string[]): Promise<Partial<StudyMaterial>[]> {
+  if (!ids || ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from('study_materials')
+    .select('id, title, chapter_id, material_type, is_locked, sort_order, icon_url, video_url, audio_url, image_url, file_size, storage_provider, created_at, updated_at')
+    .in('id', ids);
+  if (error) {
+    return [];
+  }
+  return data as any[];
 }
 
 export async function getStudyMaterialById(id: string): Promise<StudyMaterial | null> {
@@ -579,7 +598,7 @@ export async function getCompletedMaterialsWithDetails(userEmail: string): Promi
   // Step 1: Get all progress rows for this user (try ilike for case-insensitive)
   const { data: progressRows, error: progressError } = await supabase
     .from('user_material_progress')
-    .select('material_id, created_at, completed_at')
+    .select('material_id, completed_at')
     .ilike('user_email', normalizedEmail)
     .order('completed_at', { ascending: false });
 
@@ -629,7 +648,7 @@ export async function getCompletedMaterialsWithDetails(userEmail: string): Promi
   // Step 3: Combine progress with material details
   return progressRows.map(row => ({
     material_id: row.material_id,
-    created_at: row.created_at,
+    created_at: row.completed_at || null,
     completed_at: row.completed_at,
     study_materials: matMap.get(row.material_id) || null
   }));

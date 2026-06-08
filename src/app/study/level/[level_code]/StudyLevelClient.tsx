@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { StudyLevel, StudyChapter, StudyMaterial, Profile } from "@/lib/types";
-import { getStudyChapters, getCompletedMaterials } from "@/lib/db";
+import { getStudyChapters, getCompletedMaterials, getStudyLevels } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { motion } from "framer-motion";
 
@@ -22,6 +22,7 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [completedMaterials, setCompletedMaterials] = useState<string[]>([]);
   const [categoryCustomTypeNames, setCategoryCustomTypeNames] = useState<Record<string, string>>({});
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const savedProfile = localStorage.getItem("luma-user-profile");
@@ -31,61 +32,73 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
     }
 
     const fetchHierarchy = async () => {
-      const totalSteps = 4;
-      let completedSteps = 0;
-      const updateProgress = () => {
-        completedSteps++;
-        setLoadingProgress(Math.floor((completedSteps / totalSteps) * 100));
-      };
-
       try {
-        const chaps = await getStudyChapters(levelData.id);
-        updateProgress();
+        // Batch 1: Fetch chapters, category info, and all study levels in parallel
+        const [chaps, catResult, allLevels] = await Promise.all([
+          getStudyChapters(levelData.id).catch(e => { console.error("Error loading chapters:", e); return []; }),
+          levelData.category_id
+            ? Promise.resolve(
+                supabase
+                  .from('material_categories')
+                  .select('custom_type_names')
+                  .eq('id', levelData.category_id)
+                  .single()
+              ).catch((e: any) => { console.error("Error loading category custom names:", e); return { data: null }; })
+            : Promise.resolve({ data: null }),
+          getStudyLevels().catch(e => { console.error("Error loading study levels:", e); return []; })
+        ]);
+
+        const sameCatLevels = allLevels
+          .filter((l: any) => l.category_id === levelData.category_id)
+          .sort((a: any, b: any) => a.sort_order - b.sort_order);
+        const slIdx = sameCatLevels.findIndex((l: any) => l.id === levelData.id);
+        const isFirstLevel = slIdx === 0;
+
+        const isPremium = saved?.is_premium;
+        const isStaff = saved?.is_admin || saved?.is_super_admin || saved?.is_teacher;
+        const hasAccess = isStaff || isFirstLevel || isPremium || (saved?.unlocked_levels || []).includes(levelData.id);
+
+        if (!hasAccess) {
+           console.warn(`[Security Alert] User ${saved?.email || 'unauthenticated'} tried to access locked study level: ${levelData.title}`);
+           alert("Anda tidak memiliki akses ke level ini!");
+           router.push('/?tab=materi');
+           return;
+        }
+        
+        setLoadingProgress(30);
         const sortedChaps = [...chaps].sort((a, b) => a.sort_order - b.sort_order);
         setChapters(sortedChaps);
 
-        if (levelData.category_id) {
-          try {
-            const { data: catData } = await supabase
-              .from('material_categories')
-              .select('custom_type_names')
-              .eq('id', levelData.category_id)
-              .single();
-            if (catData?.custom_type_names) {
-              setCategoryCustomTypeNames(catData.custom_type_names);
-            }
-          } catch (e) {
-            console.error("Failed to fetch category custom names:", e);
-          }
+        if ((catResult as any).data?.custom_type_names) {
+          setCategoryCustomTypeNames((catResult as any).data.custom_type_names);
         }
-        
-        let completed: string[] = [];
-        let quizAccessIds: string[] = [];
-        
-        if (saved?.email) {
-          completed = await getCompletedMaterials(saved.email);
-          setCompletedMaterials(completed);
-          
-          // Ambil data kontrol akses kuis untuk murid ini
-          if (saved.id) {
-             let query = supabase.from('quiz_access_controls').select('material_id, updated_at, is_active');
-             
-             if (saved.batch) {
-               query = query.or(`batch.eq.${saved.batch},student_id.eq.${saved.id}`);
-             } else {
-               query = query.eq('student_id', saved.id);
-             }
-             
-             const { data: accessData } = await query;
-             if (accessData) {
-               setAccessControls(accessData || []);
-               const activeIds = accessData.filter(a => a.is_active).map(a => a.material_id);
-               setActiveQuizzes(activeIds);
-             }
-          }
-        }
-        updateProgress();
 
+        // Batch 2: Fetch completed materials and quiz access in parallel (if user logged in)
+        let completed: string[] = [];
+        if (saved?.email) {
+          const accessQueryBase = saved?.id
+            ? (saved.batch
+                ? supabase.from('quiz_access_controls').select('material_id, updated_at, is_active').or(`batch.eq.${saved.batch},student_id.eq.${saved.id}`)
+                : supabase.from('quiz_access_controls').select('material_id, updated_at, is_active').eq('student_id', saved.id))
+            : null;
+
+          const [completedIds, accessData] = await Promise.all([
+            getCompletedMaterials(saved.email),
+            accessQueryBase ? accessQueryBase : Promise.resolve({ data: null })
+          ]);
+
+          completed = completedIds;
+          setCompletedMaterials(completedIds);
+
+          const accessRows = (accessData as any).data;
+          if (accessRows) {
+            setAccessControls(accessRows);
+            setActiveQuizzes(accessRows.filter((a: any) => a.is_active).map((a: any) => a.material_id));
+          }
+        }
+        setLoadingProgress(65);
+
+        // Batch 3: Fetch all materials for all chapters in one query
         const chapterIds = sortedChaps.map(c => c.id);
         if (chapterIds.length > 0) {
           const { data: mats } = await supabase
@@ -104,23 +117,22 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
             });
             setMaterialsByChapter(grouped);
           }
-          updateProgress();
-
-          const isPremium = saved?.is_premium;
-          const isStaff = saved?.is_admin || saved?.is_super_admin;
-          
-          const firstExpanded = sortedChaps.find(c => {
-            if (isStaff || isPremium) return true;
-            const idx = sortedChaps.findIndex(inner => inner.id === c.id);
-            if (idx === 0) return true;
-            return false; 
-          });
-          
-          setExpandedChapter(firstExpanded?.id || sortedChaps[0].id);
         }
-        updateProgress();
-      } catch (err) {
-        console.error(err);
+        setLoadingProgress(100);
+
+
+        
+        const firstExpanded = sortedChaps.find(c => {
+          if (isStaff || isPremium) return true;
+          const idx = sortedChaps.findIndex(inner => inner.id === c.id);
+          if (idx === 0) return true;
+          return false; 
+        });
+        
+        setExpandedChapter(firstExpanded?.id || sortedChaps[0]?.id || null);
+      } catch (err: any) {
+        console.error("Failed to load study level details:", err);
+        setErrorMsg(err?.message || "Gagal memuat materi level.");
       } finally {
         setLoading(false);
       }
@@ -165,6 +177,19 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
       default: return '📄';
     }
   };
+
+  if (errorMsg) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
+        <div className="text-4xl mb-4">⚠️</div>
+        <h3 className="text-lg font-black text-slate-800 italic uppercase tracking-wider mb-2">Gagal Memuat Level</h3>
+        <p className="text-xs text-slate-400 font-medium mb-6 max-w-md">{errorMsg}</p>
+        <button onClick={() => router.push('/?tab=materi')} className="px-6 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg">
+          Kembali ke Home
+        </button>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

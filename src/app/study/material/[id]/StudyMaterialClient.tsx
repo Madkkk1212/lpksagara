@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { StudyMaterial } from "@/lib/types";
-import { markMaterialCompleted, getBasicStudyMaterials, getProfileByEmail, upsertProfile } from "@/lib/db";
+import { markMaterialCompleted, getBasicStudyMaterials, getProfileByEmail, upsertProfile, getStudyLevels } from "@/lib/db";
 import { calculateChapterXPDistribution } from "@/lib/GamificationUtils";
 import { supabase } from "@/lib/supabase";
 import KioskBarrier from "@/app/components/KioskBarrier";
@@ -25,6 +25,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
   const [studentProfileId, setStudentProfileId] = useState<string | null>(null);
   const [categoryCustomTypeNames, setCategoryCustomTypeNames] = useState<Record<string, string>>({});
   const [isChapterLocked, setIsChapterLocked] = useState(false);
+  const [isLevelLocked, setIsLevelLocked] = useState(false);
 
   useEffect(() => {
     const sessionStr = localStorage.getItem('luma-user-profile');
@@ -43,30 +44,16 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
   useEffect(() => {
     const fetchCategoryCustomTypeNames = async () => {
       try {
+        // Single JOIN query replaces 3 sequential roundtrips
         const { data: chapterData } = await supabase
           .from('study_chapters')
-          .select('level_id')
+          .select('level_id, study_levels(category_id, material_categories(custom_type_names))')
           .eq('id', materialData.chapter_id)
           .single();
         
-        if (chapterData?.level_id) {
-          const { data: levelData } = await supabase
-            .from('study_levels')
-            .select('category_id')
-            .eq('id', chapterData.level_id)
-            .single();
-          
-          if (levelData?.category_id) {
-            const { data: catData } = await supabase
-              .from('material_categories')
-              .select('custom_type_names')
-              .eq('id', levelData.category_id)
-              .single();
-            
-            if (catData?.custom_type_names) {
-              setCategoryCustomTypeNames(catData.custom_type_names);
-            }
-          }
+        const catData = (chapterData as any)?.study_levels?.material_categories;
+        if (catData?.custom_type_names) {
+          setCategoryCustomTypeNames(catData.custom_type_names);
         }
       } catch (e) {
         console.error("Failed to fetch parent category custom names:", e);
@@ -85,29 +72,64 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
         return;
       }
       try {
+        // Fetch profile first, then use profile.id for parallel queries below
         const { data: profile } = await supabase
           .from("profiles")
-          .select("id, batch, is_admin, is_super_admin, is_teacher")
+          .select("id, batch, is_admin, is_super_admin, is_teacher, is_premium, unlocked_levels")
           .eq("email", userEmail)
           .maybeSingle();
 
         if (profile) {
           setStudentProfileId(profile.id);
           
-          // Admins, Super Admins, and Teachers have automatic access to all materials and quizzes
           const isStaff = profile.is_admin || profile.is_super_admin || profile.is_teacher;
           if (isStaff) {
             setIsAccessActive(true);
             setIsRemedialAccess(false);
             setIsChapterLocked(false);
+            setIsLevelLocked(false);
           } else {
-            // Check sequential chapter locking first
-            const { data: chapterInfo } = await supabase
-              .from('study_chapters')
-              .select('level_id')
-              .eq('id', materialData.chapter_id)
-              .single();
-            
+            // Fetch chapter's level_id, quiz access, and all study levels in parallel
+            const [chapterInfoRes, quizAccessRes, studyLevelsRes] = await Promise.all([
+              supabase
+                .from('study_chapters')
+                .select('level_id, study_levels(id, category_id, sort_order)')
+                .eq('id', materialData.chapter_id)
+                .single(),
+              materialData.material_type === "quiz"
+                ? supabase
+                    .from("quiz_access_controls")
+                    .select("is_active, updated_at, created_at, is_remedial, batch")
+                    .eq("material_id", materialData.id)
+                    .eq("student_id", profile.id)
+                    .eq("is_active", true)
+                : Promise.resolve({ data: null }),
+              getStudyLevels().catch(() => [])
+            ]);
+
+            const chapterInfo = chapterInfoRes.data;
+            const levelInfo = (chapterInfo as any)?.study_levels;
+            const allLevels = studyLevelsRes || [];
+
+            let isLevelUnlocked = false;
+            if (levelInfo) {
+              const sameCatLevels = allLevels
+                .filter((l: any) => l.category_id === levelInfo.category_id)
+                .sort((a: any, b: any) => a.sort_order - b.sort_order);
+              const slIdx = sameCatLevels.findIndex((l: any) => l.id === levelInfo.id);
+              const isFirstLevel = slIdx === 0;
+              isLevelUnlocked = isFirstLevel || profile.is_premium || (profile.unlocked_levels || []).includes(levelInfo.id);
+            }
+
+            if (!isLevelUnlocked) {
+              console.warn(`[Security Alert] User ${userEmail} tried to access material from locked study level: ${levelInfo?.id}`);
+              setIsLevelLocked(true);
+              setIsAccessActive(false);
+              setCheckingAccess(false);
+              return;
+            }
+
+            // Chapter locking check
             if (chapterInfo?.level_id) {
               const { data: siblingChapters } = await supabase
                 .from('study_chapters')
@@ -118,26 +140,25 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
               if (siblingChapters) {
                 const curIndex = siblingChapters.findIndex(c => c.id === materialData.chapter_id);
                 if (curIndex > 0) {
-                  // Must check all previous chapters
                   const prevChapters = siblingChapters.slice(0, curIndex);
                   const prevChapterIds = prevChapters.map(c => c.id);
                   
-                  // Get all materials for these previous chapters
-                  const { data: prevMaterials } = await supabase
-                    .from('study_materials')
-                    .select('id, chapter_id')
-                    .in('chapter_id', prevChapterIds);
-                  
-                  if (prevMaterials && prevMaterials.length > 0) {
-                    // Get completed materials for the student
-                    const { data: completedRows } = await supabase
+                  // Fetch previous materials and completed progress in parallel
+                  const [prevMaterialsRes, completedRes] = await Promise.all([
+                    supabase
+                      .from('study_materials')
+                      .select('id, chapter_id')
+                      .in('chapter_id', prevChapterIds),
+                    supabase
                       .from('user_material_progress')
                       .select('material_id')
-                      .eq('user_email', userEmail.trim().toLowerCase());
-                    
-                    const completedIds = new Set((completedRows || []).map(r => r.material_id));
-                    
-                    // Verify if each previous chapter is completed
+                      .eq('user_email', userEmail.trim().toLowerCase())
+                  ]);
+
+                  const prevMaterials = prevMaterialsRes.data;
+                  const completedIds = new Set((completedRes.data || []).map(r => r.material_id));
+                  
+                  if (prevMaterials && prevMaterials.length > 0) {
                     for (const prevCh of prevChapters) {
                       const chMats = prevMaterials.filter(m => m.chapter_id === prevCh.id);
                       if (chMats.length > 0 && !chMats.every(m => completedIds.has(m.id))) {
@@ -150,17 +171,12 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
               }
             }
 
+            // Handle quiz access result
             if (materialData.material_type === "quiz") {
-              const { data: accessData } = await supabase
-                .from("quiz_access_controls")
-                .select("is_active, updated_at, created_at, is_remedial, batch")
-                .eq("material_id", materialData.id)
-                .eq("student_id", profile.id)
-                .eq("is_active", true);
-              
+              const accessData = (quizAccessRes as any).data;
               if (accessData && accessData.length > 0) {
                 const duration = (materialData.content as any)?.duration_minutes || 60;
-                const activeControl = accessData.find(control => {
+                const activeControl = accessData.find((control: any) => {
                   if (control.batch === 'PROGRESS:SELESAI') return false;
                   const openedTime = new Date(control.updated_at || control.created_at).getTime();
                   const expirationTime = openedTime + (duration * 60 * 1000);
@@ -175,8 +191,13 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
             }
           }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Check access error:", err);
+        setAlertData({
+          title: "Gagal Memverifikasi Akses",
+          message: err?.message || "Terjadi kesalahan saat memverifikasi hak akses Anda ke materi ini.",
+          type: "error"
+        });
       } finally {
         setCheckingAccess(false);
       }
@@ -424,6 +445,28 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
           <div className="flex flex-col items-center gap-4">
             <div className="w-12 h-12 border-4 border-slate-900 border-t-transparent rounded-full animate-spin" />
             <p className="text-slate-500 text-sm font-semibold">Memverifikasi akses...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (isLevelLocked) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
+          <div className="bg-white rounded-[2.5rem] p-10 max-w-md w-full shadow-2xl border border-slate-100 text-center space-y-6 animate-in zoom-in-95 duration-300">
+            <div className="text-6xl animate-bounce">🔒</div>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-black text-slate-800 tracking-tight italic">Level Terkunci!</h1>
+              <p className="text-slate-500 text-sm font-semibold leading-relaxed">
+                Anda tidak memiliki akses ke level ini. Silakan hubungi admin jika Anda memerlukan akses ke materi level ini.
+              </p>
+            </div>
+            <button 
+              onClick={() => router.back()}
+              className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-black uppercase tracking-widest text-xs rounded-2xl transition shadow-lg active:scale-95"
+            >
+              Kembali ke Pembelajaran
+            </button>
           </div>
         </div>
       );

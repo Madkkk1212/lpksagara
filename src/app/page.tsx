@@ -101,6 +101,7 @@ export default function Home() {
 
   // Time State
   const [currentTime, setCurrentTime] = useState("");
+  const [loadedIcons, setLoadedIcons] = useState(false);
 
   useEffect(() => {
     const updateTime = () => {
@@ -138,6 +139,27 @@ export default function Home() {
       retryFetchCategories();
     }
   }, [activeTab, categories.length, isFetching]);
+
+  useEffect(() => {
+    if (categories.length > 0 && !loadedIcons) {
+      import('@/lib/db').then(({ getMaterialCategories }) => {
+        getMaterialCategories(true).then(catsWithIcons => {
+          if (catsWithIcons && catsWithIcons.length > 0) {
+            setCategories(prev => {
+              return prev.map(pCat => {
+                const matching = catsWithIcons.find(c => c.id === pCat.id);
+                return matching ? { ...pCat, icon_url: matching.icon_url } : pCat;
+              });
+            });
+          }
+          setLoadedIcons(true);
+        }).catch(err => {
+          console.error("Failed to load category icons in background:", err);
+          setLoadedIcons(true);
+        });
+      });
+    }
+  }, [categories, loadedIcons]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -199,6 +221,21 @@ export default function Home() {
     fetchLevelMaterials();
   }, [selectedStudyCategory, studyLevels, loggedIn]);
 
+  const filteredCategories = useMemo(() => {
+    if (!loggedIn || !userProfile) return categories;
+    if (userProfile.is_admin || userProfile.is_super_admin || userProfile.is_teacher) return categories;
+    if (userProfile.category_id) {
+      return categories.filter(c => c.id === userProfile.category_id);
+    }
+    return categories;
+  }, [categories, loggedIn, userProfile]);
+
+  useEffect(() => {
+    if (loggedIn && userProfile && !userProfile.is_admin && !userProfile.is_super_admin && !userProfile.is_teacher && userProfile.category_id) {
+      setSelectedStudyCategory(userProfile.category_id);
+    }
+  }, [loggedIn, userProfile]);
+
   useEffect(() => {
     // 🛡️ EMERGENCY FALLBACK: Force dismiss splash after 5 seconds no matter what
     const emergencyTimer = window.setTimeout(() => { setShowSplash(false); setIsFetching(false); }, 5000);
@@ -235,19 +272,19 @@ export default function Home() {
 
         // Start ALL independent requests in parallel with progress tracking
         const results = await Promise.all([
-          track(getTheme().catch(() => null)),
-          track(getBanners().catch(() => [])),
-          track(getMaterialCategories().catch(() => [])),
-          track(getBasicStudyMaterials().catch(() => [])),
-          track(getExamLevels().catch(() => [])),
-          track(getStudyLevels().catch(() => [])),
-          track(getTotalStudyMaterialsCount().catch(() => 0)),
-          track(authed && localProfile ? getProfileByEmail(localProfile.email).catch(() => null) : Promise.resolve(null)),
+          track(getTheme().catch(e => { console.error("Error loading theme:", e); return null; })),
+          track(getBanners().catch(e => { console.error("Error loading banners:", e); return []; })),
+          track(getMaterialCategories().catch(e => { console.error("Error loading categories:", e); return []; })),
+          track(getBasicStudyMaterials().catch(e => { console.error("Error loading basic study materials:", e); return []; })),
+          track(getExamLevels().catch(e => { console.error("Error loading exam levels:", e); return []; })),
+          track(getStudyLevels().catch(e => { console.error("Error loading study levels:", e); return []; })),
+          track(getTotalStudyMaterialsCount().catch(e => { console.error("Error loading total study materials count:", e); return 0; })),
+          track(authed && localProfile ? getProfileByEmail(localProfile.email).catch(e => { console.error("Error loading profile:", e); return null; }) : Promise.resolve(null)),
           track(authed && localProfile ? 
             fetch(`/api/student-progress?email=${encodeURIComponent(localProfile.email)}`)
               .then(res => res.json())
               .then(json => json.data || [])
-              .catch(() => []) 
+              .catch(e => { console.error("Error fetching student progress:", e); return []; }) 
             : Promise.resolve([])
           )
         ]);
@@ -347,13 +384,17 @@ export default function Home() {
   const handleLevelClick = (levelId: string, levelCode: string, globalLocked: boolean, index: number) => {
     if (!loggedIn || !userProfile) { router.push(`/login?redirect=soal`); return; }
     
-    if (index > 0) {
+    const isStaff = userProfile.is_admin || userProfile.is_super_admin || userProfile.is_teacher;
+
+    if (!isStaff && index > 0) {
         const prevLevel = levels[index - 1];
-        const isPrevUnlocked = userProfile.is_premium || (userProfile.unlocked_levels || []).includes(prevLevel.id);
+        const prevMatchingStudyLevel = studyLevels.find(sl => sl.level_code.toLowerCase() === prevLevel.level_code.toLowerCase());
+        const isPrevUnlocked = userProfile.is_premium || (prevMatchingStudyLevel && (userProfile.unlocked_levels || []).includes(prevMatchingStudyLevel.id));
         if (!isPrevUnlocked) { alert('Selesaikan level sebelumnya terlebih dahulu!'); return; }
     }
 
-    const hasAccess = !globalLocked || userProfile.is_premium || (userProfile.unlocked_levels || []).includes(levelId);
+    const matchingStudyLevel = studyLevels.find(sl => sl.level_code.toLowerCase() === levelCode.toLowerCase());
+    const hasAccess = isStaff || !globalLocked || userProfile.is_premium || (matchingStudyLevel && (userProfile.unlocked_levels || []).includes(matchingStudyLevel.id));
     
     if (!hasAccess) { alert('Level ini premium! Silakan hubungi admin untuk akses.'); return; }
     router.push(`/exam/${levelCode.toLowerCase()}`);
@@ -717,11 +758,17 @@ export default function Home() {
                     </header>
                     {!selectedStudyCategory ? (
                       <div className="grid md:grid-cols-2 gap-6">
-                        {categories.map(cat => (
+                        {filteredCategories.map(cat => (
                           <button key={cat.id} onClick={() => { if (!loggedIn) { router.push(`/login?redirect=materi`); return; } setSelectedStudyCategory(cat.id); }} className="group relative bg-white rounded-[3rem] p-10 text-left shadow-sm ring-1 ring-slate-100 hover:shadow-2xl hover:-translate-y-2 active:scale-95 transition-all duration-500 overflow-hidden" >
                              <div className="flex items-center gap-6 mb-6 relative z-10">
                                 <div className="h-20 w-20 rounded-[2rem] flex items-center justify-center text-4xl shadow-xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500" style={{ backgroundColor: cat.badge_color || '#14b8a6', color: '#fff' }} >
-                                   {cat.icon_url ? ( <img src={cat.icon_url || undefined} alt={cat.name} className="w-full h-full object-contain" /> ) : ( cat.name === 'JLPT' ? '🇯🇵' : '👷‍♂️' )}
+                                   {cat.icon_url ? ( 
+                                      <img src={cat.icon_url || undefined} alt={cat.name} className="w-full h-full object-contain" /> 
+                                   ) : !loadedIcons ? (
+                                      <div className="h-6 w-6 border-2 border-white/60 border-t-white rounded-full animate-spin" />
+                                   ) : ( 
+                                      cat.name === 'JLPT' ? '🇯🇵' : '👷‍♂️' 
+                                   )}
                                 </div>
                                 <div>
                                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">Study Path</p>
@@ -732,7 +779,7 @@ export default function Home() {
                              <div className="absolute -bottom-20 -right-20 h-64 w-64 rounded-full opacity-10 group-hover:opacity-20 transition-opacity" style={{ background: `radial-gradient(circle, ${cat.badge_color || '#14b8a6'} 0%, transparent 70%)` }} />
                           </button>
                         ))}
-                        {categories.length === 0 && (
+                        {filteredCategories.length === 0 && (
                           <div className="col-span-full py-10 flex flex-col items-center gap-4">
                             <p className="text-slate-400 italic font-bold text-center">Kategori belum tersedia atau lambat dimuat.</p>
                             <button onClick={retryFetchCategories} className="px-6 py-2 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all">
@@ -745,7 +792,15 @@ export default function Home() {
                       <div className="space-y-8">
                         <div className="flex items-center gap-6 mb-10 pb-6 border-b border-slate-100">
                            <button onClick={() => setSelectedStudyCategory(null)} className="h-12 w-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black shadow-lg hover:scale-105 active:scale-95 transition-all"> ← </button>
-                           {categories.find(c => c.id === selectedStudyCategory)?.icon_url && ( <img src={categories.find(c => c.id === selectedStudyCategory)?.icon_url || undefined} alt="cat icon" className="w-16 h-16 object-contain p-2 bg-white rounded-[1.5rem] shadow-xl ring-1 ring-slate-100" /> )}
+                           <div className="w-16 h-16 rounded-[1.5rem] bg-white shadow-xl ring-1 ring-slate-100 flex items-center justify-center overflow-hidden">
+                              {categories.find(c => c.id === selectedStudyCategory)?.icon_url ? (
+                                 <img src={categories.find(c => c.id === selectedStudyCategory)?.icon_url || undefined} alt="cat icon" className="w-full h-full object-contain p-2" />
+                              ) : !loadedIcons ? (
+                                 <div className="h-5 w-5 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin" />
+                              ) : (
+                                 <span className="text-2xl">{categories.find(c => c.id === selectedStudyCategory)?.name === 'JLPT' ? '🇯🇵' : '👷‍♂️'}</span>
+                              )}
+                           </div>
                            <div>
                               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Jalur Belajar</p>
                               <h3 className="text-3xl font-black text-slate-800 italic">{categories.find(c => c.id === selectedStudyCategory)?.name}</h3>
@@ -753,8 +808,8 @@ export default function Home() {
                         </div>
                         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {studyLevels.filter(sl => sl.category_id === selectedStudyCategory).length > 0 ? studyLevels.filter(sl => sl.category_id === selectedStudyCategory).map((sl, slIdx, catLevels) => {
-                           // Admins & super-admins bypass all locks
-                           if (userProfile?.is_admin || userProfile?.is_super_admin) {
+                           // Admins, super-admins & teachers bypass all locks
+                           if (userProfile?.is_admin || userProfile?.is_super_admin || userProfile?.is_teacher) {
                              const isUnlocked = true;
                              return (
                                <Link key={sl.id} href="#" onClick={(e) => { e.preventDefault(); router.push(`/study/level/${sl.level_code}`); }}
@@ -779,8 +834,8 @@ export default function Home() {
                            const isFirstLevel = slIdx === 0;
 
                            // For subsequent levels: check if all materials in the PREVIOUS level are completed
-                           let isUnlocked = isFirstLevel;
-                           if (!isFirstLevel) {
+                           let isUnlocked = isFirstLevel || userProfile?.is_premium || (userProfile?.unlocked_levels || []).includes(sl.id);
+                           if (!isUnlocked && !isFirstLevel) {
                              const prevLevel = catLevels[slIdx - 1];
                              const prevLevelMats = levelMaterialIds[prevLevel.id] || [];
                              const prevCompleted = prevLevelMats.length > 0 && prevLevelMats.every(id => completedMaterials.includes(id));
@@ -841,7 +896,9 @@ export default function Home() {
                       </div>
                       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {levels.map((lvl, index) => {
-                          const hasAccess = !lvl.is_locked || userProfile?.is_premium || (userProfile?.unlocked_levels || []).includes(lvl.id);
+                          const isStaff = userProfile?.is_admin || userProfile?.is_super_admin || userProfile?.is_teacher;
+                          const matchingStudyLevel = studyLevels.find(sl => sl.level_code.toLowerCase() === lvl.level_code.toLowerCase());
+                          const hasAccess = isStaff || !lvl.is_locked || userProfile?.is_premium || (matchingStudyLevel && (userProfile?.unlocked_levels || []).includes(matchingStudyLevel.id));
                           return (
                             <button key={lvl.id} onClick={() => handleLevelClick(lvl.id, lvl.level_code, lvl.is_locked, index)} className={`group relative flex items-center gap-6 p-6 rounded-[2.5rem] text-left transition-all duration-500 ${!hasAccess ? 'bg-slate-50/50 grayscale opacity-60 border border-slate-100' : 'bg-white shadow-[0_4px_20px_rgba(0,0,0,0.03)] ring-1 ring-slate-100 hover:shadow-2xl hover:-translate-y-2 hover:ring-teal-500/20'}`} >
                                <div className="h-20 w-20 shrink-0 rounded-[2rem] flex items-center justify-center text-3xl font-black text-white shadow-xl rotate-3 group-hover:rotate-0 transition-all duration-500 overflow-hidden" style={{ background: lvl.icon_url ? 'transparent' : `linear-gradient(135deg, ${lvl.gradient_from || '#0d9488'}, ${lvl.gradient_to || '#0f172a'})` }} >

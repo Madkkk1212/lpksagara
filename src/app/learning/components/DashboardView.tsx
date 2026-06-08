@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { Profile, AppTheme, StudyMaterial } from "@/lib/types";
-import { getLeaderboard, getUserLastProgressDetails, getStudentWeeklyTargets, getCompletedMaterials, getBasicStudyMaterials, getMaterialCategories, getStudyLevels } from "@/lib/db";
+import { getLeaderboard, getUserLastProgressDetails, getStudentWeeklyTargets, getCompletedMaterials, getBasicStudyMaterials, getMaterialCategories, getStudyLevels, getMaterialsByIds } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import AISenseiChat from "./AISenseiChat";
 import { Flame, Trophy, Zap, CheckCircle2, Circle, BookOpen, Link2 } from "lucide-react";
@@ -50,18 +50,29 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
         .eq('user_email', user.email);
       setAchievements(ach || []);
 
-      // 3. Fetch Leaderboard, Weekly Targets & All Materials
-      const [lb, targets, mats, cats, chapsRes, lvls] = await Promise.all([
+      // 3. Fetch Leaderboard, Weekly Targets & Metadata
+      const [lb, targets, cats, chapsRes, lvls] = await Promise.all([
         getLeaderboard(),
         getStudentWeeklyTargets(user.email, user.batch),
-        getBasicStudyMaterials(),
         getMaterialCategories(),
         supabase.from('study_chapters').select('id, level_id'),
         getStudyLevels()
       ]);
+
+      // Fetch details only for the materials assigned in targets
+      const targetMaterialIds = targets.flatMap(t => t.material_ids || []);
+      let targetMaterials: any[] = [];
+      if (targetMaterialIds.length > 0) {
+        try {
+          targetMaterials = await getMaterialsByIds(targetMaterialIds);
+        } catch (mErr) {
+          console.error("Dashboard: Failed to load target materials", mErr);
+        }
+      }
+
       setLeaderboard(lb.filter(p => !p.is_admin && !p.is_teacher));
       setWeeklyTargets(targets);
-      setAllMaterials(mats as StudyMaterial[]);
+      setAllMaterials(targetMaterials as StudyMaterial[]);
       setCategories(cats);
       setChapters(chapsRes.data || []);
       setStudyLevels(lvls);

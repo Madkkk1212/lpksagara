@@ -50,7 +50,7 @@ export default function StudyHierarchyManager() {
   const loadLevels = async () => {
     setLoading(true);
     const [cats, data] = await Promise.all([
-      getMaterialCategories(),
+      getMaterialCategories(true),
       getStudyLevels()
     ]);
     setAppCategories(cats);

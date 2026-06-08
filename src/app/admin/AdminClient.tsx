@@ -25,6 +25,7 @@ import VideoManager from "./components/VideoManager";
 import AudioManager from "./components/AudioManager";
 import PhotoManager from "./components/PhotoManager";
 import CategoryCustomizer from "./components/CategoryCustomizer";
+import ErrorCenter from "./components/ErrorCenter";
 import QuizAccessManager from "../teacher/components/QuizAccessManager";
 import ExamAccessManager from "../teacher/components/ExamAccessManager";
 import TeacherMenuManager from "./components/TeacherMenuManager";
@@ -33,7 +34,7 @@ import { supabase } from "@/lib/supabase";
 import { getAdminMenuConfig, getProfiles, getStudyLevels } from "@/lib/db";
 import { Profile, StudyLevel } from "@/lib/types";
 
-type AdminTab = "dashboard" | "reports" | "weekly-reports" | "announcements" | "git-update" | "bulk-import" | "theme" | "banners" | "icons" | "materials" | "info-konten" | "exams" | "settings" | "users" | "proposals" | "menu-manager" | "profile-config" | "batches" | "teachers" | "assessment-templates" | "all-students-assessment" | "material-recap" | "video-manager" | "audio-manager" | "photo-manager" | "quiz-access" | "exam-access" | "teacher-menu" | "custom-names";
+type AdminTab = "dashboard" | "system-monitoring" | "reports" | "weekly-reports" | "announcements" | "git-update" | "bulk-import" | "theme" | "banners" | "icons" | "materials" | "info-konten" | "exams" | "settings" | "users" | "proposals" | "menu-manager" | "profile-config" | "batches" | "teachers" | "assessment-templates" | "all-students-assessment" | "material-recap" | "video-manager" | "audio-manager" | "photo-manager" | "quiz-access" | "exam-access" | "teacher-menu" | "custom-names";
 
 type SidebarInsightItem = {
   id: string;
@@ -125,6 +126,7 @@ export default function AdminClient() {
   const [studyLevels, setStudyLevels] = useState<StudyLevel[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [sidebarInsights, setSidebarInsights] = useState<SidebarInsights>(emptySidebarInsights);
+  const [monitoringSummary, setMonitoringSummary] = useState({ openCount: 0, criticalCount: 0, lastDayCount: 0 });
 
   const fetchMenuConfig = async () => {
     try {
@@ -280,10 +282,23 @@ export default function AdminClient() {
     }
   }
 
+  async function fetchMonitoringSummary() {
+    try {
+      const res = await fetch("/api/monitoring/errors?mode=summary", { cache: "no-store" });
+      const json = await res.json();
+      if (json?.data) setMonitoringSummary(json.data);
+    } catch (err) {
+      console.error("Failed to load monitoring summary", err);
+    }
+  }
+
   useEffect(() => {
     fetchMenuConfig();
     fetchAllData();
     fetchSidebarInsights();
+    fetchMonitoringSummary();
+    const timer = window.setInterval(fetchMonitoringSummary, 20000);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -339,6 +354,7 @@ export default function AdminClient() {
   // Fallback to hardcoded list ONLY if database is empty or hasn't loaded
   const rawBaseTabs = numDynamicTabs > 0 ? dynamicTabs : [
     { id: "dashboard", label: "Dashboard", icon: "D", is_active: true },
+    { id: "system-monitoring", label: "Error Center", icon: "!", is_active: true },
     { id: "reports", label: "Statistik & Analisa", icon: "📊", is_active: true },
     { id: "weekly-reports", label: "Laporan Mingguan", icon: "📋", is_active: true },
     { id: "announcements", label: "Pengumuman", icon: "A", is_active: true },
@@ -395,6 +411,12 @@ export default function AdminClient() {
   } else {
     const gu = uniqueTabs.find(t => t.id === "git-update");
     if (gu) gu.label = "Git Update";
+  }
+
+  if (userProfile?.is_super_admin && !uniqueTabs.some(t => t.id === "system-monitoring")) {
+    const dashboardIdx = uniqueTabs.findIndex(t => t.id === "dashboard");
+    const insertAt = dashboardIdx !== -1 ? dashboardIdx + 1 : 0;
+    uniqueTabs.splice(insertAt, 0, { id: "system-monitoring", label: "Error Center", icon: "!", is_active: true } as any);
   }
 
   if (userProfile?.is_super_admin && !uniqueTabs.some(t => t.id === "custom-names")) {
@@ -482,7 +504,7 @@ export default function AdminClient() {
 
   const tabs = userProfile?.is_super_admin
     ? uniqueTabs
-    : uniqueTabs.filter(t => t.id !== "info-konten" && t.id !== "custom-names");
+    : uniqueTabs.filter(t => t.id !== "info-konten" && t.id !== "custom-names" && t.id !== "system-monitoring");
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 text-sm">
@@ -513,7 +535,7 @@ export default function AdminClient() {
             {
               title: "Utama",
               icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" /></svg>,
-              items: ["dashboard", "reports", "weekly-reports", "announcements", "git-update"]
+              items: ["dashboard", "system-monitoring", "reports", "weekly-reports", "announcements", "git-update"]
             },
             {
               title: "Konten Belajar",
@@ -550,7 +572,14 @@ export default function AdminClient() {
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold transition-all text-xs ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
                   >
                     <span className={`w-5 text-center ${activeTab === tab.id ? 'opacity-100' : 'opacity-60'}`}>{tab.icon}</span>
-                    <span>{tab.label}</span>
+                    <span className="flex flex-1 items-center justify-between gap-2">
+                      <span>{tab.label}</span>
+                      {tab.id === "system-monitoring" && monitoringSummary.openCount > 0 && (
+                        <span className={`rounded-full px-2 py-0.5 text-[9px] font-black ${monitoringSummary.criticalCount > 0 ? "bg-rose-500 text-white" : "bg-amber-100 text-amber-700"}`}>
+                          {monitoringSummary.openCount}
+                        </span>
+                      )}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -593,6 +622,19 @@ export default function AdminClient() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+             {userProfile?.is_super_admin && monitoringSummary.openCount > 0 && (
+               <button
+                 onClick={() => setActiveTab("system-monitoring")}
+                 className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-bold ${
+                   monitoringSummary.criticalCount > 0
+                     ? "bg-rose-50 border-rose-100 text-rose-700"
+                     : "bg-amber-50 border-amber-100 text-amber-700"
+                 }`}
+               >
+                 <div className={`w-1.5 h-1.5 rounded-full ${monitoringSummary.criticalCount > 0 ? "bg-rose-500" : "bg-amber-500"}`} />
+                 {monitoringSummary.criticalCount > 0 ? `${monitoringSummary.criticalCount} Critical` : `${monitoringSummary.openCount} Errors`}
+               </button>
+             )}
              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-full border border-emerald-100">
                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                <span className="text-[10px] font-bold text-emerald-700">Connected</span>
@@ -617,6 +659,7 @@ export default function AdminClient() {
 
            <section className="bg-white border border-slate-200 rounded-2xl p-6 lg:p-8 shadow-sm relative text-slate-800">
                { activeTab === "dashboard" && <AdminDashboard /> }
+               { activeTab === "system-monitoring" && <ErrorCenter /> }
                { activeTab === "reports" && <ReportManager /> }
                { activeTab === "weekly-reports" && <WeeklyReportAdmin /> }
                { activeTab === "announcements" && <AnnouncementManager /> }

@@ -17,6 +17,9 @@ interface ExamViolation {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  browser?: string;
+  device?: string;
+  user_agent?: string;
 }
 
 interface StudentStatus {
@@ -29,6 +32,9 @@ interface StudentStatus {
   is_active: boolean;
   violations: ExamViolation[];
   isAlerted: boolean; // red flash state
+  browser?: string;
+  device?: string;
+  user_agent?: string;
 }
 
 const VIOLATION_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
@@ -38,6 +44,15 @@ const VIOLATION_LABELS: Record<string, { label: string; emoji: string; color: st
   page_hide: { label: "Sembunyikan Halaman", emoji: "🫣", color: "rose" },
   keyboard: { label: "Shortcut Berbahaya", emoji: "⌨️", color: "purple" },
   fullscreen_exit: { label: "Keluar Fullscreen", emoji: "📱", color: "rose" },
+};
+
+const getDeviceIcon = (device?: string) => {
+  if (!device) return "❓";
+  const d = device.toLowerCase();
+  if (d.includes("iphone") || d.includes("android")) return "📱";
+  if (d.includes("ipad")) return "📟";
+  if (d.includes("windows") || d.includes("mac") || d.includes("linux")) return "💻";
+  return "⚙️";
 };
 
 export default function ExamMonitorDashboard({ teacherEmail }: { teacherEmail: string }) {
@@ -105,6 +120,9 @@ export default function ExamMonitorDashboard({ teacherEmail }: { teacherEmail: s
             is_active: v.is_active,
             violations: [],
             isAlerted: false,
+            browser: v.browser,
+            device: v.device,
+            user_agent: v.user_agent,
           };
         }
         grouped[v.student_email].total_violations += v.violation_count;
@@ -167,6 +185,9 @@ export default function ExamMonitorDashboard({ teacherEmail }: { teacherEmail: s
                 is_active: v.is_active,
                 violations: [],
                 isAlerted: false,
+                browser: v.browser,
+                device: v.device,
+                user_agent: v.user_agent,
               };
 
               const filteredViolations = existing.violations.filter((ev) => ev.id !== v.id);
@@ -183,6 +204,9 @@ export default function ExamMonitorDashboard({ teacherEmail }: { teacherEmail: s
                 is_active: v.is_active,
                 isAlerted: isRealViolation && v.is_active,
                 violations: newViolations,
+                browser: v.browser || existing.browser,
+                device: v.device || existing.device,
+                user_agent: v.user_agent || existing.user_agent,
               };
 
               // Auto-clear red flash after 3 seconds
@@ -399,6 +423,14 @@ export default function ExamMonitorDashboard({ teacherEmail }: { teacherEmail: s
                         <p className="text-[10px] text-slate-300 font-bold">
                           Update: {formatTimeSince(student.last_seen)}
                         </p>
+                        {(student.device || student.browser) && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                              <span>{getDeviceIcon(student.device)}</span>
+                              <span>{student.device || "Perangkat"} · {student.browser || "Browser"}</span>
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
 

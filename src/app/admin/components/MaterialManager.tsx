@@ -33,7 +33,7 @@ export default function MaterialManager() {
   async function fetchData() {
     setLoading(true);
     const [cats, mats] = await Promise.all([
-      getMaterialCategories(),
+      getMaterialCategories(true),
       getMaterials()
     ]);
     setCategories(cats);

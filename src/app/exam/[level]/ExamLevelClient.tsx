@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import { getExamLevels, getExamTests, getQuestions, getProfileByEmail } from "@/lib/db";
-import { ExamLevel, ExamTest, Question, Profile } from "@/lib/types";
+import { getExamLevels, getExamTests, getQuestions, getProfileByEmail, getStudyLevels } from "@/lib/db";
+import { ExamLevel, ExamTest, Question, Profile, StudyLevel } from "@/lib/types";
 import KioskBarrier from "@/app/components/KioskBarrier";
 import ModernQuizPlayer, { NormalizedQuestion } from "@/app/components/ModernQuizPlayer";
 
@@ -65,6 +65,7 @@ export default function ExamLevelClient({ level }: { level: string }) {
   const [levelConfig, setLevelConfig] = useState<ExamLevel | null>(null);
   const [alertData, setAlertData] = useState<{ title: string; message: string; type?: 'warning' | 'error' | 'success' } | null>(null);
   const [testList, setTestList] = useState<ExamTest[]>([]);
+  const [studyLevels, setStudyLevels] = useState<StudyLevel[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchExamData = useCallback(async () => {
@@ -73,8 +74,12 @@ export default function ExamLevelClient({ level }: { level: string }) {
     
     if (currentLevel) {
       setLevelConfig(currentLevel);
-      const tests = await getExamTests(currentLevel.id);
+      const [tests, sLevels] = await Promise.all([
+        getExamTests(currentLevel.id),
+        getStudyLevels()
+      ]);
       setTestList(tests);
+      setStudyLevels(sLevels || []);
     }
   }, [level]);
 
@@ -113,7 +118,9 @@ export default function ExamLevelClient({ level }: { level: string }) {
     }
     
     // 1. Level-wide access check (Admin controlled)
-    const hasLevelAccess = userProfile.is_premium || !levelConfig?.is_locked || (userProfile.unlocked_levels || []).includes(levelConfig?.id || '');
+    const isStaff = userProfile.is_admin || userProfile.is_super_admin || userProfile.is_teacher;
+    const matchingStudyLevel = studyLevels.find(sl => sl.level_code.toLowerCase() === levelConfig?.level_code.toLowerCase());
+    const hasLevelAccess = isStaff || !levelConfig?.is_locked || userProfile.is_premium || (matchingStudyLevel && (userProfile.unlocked_levels || []).includes(matchingStudyLevel.id));
     if (!hasLevelAccess) {
       alert("Akses level ini premium! Silakan hubungi admin.");
       return;

@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
-import { getProfileByIdentifier, getTheme } from "@/lib/db";
+import { getTheme } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { AppTheme } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
+import { getFriendlyErrorMessage, reportClientError } from "@/lib/error-monitoring";
 
 export default function LoginClient() {
   const router = useRouter();
@@ -21,21 +23,30 @@ export default function LoginClient() {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    getTheme().then(setTheme);
+    // Use cached theme from localStorage to avoid blocking roundtrip
+    try {
+      const cached = localStorage.getItem("luma-theme-cache");
+      if (cached) setTheme(JSON.parse(cached));
+    } catch {}
 
-    const checkSession = () => {
-      const isAuthed = localStorage.getItem("luma-auth") === "true";
-      if (isAuthed) {
-        const profileRaw = localStorage.getItem("luma-user-profile");
-        if (profileRaw) {
-          const profile = JSON.parse(profileRaw);
-          if (profile.is_admin) router.push("/admin");
-          else if (profile.is_teacher) router.push("/teacher");
-          else router.push("/");
-        }
+    // Fetch fresh theme in background (non-blocking)
+    getTheme().then(t => {
+      if (t) {
+        setTheme(t);
+        try { localStorage.setItem("luma-theme-cache", JSON.stringify(t)); } catch {}
       }
-    };
-    checkSession();
+    });
+
+    const isAuthed = localStorage.getItem("luma-auth") === "true";
+    if (isAuthed) {
+      const profileRaw = localStorage.getItem("luma-user-profile");
+      if (profileRaw) {
+        const profile = JSON.parse(profileRaw);
+        if (profile.is_admin) router.push("/admin");
+        else if (profile.is_teacher) router.push("/teacher");
+        else router.push("/");
+      }
+    }
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -46,38 +57,97 @@ export default function LoginClient() {
     setErrorMsg("");
     
     try {
-      const profile = await getProfileByIdentifier(identifier);
-      
-      if (profile) {
-        if (profile.password !== passwordInput) {
-           setErrorMsg("Password Invalid. Please double check.");
-           setLoading(false);
-           return;
-        }
+      // Fetch only columns needed for authentication — much faster than select('*')
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("id, email, nip, password, full_name, is_admin, is_super_admin, is_teacher, is_student, is_alumni, is_premium, profile_completed, batch, avatar_url, level, exp")
+        .or(`email.eq.${identifier.trim().toLowerCase()},nip.eq.${identifier.trim()}`)
+        .maybeSingle();
 
-        window.localStorage.setItem("luma-auth", "true");
-        window.localStorage.setItem("luma-user-profile", JSON.stringify(profile));
-        
-        if (profile.is_admin) {
-          router.push("/admin");
-        } else if (profile.is_teacher) {
-          router.push("/teacher");
-        } else if (profile.is_student || profile.is_alumni) {
-          router.push("/learning");
-        } else if (!profile.profile_completed) {
-          router.push("/learning");
-        } else {
-          router.push(`/?tab=${redirect}`);
-        }
-      } else {
-        setErrorMsg("Identity not recognized. Enter valid Email or NIP.");
+      if (error) throw error;
+
+      if (!profile) {
+        reportClientError({
+          source: "auth",
+          error_type: "login_failed",
+          message: "Login failed: identifier not found",
+          severity: "medium",
+          page: "/login",
+          user_email: identifier.trim().toLowerCase(),
+          user_role: "guest",
+          metadata: { reason: "identifier_not_found", identifier: identifier.trim() },
+        });
+        setErrorMsg("Terjadi kendala, silakan periksa kembali data masuk Anda.");
+        setLoading(false);
+        return;
       }
+
+      if (profile.password !== passwordInput) {
+        reportClientError({
+          source: "auth",
+          error_type: "login_failed",
+          message: "Login failed: invalid password",
+          severity: "medium",
+          page: "/login",
+          user_id: profile.id,
+          user_name: profile.full_name,
+          user_email: profile.email,
+          user_role: profile.is_admin ? "admin" : profile.is_teacher ? "instructor" : "student",
+          metadata: { reason: "invalid_password", identifier: identifier.trim() },
+        });
+        setErrorMsg("Terjadi kendala, silakan periksa kembali data masuk Anda.");
+        setLoading(false);
+        return;
+      }
+
+      // ✅ Auth successful — persist immediately and navigate without waiting
+      window.localStorage.setItem("luma-auth", "true");
+      // Store partial profile immediately so the next page renders fast
+      window.localStorage.setItem("luma-user-profile", JSON.stringify(profile));
+
+      // Navigate right away
+      if (profile.is_admin) {
+        router.push("/admin");
+      } else if (profile.is_teacher) {
+        router.push("/teacher");
+      } else if (!profile.profile_completed && (profile.is_student || profile.is_alumni)) {
+        router.push("/learning");
+      } else if (redirect && redirect !== "soal" && redirect !== "materi" && redirect !== "dashboard" && redirect !== "profile") {
+        router.push(redirect.startsWith("/") ? redirect : `/${redirect}`);
+      } else if (profile.is_student || profile.is_alumni) {
+        router.push("/learning");
+      } else {
+        router.push(`/?tab=${redirect}`);
+      }
+
+      // Fetch full profile in the background to fill in remaining fields
+      supabase
+        .from("profiles")
+        .select("*")
+        .eq("email", (profile.email || identifier).trim().toLowerCase())
+        .maybeSingle()
+        .then(({ data: fullProfile }) => {
+          if (fullProfile) {
+            window.localStorage.setItem("luma-user-profile", JSON.stringify(fullProfile));
+          }
+        });
+
     } catch (err) {
-      setErrorMsg("Connection error. Check your network.");
-    } finally {
+      reportClientError({
+        source: "auth",
+        error_type: "login_error",
+        message: err instanceof Error ? err.message : "Login connection error",
+        stack_trace: err instanceof Error ? err.stack || null : null,
+        severity: "high",
+        page: "/login",
+        user_email: identifier.trim().toLowerCase(),
+        user_role: "guest",
+      });
+      setErrorMsg(getFriendlyErrorMessage());
       setLoading(false);
     }
   };
+
 
   return (
     <main className="min-h-screen relative flex items-center justify-center p-6 overflow-hidden bg-white">
@@ -199,7 +269,7 @@ export default function LoginClient() {
                 exit={{ opacity: 0, height: 0 }}
                 className="p-5 rounded-2xl bg-rose-50 border border-rose-100 text-rose-500 text-[11px] font-black italic tracking-tight"
               >
-                ⚠️ ERROR: {errorMsg.toUpperCase()}
+                {errorMsg}
               </motion.div>
             )}
             </AnimatePresence>
