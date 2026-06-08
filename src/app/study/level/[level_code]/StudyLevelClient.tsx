@@ -33,8 +33,8 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
 
     const fetchHierarchy = async () => {
       try {
-        // Batch 1: Fetch chapters, category info, and all study levels in parallel
-        const [chaps, catResult, allLevels] = await Promise.all([
+        // Batch 1: Fetch chapters, category info, all study levels, and completed materials in parallel
+        const [chaps, catResult, allLevels, completed] = await Promise.all([
           getStudyChapters(levelData.id).catch(e => { console.error("Error loading chapters:", e); return []; }),
           levelData.category_id
             ? Promise.resolve(
@@ -45,7 +45,8 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
                   .single()
               ).catch((e: any) => { console.error("Error loading category custom names:", e); return { data: null }; })
             : Promise.resolve({ data: null }),
-          getStudyLevels().catch(e => { console.error("Error loading study levels:", e); return []; })
+          getStudyLevels().catch(e => { console.error("Error loading study levels:", e); return []; }),
+          saved?.email ? getCompletedMaterials(saved.email) : Promise.resolve([])
         ]);
 
         const sameCatLevels = allLevels
@@ -56,7 +57,22 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
 
         const isPremium = saved?.is_premium;
         const isStaff = saved?.is_admin || saved?.is_super_admin || saved?.is_teacher;
-        const hasAccess = isStaff || isFirstLevel || isPremium || (saved?.unlocked_levels || []).includes(levelData.id);
+
+        let isPrevLvlCompleted = false;
+        if (slIdx > 0) {
+          const prevLvl = sameCatLevels[slIdx - 1];
+          const { data: prevChaps } = await supabase.from('study_chapters').select('id').eq('level_id', prevLvl.id);
+          const prevChapIds = prevChaps?.map(c => c.id) || [];
+          if (prevChapIds.length > 0) {
+             const { data: prevMats } = await supabase.from('study_materials').select('id').in('chapter_id', prevChapIds);
+             const prevMatIds = prevMats?.map(m => m.id) || [];
+             if (prevMatIds.length > 0) {
+                isPrevLvlCompleted = prevMatIds.every(id => completed.includes(id));
+             }
+          }
+        }
+
+        const hasAccess = isStaff || isFirstLevel || isPremium || isPrevLvlCompleted || (saved?.unlocked_levels || []).includes(levelData.id);
 
         if (!hasAccess) {
            console.warn(`[Security Alert] User ${saved?.email || 'unauthenticated'} tried to access locked study level: ${levelData.title}`);
@@ -73,27 +89,22 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
           setCategoryCustomTypeNames((catResult as any).data.custom_type_names);
         }
 
-        // Batch 2: Fetch completed materials and quiz access in parallel (if user logged in)
-        let completed: string[] = [];
+        // Batch 2: Fetch quiz access (if user logged in)
         if (saved?.email) {
+          setCompletedMaterials(completed);
+
           const accessQueryBase = saved?.id
             ? (saved.batch
                 ? supabase.from('quiz_access_controls').select('material_id, updated_at, is_active').or(`batch.eq.${saved.batch},student_id.eq.${saved.id}`)
                 : supabase.from('quiz_access_controls').select('material_id, updated_at, is_active').eq('student_id', saved.id))
             : null;
 
-          const [completedIds, accessData] = await Promise.all([
-            getCompletedMaterials(saved.email),
-            accessQueryBase ? accessQueryBase : Promise.resolve({ data: null })
-          ]);
-
-          completed = completedIds;
-          setCompletedMaterials(completedIds);
-
-          const accessRows = (accessData as any).data;
-          if (accessRows) {
-            setAccessControls(accessRows);
-            setActiveQuizzes(accessRows.filter((a: any) => a.is_active).map((a: any) => a.material_id));
+          if (accessQueryBase) {
+            const { data: accessData } = await accessQueryBase;
+            if (accessData) {
+              setAccessControls(accessData);
+              setActiveQuizzes(accessData.filter((a: any) => a.is_active).map((a: any) => a.material_id));
+            }
           }
         }
         setLoadingProgress(65);

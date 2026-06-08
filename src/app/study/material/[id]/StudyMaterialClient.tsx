@@ -89,8 +89,8 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
             setIsChapterLocked(false);
             setIsLevelLocked(false);
           } else {
-            // Fetch chapter's level_id, quiz access, and all study levels in parallel
-            const [chapterInfoRes, quizAccessRes, studyLevelsRes] = await Promise.all([
+            // Fetch chapter's level_id, quiz access, all study levels, and user's completed materials in parallel
+            const [chapterInfoRes, quizAccessRes, studyLevelsRes, completedRes] = await Promise.all([
               supabase
                 .from('study_chapters')
                 .select('level_id, study_levels(id, category_id, sort_order)')
@@ -104,7 +104,11 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                     .eq("student_id", profile.id)
                     .eq("is_active", true)
                 : Promise.resolve({ data: null }),
-              getStudyLevels().catch(() => [])
+              getStudyLevels().catch(() => []),
+              supabase
+                .from('user_material_progress')
+                .select('material_id')
+                .eq('user_email', userEmail.trim().toLowerCase())
             ]);
 
             const chapterInfo = chapterInfoRes.data;
@@ -118,7 +122,23 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                 .sort((a: any, b: any) => a.sort_order - b.sort_order);
               const slIdx = sameCatLevels.findIndex((l: any) => l.id === levelInfo.id);
               const isFirstLevel = slIdx === 0;
-              isLevelUnlocked = isFirstLevel || profile.is_premium || (profile.unlocked_levels || []).includes(levelInfo.id);
+
+              let isPrevLvlCompleted = false;
+              const completed = (completedRes.data || []).map((r: any) => r.material_id);
+              if (slIdx > 0) {
+                const prevLvl = sameCatLevels[slIdx - 1];
+                const { data: prevChaps } = await supabase.from('study_chapters').select('id').eq('level_id', prevLvl.id);
+                const prevChapIds = prevChaps?.map(c => c.id) || [];
+                if (prevChapIds.length > 0) {
+                   const { data: prevMats } = await supabase.from('study_materials').select('id').in('chapter_id', prevChapIds);
+                   const prevMatIds = prevMats?.map(m => m.id) || [];
+                   if (prevMatIds.length > 0) {
+                      isPrevLvlCompleted = prevMatIds.every(id => completed.includes(id));
+                   }
+                }
+              }
+
+              isLevelUnlocked = isFirstLevel || profile.is_premium || isPrevLvlCompleted || (profile.unlocked_levels || []).includes(levelInfo.id);
             }
 
             if (!isLevelUnlocked) {
