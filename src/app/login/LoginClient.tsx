@@ -151,36 +151,35 @@ export default function LoginClient() {
 
   return (
     <main className="min-h-screen relative flex items-center justify-center p-6 overflow-hidden bg-white">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes float-1 {
+          0%, 100% { transform: scale(1) translate(0px, 0px); opacity: 0.1; }
+          50% { transform: scale(1.2) translate(30px, -30px); opacity: 0.2; }
+        }
+        @keyframes float-2 {
+          0%, 100% { transform: scale(1.1) translate(0px, 0px); opacity: 0.1; }
+          50% { transform: scale(1) translate(-40px, 40px); opacity: 0.2; }
+        }
+        .bg-float-1 {
+          animation: float-1 15s infinite linear;
+        }
+        .bg-float-2 {
+          animation: float-2 18s infinite linear;
+        }
+      `}} />
+
       {/* Background Image with Overlay */}
       <div 
         className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/images/bg_login.png')" }}
       >
-        <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px]" />
+        <div className="absolute inset-0 bg-white/50" />
       </div>
 
       {/* Floating Shapes Decor */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-        <motion.div 
-          animate={{ 
-            scale: [1, 1.2, 1],
-            opacity: [0.1, 0.2, 0.1],
-            x: [0, 30, 0],
-            y: [0, -30, 0]
-          }}
-          transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-          className="absolute top-[-10%] left-[-5%] w-[50%] h-[50%] bg-indigo-400 blur-[120px] rounded-full" 
-        />
-        <motion.div 
-          animate={{ 
-            scale: [1.1, 1, 1.1],
-            opacity: [0.1, 0.2, 0.1],
-            x: [0, -40, 0],
-            y: [0, 40, 0]
-          }}
-          transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
-          className="absolute bottom-[-10%] right-[-5%] w-[60%] h-[60%] bg-emerald-400 blur-[150px] rounded-full" 
-        />
+        <div className="absolute top-[-10%] left-[-5%] w-[50%] h-[50%] bg-indigo-400 blur-[120px] rounded-full bg-float-1" />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[60%] h-[60%] bg-emerald-400 blur-[150px] rounded-full bg-float-2" />
       </div>
 
       <div className="relative z-10 w-full max-w-[480px]">
@@ -217,7 +216,7 @@ export default function LoginClient() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="rounded-[3.5rem] bg-white/80 backdrop-blur-[40px] p-10 md:p-12 shadow-[0_40px_100px_rgba(0,0,0,0.1)] border border-white/50 relative overflow-hidden"
+          className="rounded-[3.5rem] bg-white/90 backdrop-blur-md p-10 md:p-12 shadow-[0_40px_100px_rgba(0,0,0,0.1)] border border-white/50 relative overflow-hidden"
         >
           {/* Internal Glow */}
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/5 blur-[80px] rounded-full pointer-events-none" />
