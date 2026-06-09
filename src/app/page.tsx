@@ -101,7 +101,6 @@ export default function Home() {
 
   // Time State
   const [currentTime, setCurrentTime] = useState("");
-  const [loadedIcons, setLoadedIcons] = useState(false);
 
   useEffect(() => {
     const updateTime = () => {
@@ -113,7 +112,7 @@ export default function Home() {
     return () => clearInterval(timer);
   }, []);
 
-  const [isFetching, setIsFetching] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
 
   const retryFetchCategories = async () => {
@@ -121,7 +120,7 @@ export default function Home() {
       const { getMaterialCategories } = await import('@/lib/db');
       let retries = 5;
       while (retries > 0) {
-        const c = await getMaterialCategories();
+        const c = await getMaterialCategories(true);
         if (c && c.length > 0) {
           setCategories(c.filter((cat: any) => cat.is_active !== false));
           return;
@@ -139,27 +138,6 @@ export default function Home() {
       retryFetchCategories();
     }
   }, [activeTab, categories.length, isFetching]);
-
-  useEffect(() => {
-    if (categories.length > 0 && !loadedIcons) {
-      import('@/lib/db').then(({ getMaterialCategories }) => {
-        getMaterialCategories(true).then(catsWithIcons => {
-          if (catsWithIcons && catsWithIcons.length > 0) {
-            setCategories(prev => {
-              return prev.map(pCat => {
-                const matching = catsWithIcons.find(c => c.id === pCat.id);
-                return matching ? { ...pCat, icon_url: matching.icon_url } : pCat;
-              });
-            });
-          }
-          setLoadedIcons(true);
-        }).catch(err => {
-          console.error("Failed to load category icons in background:", err);
-          setLoadedIcons(true);
-        });
-      });
-    }
-  }, [categories, loadedIcons]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -240,9 +218,9 @@ export default function Home() {
     // 🛡️ EMERGENCY FALLBACK: Force dismiss splash after 5 seconds no matter what
     const emergencyTimer = window.setTimeout(() => { setShowSplash(false); setIsFetching(false); }, 5000);
 
-    // Splash timer: fade out the overlay after 800ms
+    // Splash timer: fade out the overlay after 300ms
     const isPostLogout = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get("logout") === "1" : false;
-    const splashTimer = window.setTimeout(() => setShowSplash(false), isPostLogout ? 0 : 800);
+    const splashTimer = window.setTimeout(() => setShowSplash(false), isPostLogout ? 0 : 300);
 
     const init = async () => {
       try {
@@ -274,7 +252,7 @@ export default function Home() {
         const results = await Promise.all([
           track(getTheme().catch(e => { console.error("Error loading theme:", e); return null; })),
           track(getBanners().catch(e => { console.error("Error loading banners:", e); return []; })),
-          track(getMaterialCategories().catch(e => { console.error("Error loading categories:", e); return []; })),
+          track(getMaterialCategories(true).catch(e => { console.error("Error loading categories:", e); return []; })),
           track(getBasicStudyMaterials().catch(e => { console.error("Error loading basic study materials:", e); return []; })),
           track(getExamLevels().catch(e => { console.error("Error loading exam levels:", e); return []; })),
           track(getStudyLevels().catch(e => { console.error("Error loading study levels:", e); return []; })),
@@ -474,11 +452,6 @@ export default function Home() {
           @keyframes splashBar { 0% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
         `}</style>
 
-      {isFetching ? (
-         <div className="flex-1 flex justify-center items-center">
-            <div className="h-10 w-10 border-4 border-teal-500/20 border-t-teal-500 rounded-full animate-spin"></div>
-         </div>
-      ) : (
         <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-screen-2xl flex-col pb-40 md:pb-12">
           <header 
           className="mb-8 hidden rounded-[2.5rem] p-4 shadow-xl ring-1 ring-white/50 backdrop-blur-xl md:block px-8 relative z-[900]"
@@ -658,7 +631,12 @@ export default function Home() {
                   <>
                     <section className="overflow-hidden rounded-3xl md:rounded-[3rem] bg-white shadow-2xl ring-1 ring-black/[0.03] transition-all">
                       <div className="relative h-[440px] md:h-[500px]">
-                        {banners.map((banner, idx) => (
+                        {banners.length === 0 ? (
+                          <div className="absolute inset-0 bg-slate-100 animate-pulse flex items-center justify-center rounded-[3rem]">
+                            <span className="text-slate-300 text-xs font-black uppercase tracking-[0.4em]">Loading Banners...</span>
+                          </div>
+                        ) : (
+                          banners.map((banner, idx) => (
                           <div 
                             key={banner.id}
                             className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${currentSlide === idx ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
@@ -674,7 +652,7 @@ export default function Home() {
                                <button onClick={() => goProtected("soal")} className="mt-8 px-10 py-5 bg-white text-slate-900 rounded-[2rem] font-black text-sm tracking-widest shadow-2xl shadow-black/30 active:scale-95 transition-all hover:px-12"> {banner.cta_text?.toUpperCase() || 'MULAI BELAJAR'} </button>
                             </div>
                           </div>
-                        ))}
+                        )))}
                         <div className="absolute bottom-6 right-12 z-20 flex gap-2">
                            {banners.map((_, i) => (
                               <button key={i} onClick={() => setCurrentSlide(i)} className={`h-1.5 transition-all rounded-full ${currentSlide === i ? 'w-10 bg-white' : 'w-2 bg-white/40 hover:bg-white/60'}`} />
@@ -758,14 +736,23 @@ export default function Home() {
                     </header>
                     {!selectedStudyCategory ? (
                       <div className="grid md:grid-cols-2 gap-6">
-                        {filteredCategories.map(cat => (
+                        {categories.length === 0 ? (
+                          [1, 2].map((i) => (
+                            <div key={i} className="bg-white rounded-[3rem] p-10 h-[180px] animate-pulse flex items-center gap-6 border border-slate-50">
+                              <div className="h-20 w-20 rounded-[2rem] bg-slate-200 shrink-0" />
+                              <div className="flex-1 space-y-3">
+                                <div className="h-6 bg-slate-200 rounded-lg w-2/3" />
+                                <div className="h-4 bg-slate-200 rounded-lg w-1/2" />
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          filteredCategories.map(cat => (
                           <button key={cat.id} onClick={() => { if (!loggedIn) { router.push(`/login?redirect=materi`); return; } setSelectedStudyCategory(cat.id); }} className="group relative bg-white rounded-[3rem] p-10 text-left shadow-sm ring-1 ring-slate-100 hover:shadow-2xl hover:-translate-y-2 active:scale-95 transition-all duration-500 overflow-hidden" >
                              <div className="flex items-center gap-6 mb-6 relative z-10">
                                 <div className="h-20 w-20 rounded-[2rem] flex items-center justify-center text-4xl shadow-xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500" style={{ backgroundColor: cat.badge_color || '#14b8a6', color: '#fff' }} >
                                    {cat.icon_url ? ( 
                                       <img src={cat.icon_url || undefined} alt={cat.name} className="w-full h-full object-contain" /> 
-                                   ) : !loadedIcons ? (
-                                      <div className="h-6 w-6 border-2 border-white/60 border-t-white rounded-full animate-spin" />
                                    ) : ( 
                                       cat.name === 'JLPT' ? '🇯🇵' : '👷‍♂️' 
                                    )}
@@ -778,7 +765,7 @@ export default function Home() {
                              <p className="text-slate-500 relative z-10">{cat.description}</p>
                              <div className="absolute -bottom-20 -right-20 h-64 w-64 rounded-full opacity-10 group-hover:opacity-20 transition-opacity" style={{ background: `radial-gradient(circle, ${cat.badge_color || '#14b8a6'} 0%, transparent 70%)` }} />
                           </button>
-                        ))}
+                        )))}
                         {filteredCategories.length === 0 && (
                           <div className="col-span-full py-10 flex flex-col items-center gap-4">
                             <p className="text-slate-400 italic font-bold text-center">Kategori belum tersedia atau lambat dimuat.</p>
@@ -795,9 +782,7 @@ export default function Home() {
                            <div className="w-16 h-16 rounded-[1.5rem] bg-white shadow-xl ring-1 ring-slate-100 flex items-center justify-center overflow-hidden">
                               {categories.find(c => c.id === selectedStudyCategory)?.icon_url ? (
                                  <img src={categories.find(c => c.id === selectedStudyCategory)?.icon_url || undefined} alt="cat icon" className="w-full h-full object-contain p-2" />
-                              ) : !loadedIcons ? (
-                                 <div className="h-5 w-5 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin" />
-                              ) : (
+                               ) : (
                                  <span className="text-2xl">{categories.find(c => c.id === selectedStudyCategory)?.name === 'JLPT' ? '🇯🇵' : '👷‍♂️'}</span>
                               )}
                            </div>
@@ -807,7 +792,19 @@ export default function Home() {
                            </div>
                         </div>
                         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {studyLevels.filter(sl => sl.category_id === selectedStudyCategory).length > 0 ? studyLevels.filter(sl => sl.category_id === selectedStudyCategory).map((sl, slIdx, catLevels) => {
+                        {studyLevels.length === 0 ? (
+                           [1, 2, 3].map((i) => (
+                            <div key={i} className="bg-white rounded-[2.5rem] p-8 h-[220px] animate-pulse flex flex-col justify-between border border-slate-50">
+                              <div className="h-16 w-16 rounded-3xl bg-slate-200" />
+                              <div className="space-y-3 my-4 flex-1">
+                                <div className="h-6 bg-slate-200 rounded-lg w-3/4" />
+                                <div className="h-4 bg-slate-200 rounded-lg w-full" />
+                                <div className="h-4 bg-slate-200 rounded-lg w-2/3" />
+                              </div>
+                              <div className="h-4 bg-slate-200 rounded-lg w-1/3" />
+                            </div>
+                           ))
+                         ) : studyLevels.filter(sl => sl.category_id === selectedStudyCategory).length > 0 ? studyLevels.filter(sl => sl.category_id === selectedStudyCategory).map((sl, slIdx, catLevels) => {
                            // Admins, super-admins & teachers bypass all locks
                            if (userProfile?.is_admin || userProfile?.is_super_admin || userProfile?.is_teacher) {
                              const isUnlocked = true;
@@ -895,7 +892,18 @@ export default function Home() {
                          <span className="h-px flex-1 bg-slate-100" />
                       </div>
                       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {levels.map((lvl, index) => {
+                        {levels.length === 0 ? (
+                          [1, 2, 3].map((i) => (
+                            <div key={i} className="bg-white p-6 rounded-[2.5rem] h-[120px] animate-pulse flex items-center gap-6 border border-slate-50">
+                              <div className="h-20 w-20 rounded-[2rem] bg-slate-200 shrink-0" />
+                              <div className="flex-1 space-y-3">
+                                <div className="h-5 bg-slate-200 rounded-lg w-2/3" />
+                                <div className="h-3 bg-slate-200 rounded-lg w-1/2" />
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          levels.map((lvl, index) => {
                           const isStaff = userProfile?.is_admin || userProfile?.is_super_admin || userProfile?.is_teacher;
                           const matchingStudyLevel = studyLevels.find(sl => sl.level_code.toLowerCase() === lvl.level_code.toLowerCase());
                           const hasAccess = isStaff || !lvl.is_locked || userProfile?.is_premium || (matchingStudyLevel && (userProfile?.unlocked_levels || []).includes(matchingStudyLevel.id));
@@ -912,7 +920,7 @@ export default function Home() {
                                {hasAccess && ( <div className="absolute top-4 right-4 h-2 w-2 rounded-full bg-teal-500 animate-pulse" /> )}
                             </button>
                           );
-                        })}
+                        }))}
                         {levels.length === 0 && ( <div className="col-span-full py-20 text-center bg-white/50 rounded-[3rem] border-2 border-dashed border-slate-100"> <span className="text-4xl mb-4 block grayscale opacity-30">📚</span> <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Materi Latihan belum tersedia.</p> </div> )}
                       </div>
                     </section>
@@ -1054,7 +1062,6 @@ export default function Home() {
           </div>
         </nav>
         </div>
-      )}
 
       <AnimatePresence>
         {lockedMessage && (
