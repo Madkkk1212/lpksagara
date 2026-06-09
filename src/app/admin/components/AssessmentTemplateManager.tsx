@@ -312,12 +312,25 @@ export default function AssessmentTemplateManager() {
 
       // 2. Prepare payload with stable IDs
       const payload = templates.map(tpl => {
-        const id = existingMap.get(tpl.chapter_title);
+        let id = existingMap.get(tpl.chapter_title) || tpl.id;
+        if (!id) {
+          if (typeof crypto !== "undefined" && crypto.randomUUID) {
+            id = crypto.randomUUID();
+          } else {
+            // fallback simple UUID generator
+            id = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+              const r = (Math.random() * 16) | 0;
+              const v = c === "x" ? r : (r & 0x3) | 0x8;
+              return v.toString(16);
+            });
+          }
+        }
         // If it's a custom chapter (starts with custom-), we set chapter_id to null
         // because it's a manual entry not linked to study_chapters table.
         const isCustom = tpl.chapter_id?.toString().startsWith("custom");
         
         const item: any = {
+          id: id,
           level_id: tpl.level_id,
           chapter_id: isCustom ? null : tpl.chapter_id,
           chapter_title: tpl.chapter_title,
@@ -325,7 +338,6 @@ export default function AssessmentTemplateManager() {
           sort_order: tpl.sort_order,
           is_active: tpl.is_active,
         };
-        if (id) item.id = id;
         return item;
       });
 

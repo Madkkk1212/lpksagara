@@ -21,6 +21,7 @@ import BatchManager from "./components/BatchManager";
 import AssessmentTemplateManager from "./components/AssessmentTemplateManager";
 import AllStudentsAssessment from "./components/AllStudentsAssessment";
 import MaterialRecap from "./components/MaterialRecap";
+import StudentProgressMonitoring from "./components/StudentProgressMonitoring";
 import VideoManager from "./components/VideoManager";
 import AudioManager from "./components/AudioManager";
 import PhotoManager from "./components/PhotoManager";
@@ -34,7 +35,7 @@ import { supabase } from "@/lib/supabase";
 import { getAdminMenuConfig, getProfiles, getStudyLevels } from "@/lib/db";
 import { Profile, StudyLevel } from "@/lib/types";
 
-type AdminTab = "dashboard" | "system-monitoring" | "reports" | "weekly-reports" | "announcements" | "git-update" | "bulk-import" | "theme" | "banners" | "icons" | "materials" | "info-konten" | "exams" | "settings" | "users" | "proposals" | "menu-manager" | "profile-config" | "batches" | "teachers" | "assessment-templates" | "all-students-assessment" | "material-recap" | "video-manager" | "audio-manager" | "photo-manager" | "quiz-access" | "exam-access" | "teacher-menu" | "custom-names";
+type AdminTab = "dashboard" | "system-monitoring" | "reports" | "weekly-reports" | "announcements" | "git-update" | "bulk-import" | "theme" | "banners" | "icons" | "materials" | "info-konten" | "exams" | "settings" | "users" | "proposals" | "menu-manager" | "profile-config" | "batches" | "teachers" | "assessment-templates" | "all-students-assessment" | "student-progress" | "material-recap" | "video-manager" | "audio-manager" | "photo-manager" | "quiz-access" | "exam-access" | "teacher-menu" | "custom-names";
 
 type SidebarInsightItem = {
   id: string;
@@ -378,6 +379,8 @@ export default function AdminClient() {
     { id: "teachers", label: "Kelola Guru", icon: "G", is_active: true },
     { id: "proposals", label: "Usulan Guru", icon: "P", is_active: true },
     { id: "assessment-templates", label: "Template Penilaian", icon: "📝", is_active: false },
+    { id: "all-students-assessment", label: "Nilai Seluruh Siswa", icon: "📊", is_active: true },
+    { id: "student-progress", label: "Progres Siswa", icon: "📈", is_active: true },
     { id: "settings", label: "Settings", icon: "⚙️", is_active: true },
   ];
 
@@ -450,6 +453,13 @@ export default function AdminClient() {
     uniqueTabs.splice(insertAt, 0, { id: "all-students-assessment", label: "Nilai Seluruh Siswa", icon: "📊", is_active: true } as any);
   }
 
+  // 'student-progress'
+  if (!uniqueTabs.some(t => t.id === "student-progress") && !rawBaseTabs.some(t => t.id === "student-progress")) {
+    const targetIdx = uniqueTabs.findIndex(t => t.id === "all-students-assessment");
+    const insertAt = targetIdx !== -1 ? targetIdx + 1 : uniqueTabs.length;
+    uniqueTabs.splice(insertAt, 0, { id: "student-progress", label: "Progres Siswa", icon: "📈", is_active: true } as any);
+  }
+
   // Ensure Quiz and Exam access appear
   if (!uniqueTabs.some(t => t.id === "quiz-access") && !rawBaseTabs.some(t => t.id === "quiz-access")) {
     const usersIdx = uniqueTabs.findIndex(t => t.id === "users");
@@ -506,6 +516,12 @@ export default function AdminClient() {
     ? uniqueTabs
     : uniqueTabs.filter(t => t.id !== "info-konten" && t.id !== "custom-names" && t.id !== "system-monitoring");
 
+  console.log("=== ADMIN MENU DIAGNOSTICS ===");
+  console.log("Profile:", userProfile?.email, "Admin:", userProfile?.is_admin, "Super Admin:", userProfile?.is_super_admin);
+  console.log("Tabs count:", tabs.length);
+  console.log("Tabs list:", tabs.map(t => t.id));
+  console.log("Student progress in tabs?:", tabs.some(t => t.id === "student-progress"));
+
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 text-sm">
       {/* Sidebar Overlay */}
@@ -545,7 +561,7 @@ export default function AdminClient() {
             {
               title: "Manajemen User",
               icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a7 7 0 00-7 7v1h11v-1a7 7 0 00-7-7z" /></svg>,
-              items: ["users", "batches", "teachers", "quiz-access", "exam-access", "proposals", "all-students-assessment", "assessment-templates"]
+              items: ["users", "batches", "teachers", "quiz-access", "exam-access", "proposals", "all-students-assessment", "student-progress", "assessment-templates"]
             },
             {
               title: "Konfigurasi",
@@ -751,6 +767,7 @@ export default function AdminClient() {
                {activeTab === "menu-manager" && <MenuManager onConfigChange={fetchMenuConfig} />}
                {activeTab === "assessment-templates" && <AssessmentTemplateManager />}
                {activeTab === "all-students-assessment" && <AllStudentsAssessment students={students} levels={studyLevels} />}
+               {activeTab === "student-progress" && <StudentProgressMonitoring students={students} levels={studyLevels} />}
                {activeTab === "material-recap" && <MaterialRecap />}
                {activeTab === "video-manager" && <VideoManager />}
                {activeTab === "audio-manager" && <AudioManager />}
