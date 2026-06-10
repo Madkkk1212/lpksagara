@@ -11,6 +11,8 @@ import ModernQuizPlayer, { NormalizedQuestion } from "@/app/components/ModernQui
 
 export default function StudyMaterialClient({ materialData }: { materialData: StudyMaterial }) {
   const router = useRouter();
+  const [showPdf, setShowPdf] = useState(false);
+  const [showPpt, setShowPpt] = useState(false);
   const [showTranslation, setShowTranslation] = useState(false);
   const [showPracticeQuiz, setShowPracticeQuiz] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
@@ -896,8 +898,15 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
               </div>
             )}
 
-            {/* PDF Document Viewer */}
-            {(content.pdf_url || content.document_url) && (
+            {/* PDF Viewer */}
+            {(() => {
+              let parsedContent = content || {};
+              if (typeof parsedContent === 'string') {
+                try { parsedContent = JSON.parse(parsedContent); } catch(e) {}
+              }
+              const activePdfUrl = parsedContent.pdf_url || parsedContent.document_url || parsedContent.sections?.[0]?.media?.pdf_url || parsedContent.sections?.[0]?.media?.pdfUrl || parsedContent.sections?.[0]?.media?.pdf;
+              if (!activePdfUrl) return null;
+              return (
               <div className="mb-8 rounded-[2rem] overflow-hidden bg-white border border-slate-100 shadow-lg p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -907,25 +916,43 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                       <p className="text-xs font-bold text-slate-400">Silakan pelajari materi PDF di bawah ini langsung.</p>
                     </div>
                   </div>
-                  <a 
-                    href={fixUrl(content.pdf_url || content.document_url)} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="px-4 py-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 rounded-xl text-xs font-black transition-all"
-                  >
-                    Buka Tab Baru ↗
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setShowPdf(!showPdf)}
+                      className="px-4 py-2 bg-teal-50 hover:bg-teal-100 text-teal-600 rounded-xl text-xs font-black transition-all"
+                    >
+                      {showPdf ? "Tutup PDF" : "Buka PDF"}
+                    </button>
+                    <a 
+                      href={fixUrl(activePdfUrl)} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="px-4 py-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 rounded-xl text-xs font-black transition-all"
+                    >
+                      Tab Baru ↗
+                    </a>
+                  </div>
                 </div>
-                <iframe 
-                  src={`${fixUrl(content.pdf_url || content.document_url)}#toolbar=0`} 
-                  className="w-full h-[600px] rounded-2xl border border-slate-100 shadow-inner"
-                  title="PDF Viewer"
-                />
+                {showPdf && (
+                  <iframe 
+                    src={`${fixUrl(activePdfUrl)}#toolbar=0`} 
+                    className="w-full h-[600px] rounded-2xl border border-slate-100 shadow-inner mt-4 animate-in fade-in duration-500"
+                    title="PDF Viewer"
+                  />
+                )}
               </div>
-            )}
+              );
+            })()}
 
             {/* PPT Slides iframe viewer */}
-            {content.ppt_url && (
+            {(() => {
+              let parsedContent = content || {};
+              if (typeof parsedContent === 'string') {
+                try { parsedContent = JSON.parse(parsedContent); } catch(e) {}
+              }
+              const activePptUrl = parsedContent.ppt_url || parsedContent.sections?.[0]?.media?.ppt_url || parsedContent.sections?.[0]?.media?.pptUrl || parsedContent.sections?.[0]?.media?.ppt;
+              if (!activePptUrl) return null;
+              return (
               <div className="mb-8 rounded-[2rem] overflow-hidden bg-white border border-slate-100 shadow-lg p-6 relative z-10">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -935,22 +962,33 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                       <p className="text-xs font-bold text-slate-400">Silakan pelajari slide presentasi PPT di bawah ini langsung.</p>
                     </div>
                   </div>
-                  <a 
-                    href={fixUrl(content.ppt_url)} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="px-4 py-2 bg-slate-100 hover:bg-amber-50 hover:text-amber-600 text-slate-600 rounded-xl text-xs font-black transition-all"
-                  >
-                    Download PPT ↗
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setShowPpt(!showPpt)}
+                      className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-xl text-xs font-black transition-all"
+                    >
+                      {showPpt ? "Tutup PPT" : "Buka PPT"}
+                    </button>
+                    <a 
+                      href={fixUrl(activePptUrl)} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="px-4 py-2 bg-slate-100 hover:bg-amber-50 hover:text-amber-600 text-slate-600 rounded-xl text-xs font-black transition-all"
+                    >
+                      Download ↗
+                    </a>
+                  </div>
                 </div>
-                <iframe 
-                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fixUrl(content.ppt_url)!)}`} 
-                  className="w-full h-[600px] rounded-2xl border border-slate-100 shadow-inner"
-                  title="PPT Viewer"
-                />
+                {showPpt && (
+                  <iframe 
+                    src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fixUrl(activePptUrl)!)}`} 
+                    className="w-full h-[600px] rounded-2xl border border-slate-100 shadow-inner mt-4 animate-in fade-in duration-500"
+                    title="PPT Viewer"
+                  />
+                )}
               </div>
-            )}
+              );
+            })()}
 
             {/* Study Specific Content Render */}
             {materialData.material_type === 'moji_goi' && renderMojiGoi()}
