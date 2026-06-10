@@ -60,6 +60,7 @@ export default function ExamLevelClient({ level }: { level: string }) {
   const [userAnswers, setUserAnswers] = useState<Record<string, number>>({});
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [timer, setTimer] = useState(0);
+  const [isExamFinished, setIsExamFinished] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const [levelConfig, setLevelConfig] = useState<ExamLevel | null>(null);
@@ -180,6 +181,7 @@ export default function ExamLevelClient({ level }: { level: string }) {
     setTimer(selectedTest.duration_minutes * 60);
     setCurrentIdx(0);
     setUserAnswers({});
+    setIsExamFinished(false);
     setActiveView("exam");
   };
 
@@ -342,6 +344,7 @@ export default function ExamLevelClient({ level }: { level: string }) {
         studentId={userProfile?.id || undefined}
         testId={selectedTest.id}
         testTitle={selectedTest.title}
+        disabled={isExamFinished}
       >
         <ModernQuizPlayer
           title={selectedTest.title}
@@ -350,6 +353,7 @@ export default function ExamLevelClient({ level }: { level: string }) {
           durationMinutes={selectedTest.duration_minutes || 10}
           localStorageKey={`exam_test_${selectedTest.id}`}
           onFinish={(answers, scorePct) => {
+            setIsExamFinished(true);
             // Exam completed and scores can be reviewed inside the review layout.
           }}
           onClose={() => {

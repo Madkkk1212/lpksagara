@@ -700,7 +700,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                             </div>
                           )}
 
-                          {/* PDF Document — buka langsung di browser/tab baru */}
+                          {/* PDF Document — expand/collapse iframe */}
                           {(() => {
                             let parsedContent = content || {};
                             if (typeof parsedContent === 'string') {
@@ -709,34 +709,44 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                             const activePdfUrl = parsedContent.pdf_url || parsedContent.document_url || parsedContent.sections?.[0]?.media?.pdf_url || parsedContent.sections?.[0]?.media?.pdfUrl || parsedContent.sections?.[0]?.media?.pdf;
                             if (!activePdfUrl) return null;
                             const fixedPdfUrl = fixUrl(activePdfUrl) || '';
+                            // Serve through our proxy so CORS/Content-Disposition headers are correct
+                            const proxyUrl = `/api/pdf-proxy?url=${encodeURIComponent(fixedPdfUrl)}`;
                             return (
-                            <div className="mb-5 sm:mb-8 rounded-[1.5rem] sm:rounded-[2rem] bg-gradient-to-br from-rose-50 to-white border border-rose-100 shadow-lg p-4 sm:p-6 relative z-10">
-                              <div className="flex items-center gap-4">
-                                <div className="h-14 w-14 shrink-0 bg-white rounded-2xl flex items-center justify-center text-3xl shadow-sm border border-rose-100">
-                                  📕
+                            <div className="mb-5 sm:mb-8 rounded-[1.5rem] sm:rounded-[2rem] bg-white border border-slate-100 shadow-lg p-4 sm:p-6 relative z-10">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="flex items-center gap-4">
+                                  <div className="h-12 w-12 shrink-0 bg-rose-50 rounded-2xl flex items-center justify-center text-2xl shadow-sm border border-rose-100">
+                                    📕
+                                  </div>
+                                  <div className="min-w-0">
+                                    <h3 className="text-base sm:text-lg font-black text-slate-800 truncate">{content.pdf_name || "Dokumen PDF"}</h3>
+                                    <p className="text-xs font-bold text-slate-400 mt-0.5">Silakan pelajari materi PDF di bawah ini langsung.</p>
+                                  </div>
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <h3 className="text-base sm:text-lg font-black text-slate-800 truncate">{content.pdf_name || "Dokumen PDF"}</h3>
-                                  <p className="text-xs font-bold text-slate-400 mt-0.5">Ketuk tombol untuk membuka materi PDF</p>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => setShowPdf(!showPdf)}
+                                    className="px-4 py-2 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-xl text-xs font-black transition-all active:scale-95 whitespace-nowrap"
+                                  >
+                                    {showPdf ? 'Tutup PDF' : 'Buka PDF'}
+                                  </button>
+                                  <a
+                                    href={fixedPdfUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="px-4 py-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-500 rounded-xl text-xs font-black transition-all active:scale-95 whitespace-nowrap"
+                                  >
+                                    Tab Baru ↗
+                                  </a>
                                 </div>
                               </div>
-                              <div className="flex gap-2 mt-4">
-                                <a
-                                  href={fixedPdfUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="flex-1 py-3 bg-slate-900 hover:bg-teal-600 text-white rounded-2xl text-xs font-black text-center transition-all active:scale-95 shadow-md"
-                                >
-                                  📖 Buka PDF
-                                </a>
-                                <a
-                                  href={fixedPdfUrl}
-                                  download
-                                  className="px-4 py-3 bg-white hover:bg-rose-50 text-rose-500 rounded-2xl text-xs font-black text-center transition-all active:scale-95 border border-rose-100"
-                                >
-                                  ⬇️
-                                </a>
-                              </div>
+                              {showPdf && (
+                                <iframe
+                                  src={fixedPdfUrl}
+                                  className="w-full h-[480px] sm:h-[650px] rounded-2xl border border-slate-100 shadow-inner mt-4 animate-in fade-in duration-500 bg-gray-50"
+                                  title="PDF Viewer"
+                                />
+                              )}
                             </div>
                             );
                           })()}

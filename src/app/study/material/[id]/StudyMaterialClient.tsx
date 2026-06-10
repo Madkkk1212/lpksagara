@@ -8,6 +8,7 @@ import { calculateChapterXPDistribution } from "@/lib/GamificationUtils";
 import { supabase } from "@/lib/supabase";
 import KioskBarrier from "@/app/components/KioskBarrier";
 import ModernQuizPlayer, { NormalizedQuestion } from "@/app/components/ModernQuizPlayer";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function StudyMaterialClient({ materialData }: { materialData: StudyMaterial }) {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
   const [isAlreadyCompleted, setIsAlreadyCompleted] = useState(false);
+  const [isQuizFinished, setIsQuizFinished] = useState(false);
   const [alertData, setAlertData] = useState<{ title: string; message: string; type?: 'warning' | 'error' | 'success' } | null>(null);
   const [isAccessActive, setIsAccessActive] = useState(false);
   const [isRemedialAccess, setIsRemedialAccess] = useState(false);
@@ -544,7 +546,9 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
       // Jalankan semua penyimpanan secara paralel agar sangat cepat!
       await Promise.all([p1, p2, p3]);
 
-      setIsAlreadyCompleted(true);
+      if (materialData.material_type !== 'quiz') {
+        setIsAlreadyCompleted(true);
+      }
       
       if (!alreadyDone) {
         setAlertData({
@@ -741,6 +745,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
         studentId={studentProfileId || undefined}
         testId={materialData.id}
         testTitle={materialData.title}
+        disabled={isQuizFinished}
       >
         <ModernQuizPlayer
           title={materialData.title}
@@ -750,6 +755,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
           localStorageKey={`material_quiz_${materialData.id}`}
           accessOpenedAt={accessOpenedAt || undefined}
           onFinish={async (answers, score) => {
+            setIsQuizFinished(true);
             await handleFinish(answers, score);
           }}
           onClose={() => router.back()}
@@ -935,7 +941,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
               if (!activePdfUrl) return null;
               return (
               <div className="mb-8 rounded-[2rem] overflow-hidden bg-white border border-slate-100 shadow-lg p-6">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">📕</span>
                     <div>
@@ -946,7 +952,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={() => setShowPdf(!showPdf)}
-                      className="px-4 py-2 bg-teal-50 hover:bg-teal-100 text-teal-600 rounded-xl text-xs font-black transition-all"
+                      className="px-4 py-2 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-xl text-xs font-black transition-all active:scale-95 whitespace-nowrap"
                     >
                       {showPdf ? "Tutup PDF" : "Buka PDF"}
                     </button>
@@ -954,7 +960,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                       href={fixUrl(activePdfUrl)} 
                       target="_blank" 
                       rel="noreferrer"
-                      className="px-4 py-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 rounded-xl text-xs font-black transition-all"
+                      className="px-4 py-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 rounded-xl text-xs font-black transition-all active:scale-95 whitespace-nowrap"
                     >
                       Tab Baru ↗
                     </a>
@@ -962,8 +968,8 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                 </div>
                 {showPdf && (
                   <iframe 
-                    src={`${fixUrl(activePdfUrl)}#toolbar=0`} 
-                    className="w-full h-[600px] rounded-2xl border border-slate-100 shadow-inner mt-4 animate-in fade-in duration-500"
+                    src={fixUrl(activePdfUrl)}
+                    className="w-full h-[600px] rounded-2xl border border-slate-100 shadow-inner mt-4 animate-in fade-in duration-500 bg-gray-50"
                   />
                 )}
               </div>
@@ -1104,7 +1110,8 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
             mode="latihan"
             localStorageKey={`practice_quiz_${materialData.id}`}
             onFinish={() => {
-              setShowPracticeQuiz(false);
+              // Quiz completed, let ModernQuizPlayer show the result screen.
+              // It will be closed when the user clicks the close button which calls onClose.
             }}
             onClose={() => setShowPracticeQuiz(false)}
           />

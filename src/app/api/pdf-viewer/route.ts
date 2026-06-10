@@ -98,7 +98,8 @@ export async function GET(request: NextRequest) {
         // Step 2: get raw bytes, pass to PDF.js via { data } — no HTTP fetch by PDF.js at all
         loaderText.textContent = 'Memuat halaman...';
         const arrayBuffer = await res.arrayBuffer();
-        const pdf         = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const typedArray  = new Uint8Array(arrayBuffer);
+        const pdf         = await pdfjsLib.getDocument({ data: typedArray }).promise;
         const total       = pdf.numPages;
 
         loader.style.display = 'none';

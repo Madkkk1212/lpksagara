@@ -13,9 +13,20 @@ interface KioskBarrierProps {
   testId?: string;
   testTitle?: string;
   onViolationForceExit?: () => void;
+  disabled?: boolean;
 }
 
-export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", userName, userEmail, studentId, testId, testTitle, onViolationForceExit }: KioskBarrierProps) {
+export default function KioskBarrier({ 
+  children, 
+  title = "Mode Ujian (Kiosk)", 
+  userName, 
+  userEmail, 
+  studentId, 
+  testId, 
+  testTitle, 
+  onViolationForceExit,
+  disabled = false
+}: KioskBarrierProps) {
   const [isLocked, setIsLocked] = useState(false);
   const [violation, setViolation] = useState(false);
   const [violationCount, setViolationCount] = useState(0);
@@ -30,8 +41,38 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", u
 
   // Sync ref with state
   useEffect(() => {
-    isLockedRef.current = isLocked;
-  }, [isLocked]);
+    isLockedRef.current = isLocked && !disabled;
+  }, [isLocked, disabled]);
+
+  // Reset states & release lock when disabled
+  useEffect(() => {
+    if (disabled) {
+      setIsLocked(false);
+      setViolation(false);
+      setIsScreenHidden(false);
+      
+      // Exit fullscreen
+      try {
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        else if ((document as any).webkitFullscreenElement) (document as any).webkitExitFullscreen();
+      } catch (_) {}
+
+      // Unlock keyboard
+      try {
+        if ((navigator as any).keyboard?.unlock) (navigator as any).keyboard.unlock();
+      } catch (_) {}
+
+      // Mark user as inactive in database
+      if (userEmail && testId) {
+        supabase
+          .from("exam_violations")
+          .update({ is_active: false })
+          .eq("student_email", userEmail)
+          .eq("test_id", testId)
+          .then(() => {});
+      }
+    }
+  }, [disabled, userEmail, testId]);
 
   // Trigger screenshot warning briefly
   const triggerScreenshotWarning = useCallback(() => {
@@ -153,7 +194,7 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", u
   }, [violationCooldown]);
 
   useEffect(() => {
-    if (!isLocked) return;
+    if (!isLocked || disabled) return;
 
     // ─── FULLSCREEN ───────────────────────────────────────────────
     const handleFullscreenChange = () => {
@@ -267,7 +308,7 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", u
         if ((navigator as any).keyboard?.unlock) (navigator as any).keyboard.unlock();
       } catch (_) {}
     };
-  }, [isLocked, triggerViolation, triggerScreenshotWarning]);
+  }, [isLocked, triggerViolation, triggerScreenshotWarning, disabled]);
 
   // ─── REQUEST LOCK ─────────────────────────────────────────────────
   const requestLock = async () => {
@@ -303,7 +344,7 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", u
   };
 
   // ─── PRE-LOCK SCREEN ──────────────────────────────────────────────
-  if (!isLocked) {
+  if (!isLocked && !disabled) {
     return (
       <div className="fixed inset-0 z-[100] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex flex-col items-center justify-center p-6 text-center">
         {/* Animated background elements */}
@@ -360,7 +401,7 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", u
   return (
     <>
       {/* Anti-screenshot CSS overlay - makes screenshot appear black in some systems */}
-      <style>{`
+      <style>{!disabled ? `
         @media print {
           * { display: none !important; }
           body::after { 
@@ -377,16 +418,16 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", u
         .kiosk-active img, .kiosk-active video, .kiosk-active audio {
           pointer-events: none !important;
         }
-      `}</style>
+      ` : ''}</style>
 
       <div 
-        className="kiosk-active h-screen w-screen overflow-hidden bg-slate-50 flex flex-col relative transition-all duration-75"
-        style={isScreenHidden ? { filter: 'blur(60px)', opacity: 0.01, transform: 'scale(0.95)' } : undefined}
+        className={`${!disabled ? 'kiosk-active' : ''} h-screen w-screen overflow-hidden bg-slate-50 flex flex-col relative transition-all duration-75`}
+        style={(!disabled && isScreenHidden) ? { filter: 'blur(60px)', opacity: 0.01, transform: 'scale(0.95)' } : undefined}
       >
         {children}
 
         {/* Watermark overlay - traced if screenshot is taken */}
-        {userName && (
+        {!disabled && userName && (
           <div
             className="fixed inset-0 pointer-events-none z-[50] overflow-hidden select-none"
             aria-hidden="true"
@@ -409,7 +450,7 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", u
       </div>
 
       {/* Screenshot Warning Overlay */}
-      {screenshotWarning && (
+      {!disabled && screenshotWarning && (
         <div className="fixed inset-0 z-[300] bg-black flex items-center justify-center pointer-events-none select-none">
           <div className="text-center">
             <div className="text-8xl mb-4 animate-bounce">📵</div>
@@ -420,7 +461,7 @@ export default function KioskBarrier({ children, title = "Mode Ujian (Kiosk)", u
       )}
 
       {/* VIOLATION OVERLAY */}
-      {violation && (
+      {!disabled && violation && (
         <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center p-6 text-center select-none"
           style={{ background: 'linear-gradient(135deg, #be123c 0%, #9f1239 50%, #881337 100%)' }}
         >
