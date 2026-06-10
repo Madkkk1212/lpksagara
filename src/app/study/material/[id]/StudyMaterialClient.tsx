@@ -495,59 +495,73 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
         });
       }
 
-      if (studentProfileId) {
-        await supabase
+      // 1. Mark Access Control
+      const p1 = studentProfileId ? supabase
           .from("quiz_access_controls")
           .update({ batch: "PROGRESS:SELESAI" })
           .eq("material_id", materialData.id)
-          .eq("student_id", studentProfileId);
+          .eq("student_id", studentProfileId) : Promise.resolve();
+
+      // 2. Mark Completed
+      const p2 = markMaterialCompleted(userEmail, materialData.id);
+
+      // 3. Award XP
+      let awardedXP = 0;
+      let p3 = Promise.resolve();
+      
+      if (!alreadyDone) {
+        p3 = (async () => {
+          const chapterMats = await getBasicStudyMaterials(materialData.chapter_id);
+          const materialsOnly = chapterMats.filter(m => m.material_type !== 'quiz');
+          const quizzesOnly = chapterMats.filter(m => m.material_type === 'quiz');
+
+          const isQuiz = materialData.material_type === 'quiz';
+          const distribution = calculateChapterXPDistribution(materialsOnly.length, quizzesOnly.length);
+
+          if (isQuiz) {
+            const idx = quizzesOnly.findIndex(m => m.id === materialData.id);
+            awardedXP = (distribution.quizzes && distribution.quizzes[idx]) || 0;
+          } else {
+            const idx = materialsOnly.findIndex(m => m.id === materialData.id);
+            awardedXP = (distribution.materials && distribution.materials[idx]) || 0;
+          }
+
+          if (awardedXP > 0) {
+            const prof = await getProfileByEmail(userEmail);
+            if (prof) {
+              const newExp = (prof.exp || 0) + awardedXP;
+              const newLevel = Math.floor(newExp / 1000) + 1;
+              await upsertProfile({ email: userEmail, exp: newExp, level: newLevel });
+              const updatedProf = { ...prof, exp: newExp, level: newLevel,
+                unlocked_materials: [...(prof.unlocked_materials || []), materialData.id]
+              };
+              localStorage.setItem('luma-user-profile', JSON.stringify(updatedProf));
+            }
+          }
+        })();
       }
 
-      await markMaterialCompleted(userEmail, materialData.id);
+      // Jalankan semua penyimpanan secara paralel agar sangat cepat!
+      await Promise.all([p1, p2, p3]);
 
+      setIsAlreadyCompleted(true);
+      
       if (!alreadyDone) {
-        // Award XP only for first-time completion
-        const chapterMats = await getBasicStudyMaterials(materialData.chapter_id);
-        const materialsOnly = chapterMats.filter(m => m.material_type !== 'quiz');
-        const quizzesOnly = chapterMats.filter(m => m.material_type === 'quiz');
-
-        const isQuiz = materialData.material_type === 'quiz';
-        const distribution = calculateChapterXPDistribution(materialsOnly.length, quizzesOnly.length);
-
-        let awardedXP = 0;
-        if (isQuiz) {
-          const idx = quizzesOnly.findIndex(m => m.id === materialData.id);
-          awardedXP = (distribution.quizzes && distribution.quizzes[idx]) || 0;
-        } else {
-          const idx = materialsOnly.findIndex(m => m.id === materialData.id);
-          awardedXP = (distribution.materials && distribution.materials[idx]) || 0;
-        }
-
-        const prof = await getProfileByEmail(userEmail);
-        if (prof && awardedXP > 0) {
-          const newExp = (prof.exp || 0) + awardedXP;
-          const newLevel = Math.floor(newExp / 1000) + 1;
-          await upsertProfile({ email: userEmail, exp: newExp, level: newLevel });
-          const updatedProf = { ...prof, exp: newExp, level: newLevel,
-            unlocked_materials: [...(prof.unlocked_materials || []), materialData.id]
-          };
-          localStorage.setItem('luma-user-profile', JSON.stringify(updatedProf));
-        }
-
-        setIsAlreadyCompleted(true);
         setAlertData({
           title: "Materi Selesai! 🎉",
-          message: `Selamat, Anda berhasil menyelesaikan materi ini${awardedXP > 0 ? ` dan mendapatkan +${awardedXP} EXP` : ''}.`,
+          message: `Selamat, Anda berhasil menyelesaikan materi ini${awardedXP > 0 ? ` dan mendapatkan +${awardedXP} EXP` : ''}. Mengembalikan ke menu utama...`,
           type: "success"
         });
       }
 
+      // Otomatis kembali ke halaman learning setelah 1.5 detik
       if (materialData.material_type !== 'quiz') {
-        if (alreadyDone) {
-          // If they click the button when it's already done (Selesai Belajar (Kembali))
+        setTimeout(() => {
           router.push('/learning');
           router.refresh();
-        }
+        }, alreadyDone ? 0 : 1500);
+      } else {
+        setIsFinishing(false);
       }
     } catch(e: any) {
       console.error("[handleFinish] Error saving quiz result:", e);
