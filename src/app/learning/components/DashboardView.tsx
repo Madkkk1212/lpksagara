@@ -11,6 +11,7 @@ import { WeeklyTarget } from "@/lib/types";
 export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: { user: Profile, theme: AppTheme | null, onUpgrade?: (msg: string) => void, onSwitchTab?: (tab: any) => void }) {
   const [leaderboard, setLeaderboard] = useState<Profile[]>([]);
   const [lastProgress, setLastProgress] = useState<any[]>([]);
+  const [quizAccessList, setQuizAccessList] = useState<any[]>([]);
   const [achievements, setAchievements] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [weeklyTargets, setWeeklyTargets] = useState<WeeklyTarget[]>([]);
@@ -27,6 +28,34 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
   // Progress formula: assuming levels are 1000 exp each
   const levelProgress = currentExp % 1000;
   const progressPercent = Math.min(levelProgress / 10, 100);
+
+  // Find the first valid progress item to continue learning
+  const continueLearningMaterial = useMemo(() => {
+    if (!lastProgress || lastProgress.length === 0) return null;
+    
+    return lastProgress.find(progressItem => {
+      const mat = progressItem.study_materials;
+      if (!mat) return false;
+      
+      if (mat.material_type !== 'quiz') {
+        return true; // Study materials are always valid to review
+      }
+      
+      // If it is a quiz, check if there is an active access control
+      const control = quizAccessList.find((c: any) => c.material_id === mat.id);
+      if (!control) return false; // No access control row = locked/completed
+      
+      if (!control.is_active) return false;
+      if (control.batch === 'PROGRESS:SELESAI') return false; // Already finished
+      
+      // Duration check
+      const parsedContent = (typeof mat.content === 'string' ? JSON.parse(mat.content) : mat.content) || {};
+      const duration = parsedContent.duration_minutes || 60;
+      const openedTime = new Date(control.updated_at || control.created_at).getTime();
+      const expirationTime = openedTime + (duration * 60 * 1000);
+      return Date.now() <= expirationTime;
+    });
+  }, [lastProgress, quizAccessList]);
 
   useEffect(() => {
     async function loadDashboard() {
@@ -86,6 +115,17 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
         setCompletedMaterials(progress.map((p: any) => p.material_id));
       } catch (err) {
         console.error("Dashboard: Failed to fetch progress via API", err);
+      }
+
+      // 5. Fetch Quiz Access Controls
+      try {
+        const { data: qAccess } = await supabase
+          .from('quiz_access_controls')
+          .select('material_id, is_active, is_remedial, batch, updated_at, created_at')
+          .eq('student_id', user.id);
+        setQuizAccessList(qAccess || []);
+      } catch (err) {
+        console.error("Dashboard: Failed to fetch quiz access controls", err);
       }
     }
     loadDashboard();
@@ -355,12 +395,12 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div
               onClick={() => {
-                const matId = lastProgress[0]?.material_id;
+                const matId = continueLearningMaterial?.material_id;
                 console.log("Dashboard: Navigating to material", matId);
                 if (matId) window.location.href = `/study/material/${matId}`;
               }}
               className={`p-8 bg-white rounded-[2.5rem] border-2 transition-all duration-700 group relative overflow-hidden ${
-                lastProgress[0]?.material_id 
+                continueLearningMaterial?.material_id 
                   ? 'border-teal-400 shadow-xl shadow-teal-100 hover:shadow-2xl hover:translate-y-[-8px] cursor-pointer' 
                   : 'border-slate-100'
               }`}
@@ -370,23 +410,23 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
                </div>
                <div className="relative z-10">
                   <span className="px-3 py-1 bg-teal-50 text-teal-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-teal-100 mb-4 inline-block">
-                    {lastProgress[0]?.material_id ? '▶ Lanjutkan' : 'Materi Terakhir'}
+                    {continueLearningMaterial?.material_id ? '▶ Lanjutkan' : 'Materi Terakhir'}
                   </span>
                   <h4 className="text-2xl font-black text-slate-800 leading-tight mb-1 group-hover:text-teal-600 transition-colors">
-                    {lastProgress[0]?.study_materials?.title || 'Mulailah Belajar!'}
+                    {continueLearningMaterial?.study_materials?.title || 'Mulailah Belajar!'}
                   </h4>
-                  {lastProgress[0]?.study_materials && (
+                  {continueLearningMaterial?.study_materials && (
                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">
                       {(() => {
-                        const sm = lastProgress[0]?.study_materials;
+                        const sm = continueLearningMaterial?.study_materials;
                         if (!sm) return '';
                         return getMaterialTypeDisplayName(sm);
                       })()} 
-                      {lastProgress[0]?.study_materials?.study_chapters?.title ? ` · ${lastProgress[0]?.study_materials?.study_chapters?.title}` : ''}
+                      {continueLearningMaterial?.study_materials?.study_chapters?.title ? ` · ${continueLearningMaterial?.study_materials?.study_chapters?.title}` : ''}
                     </p>
                   )}
                   <p className="text-xs text-slate-400 font-medium">
-                    {lastProgress[0]?.material_id ? 'Klik untuk langsung melanjutkan materi ini →' : 'Mulai belajar dan pantau progres Anda di sini.'}
+                    {continueLearningMaterial?.material_id ? 'Klik untuk langsung melanjutkan materi ini →' : 'Mulai belajar dan pantau progres Anda di sini.'}
                   </p>
                </div>
             </div>

@@ -76,12 +76,14 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
         // Fetch profile first, then use profile.id for parallel queries below
         const { data: profile } = await supabase
           .from("profiles")
-          .select("id, batch, is_admin, is_super_admin, is_teacher, is_premium, unlocked_levels")
+          .select("id, batch, is_admin, is_super_admin, is_teacher, is_premium, unlocked_levels, unlocked_materials")
           .eq("email", userEmail)
           .maybeSingle();
 
         if (profile) {
           setStudentProfileId(profile.id);
+          const unlocked = profile.unlocked_materials || [];
+          setIsAlreadyCompleted(unlocked.includes(materialData.id));
           
           const isStaff = profile.is_admin || profile.is_super_admin || profile.is_teacher;
           if (isStaff) {
@@ -463,8 +465,21 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
           section_video_url: fixUrl(content.video_url || content.videoUrl || content.video || materialData.video_url)
         }));
 
+    const isStaff = typeof window !== 'undefined' && (() => {
+      try {
+        const raw = localStorage.getItem("luma-user-profile");
+        if (raw) {
+          const u = JSON.parse(raw);
+          return u.is_admin || u.is_super_admin || u.is_teacher;
+        }
+      } catch (e) {}
+      return false;
+    })();
+
     // Jika akses remedial aktif → izinkan mengerjakan meskipun sudah selesai sebelumnya
-    const showCompletedScreen = isAlreadyCompleted && !isAccessActive && !isRemedialAccess;
+    const isQuiz = materialData.material_type === 'quiz';
+    const showCompletedScreen = isQuiz && !isStaff && isAlreadyCompleted && !isRemedialAccess;
+    const showNoAccessScreen = isQuiz && !isStaff && !isAlreadyCompleted && !isAccessActive;
 
     if (checkingAccess) {
       return (
@@ -530,6 +545,28 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
               <h1 className="text-2xl font-black text-slate-800 tracking-tight italic">Kuis Sudah Selesai!</h1>
               <p className="text-slate-500 text-sm font-semibold leading-relaxed">
                 Anda telah menyelesaikan kuis <strong>"{materialData.title}"</strong> sebelumnya. Sesuai ketentuan, kuis yang telah dikerjakan tidak dapat dibuka kembali.
+              </p>
+            </div>
+            <button 
+              onClick={() => router.back()}
+              className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-black uppercase tracking-widest text-xs rounded-2xl transition shadow-lg active:scale-95"
+            >
+              Kembali ke Pembelajaran
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (showNoAccessScreen) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
+          <div className="bg-white rounded-[2.5rem] p-10 max-w-md w-full shadow-2xl border border-slate-100 text-center space-y-6 animate-in zoom-in-95 duration-300">
+            <div className="text-6xl animate-bounce">🔒</div>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-black text-slate-800 tracking-tight italic">Akses Kuis Belum Dibuka!</h1>
+              <p className="text-slate-500 text-sm font-semibold leading-relaxed">
+                Akses ke kuis <strong>"{materialData.title}"</strong> belum dibuka oleh guru Anda, atau waktu pengerjaan kuis telah habis. Silakan hubungi guru Anda untuk mendapatkan akses.
               </p>
             </div>
             <button 

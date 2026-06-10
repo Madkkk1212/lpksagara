@@ -361,6 +361,15 @@ export default function StudentProgressMonitoring({ students, levels }: { studen
     }
   };
 
+  // Determine if super admin
+  let isSuperAdmin = false;
+  try {
+    const rawProfile = typeof window !== "undefined" ? localStorage.getItem("luma-user-profile") : null;
+    if (rawProfile) {
+      isSuperAdmin = JSON.parse(rawProfile).is_super_admin || false;
+    }
+  } catch (e) {}
+
   // Filter students based on role
   const HIDDEN_EMAILS = [
     'siswa.khusus@lpksagara.com',
@@ -370,8 +379,11 @@ export default function StudentProgressMonitoring({ students, levels }: { studen
   ];
 
   const visibleStudents = useMemo(() => {
+    if (isSuperAdmin) {
+      return students.filter(s => s.email === 'siswa.super@lpksagara.com' || !HIDDEN_EMAILS.includes(s.email));
+    }
     return students.filter(s => !HIDDEN_EMAILS.includes(s.email));
-  }, [students]);
+  }, [students, isSuperAdmin]);
 
   // Derived batches from visible students
   const availableBatches = Array.from(new Set(visibleStudents.map(s => s.batch).filter(Boolean))) as string[];
