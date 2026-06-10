@@ -708,6 +708,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                             }
                             const activePdfUrl = parsedContent.pdf_url || parsedContent.document_url || parsedContent.sections?.[0]?.media?.pdf_url || parsedContent.sections?.[0]?.media?.pdfUrl || parsedContent.sections?.[0]?.media?.pdf;
                             if (!activePdfUrl) return null;
+                            const fixedPdfUrl = fixUrl(activePdfUrl) || '';
                             return (
                             <div className="mb-5 sm:mb-8 rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden bg-white border border-slate-100 shadow-lg p-4 sm:p-6 relative z-10">
                               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3 sm:mb-4">
@@ -718,18 +719,18 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                                     <p className="text-xs font-bold text-slate-400">Silakan pelajari materi PDF di bawah ini.</p>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex gap-2">
                                   <button 
                                     onClick={() => setShowPdf(!showPdf)}
-                                    className="flex-1 sm:flex-none px-4 py-2 bg-teal-50 hover:bg-teal-100 text-teal-600 rounded-xl text-xs font-black transition-all text-center"
+                                    className="flex-1 sm:flex-none px-4 py-2.5 bg-teal-50 hover:bg-teal-100 text-teal-600 rounded-xl text-xs font-black transition-all text-center"
                                   >
                                     {showPdf ? "Tutup PDF" : "Buka PDF"}
                                   </button>
                                   <a 
-                                    href={fixUrl(activePdfUrl)} 
+                                    href={fixedPdfUrl} 
                                     target="_blank" 
                                     rel="noreferrer"
-                                    className="flex-1 sm:flex-none px-4 py-2 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 rounded-xl text-xs font-black transition-all text-center"
+                                    className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 rounded-xl text-xs font-black transition-all text-center"
                                   >
                                     Tab Baru ↗
                                   </a>
@@ -737,8 +738,9 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                               </div>
                               {showPdf && (
                                 <iframe 
-                                  src={`${fixUrl(activePdfUrl)}#toolbar=0`} 
-                                  className="w-full h-[360px] sm:h-[500px] rounded-2xl border border-slate-100 shadow-inner mt-4 animate-in fade-in duration-500"
+                                  src={`${fixedPdfUrl}#toolbar=0`}
+                                  className="w-full h-[420px] sm:h-[600px] rounded-2xl border border-slate-100 shadow-inner mt-4 animate-in fade-in duration-500"
+                                  title="PDF Viewer"
                                 />
                               )}
                             </div>
@@ -753,6 +755,8 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                             }
                             const activePptUrl = parsedContent.ppt_url || parsedContent.sections?.[0]?.media?.ppt_url || parsedContent.sections?.[0]?.media?.pptUrl || parsedContent.sections?.[0]?.media?.ppt;
                             if (!activePptUrl) return null;
+                            const fixedPptUrl = fixUrl(activePptUrl) || '';
+                            const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fixedPptUrl)}`;
                             return (
                             <div className="mb-5 sm:mb-8 rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden bg-white border border-slate-100 shadow-lg p-4 sm:p-6 relative z-10">
                               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3 sm:mb-4">
@@ -763,18 +767,18 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                                     <p className="text-xs font-bold text-slate-400">Silakan pelajari slide presentasi PPT di bawah ini.</p>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex gap-2">
                                   <button 
                                     onClick={() => setShowPpt(!showPpt)}
-                                    className="flex-1 sm:flex-none px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-xl text-xs font-black transition-all text-center"
+                                    className="flex-1 sm:flex-none px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-xl text-xs font-black transition-all text-center"
                                   >
                                     {showPpt ? "Tutup PPT" : "Buka PPT"}
                                   </button>
                                   <a 
-                                    href={fixUrl(activePptUrl)} 
+                                    href={fixedPptUrl} 
                                     target="_blank" 
                                     rel="noreferrer"
-                                    className="flex-1 sm:flex-none px-4 py-2 bg-slate-100 hover:bg-amber-50 hover:text-amber-600 text-slate-600 rounded-xl text-xs font-black transition-all text-center"
+                                    className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-100 hover:bg-amber-50 hover:text-amber-600 text-slate-600 rounded-xl text-xs font-black transition-all text-center"
                                   >
                                     Download PPT ↗
                                   </a>
@@ -782,8 +786,8 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                               </div>
                               {showPpt && (
                                 <iframe 
-                                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fixUrl(activePptUrl)!)}`} 
-                                  className="w-full h-[360px] sm:h-[500px] rounded-2xl border border-slate-100 shadow-inner mt-4 animate-in fade-in duration-500"
+                                  src={officeViewerUrl}
+                                  className="w-full h-[420px] sm:h-[600px] rounded-2xl border border-slate-100 shadow-inner mt-4 animate-in fade-in duration-500"
                                   title="PPT Viewer"
                                 />
                               )}
