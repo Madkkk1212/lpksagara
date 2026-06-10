@@ -533,10 +533,21 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
           };
           localStorage.setItem('luma-user-profile', JSON.stringify(updatedProf));
         }
+
+        setIsAlreadyCompleted(true);
+        setAlertData({
+          title: "Materi Selesai! 🎉",
+          message: `Selamat, Anda berhasil menyelesaikan materi ini${awardedXP > 0 ? ` dan mendapatkan +${awardedXP} EXP` : ''}.`,
+          type: "success"
+        });
       }
 
       if (materialData.material_type !== 'quiz') {
-        router.back();
+        if (alreadyDone) {
+          // If they click the button when it's already done (Selesai Belajar (Kembali))
+          router.push('/learning');
+          router.refresh();
+        }
       }
     } catch(e: any) {
       console.error("[handleFinish] Error saving quiz result:", e);
@@ -935,7 +946,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                 </div>
                 {showPdf && (
                   <iframe 
-                    src={`https://docs.google.com/gview?url=${encodeURIComponent(fixUrl(activePdfUrl)!)}&embedded=true`} 
+                    src={`${fixUrl(activePdfUrl)}#toolbar=0`} 
                     className="w-full h-[600px] rounded-2xl border border-slate-100 shadow-inner mt-4 animate-in fade-in duration-500"
                   />
                 )}

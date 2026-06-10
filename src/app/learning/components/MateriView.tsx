@@ -458,7 +458,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
         if (onRefreshUser) onRefreshUser();
         
         alert(`Selamat! Materi selesai. Anda mendapatkan +${awardedXP} EXP! 🏆`);
-        setSelectedMaterial(null);
+        // setSelectedMaterial(null); // REMOVED: let the user see the success state and close it themselves
     } catch (err: any) {
         console.error("Error saving progress:", err);
         reportClientError({
@@ -676,7 +676,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                               </div>
                               {showPdf && (
                                 <iframe 
-                                  src={`https://docs.google.com/gview?url=${encodeURIComponent(fixUrl(activePdfUrl)!)}&embedded=true`} 
+                                  src={`${fixUrl(activePdfUrl)}#toolbar=0`} 
                                   className="w-full h-[500px] rounded-2xl border border-slate-100 shadow-inner mt-4 animate-in fade-in duration-500"
                                 />
                               )}
