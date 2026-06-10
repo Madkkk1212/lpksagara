@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 export default function GitUpdateManager() {
-  const [version] = useState("v2.1.1 - Paling Baru");
+  const [version] = useState("v2.1.2 - Paling Baru");
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -25,21 +25,80 @@ export default function GitUpdateManager() {
         </div>
       </div>
 
-      {/* ── LATEST RELEASE: v2.1.1 ── */}
-      <div className="bg-white rounded-3xl p-8 border-2 border-indigo-100 shadow-xl shadow-indigo-50/50 space-y-6">
+      {/* ── LATEST RELEASE: v2.1.2 ── */}
+      <div className="bg-white rounded-3xl p-8 border-2 border-teal-100 shadow-xl shadow-teal-50/50 space-y-6 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-400 to-emerald-500" />
+        <div className="flex items-center justify-between border-b border-slate-100 pb-6 relative z-10">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-teal-50 rounded-2xl flex items-center justify-center text-2xl shadow-inner border border-teal-100">
+              🛡️
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-slate-800">v2.1.2 — Zero Data Loss & Auto-Retry Sync</h3>
+              <p className="text-xs font-bold text-slate-400">Dipublikasikan pada: 10 Juni 2026</p>
+            </div>
+          </div>
+          <span className="px-3 py-1.5 bg-teal-50 text-teal-700 rounded-full text-xs font-black border border-teal-200 animate-pulse">
+            Latest 🔥
+          </span>
+        </div>
+
+        <div className="space-y-4 text-sm text-slate-600 leading-relaxed relative z-10">
+          <div className="p-5 bg-teal-50/50 rounded-2xl border border-teal-100 space-y-2">
+            <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider text-teal-700">📌 Ringkasan Pembaruan:</h4>
+            <p className="text-slate-700">
+              Pembaruan kritikal untuk memastikan keamanan data materi (Zero Data Loss) saat melakukan pengeditan di panel admin, serta implementasi sistem Auto-Retry cerdas yang akan otomatis menyimpan nilai kuis siswa meski koneksi internet terputus (Network Error 480).
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3 hover:border-teal-200 transition-all">
+              <span className="text-teal-500 text-lg shrink-0">🛡️</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Proteksi Konten Kuis (Zero Data Loss)</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Memperbaiki celah di halaman Kelola Materi dimana pengeditan metadata kuis berisiko menghapus soal. Kini soal tersimpan permanen dan sangat aman dari risiko overwriting.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3 hover:border-teal-200 transition-all">
+              <span className="text-teal-500 text-lg shrink-0">🔄</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Aggressive Grade Auto-Retry</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Jika pengiriman nilai ujian gagal karena koneksi lambat, sistem otomatis melakukan retri pengiriman hingga 3x berturut-turut di latar belakang tanpa disadari siswa.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3 hover:border-teal-200 transition-all">
+              <span className="text-teal-500 text-lg shrink-0">💾</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Local Storage Backup Queue</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Bila internet mati total (semua retri gagal), nilai langsung diamankan secara lokal di perangkat siswa dan akan di-sync secara ajaib saat internet menyala kembali.</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3 hover:border-teal-200 transition-all">
+              <span className="text-teal-500 text-lg shrink-0">🚑</span>
+              <div>
+                <p className="font-black text-xs text-slate-800">Disaster Recovery (Bab 1 & 2)</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Berhasil mengeksekusi sistem pemulihan darurat untuk mengembalikan soal-soal penting dari snapshot cloud terdahulu yang sempat lenyap.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── PREVIOUS RELEASE: v2.1.1 ── */}
+      <div className="bg-white rounded-3xl p-8 border-2 border-slate-100 shadow-sm space-y-6 opacity-80 hover:opacity-100 transition-all">
         <div className="flex items-center justify-between border-b border-slate-100 pb-6">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-2xl shadow-inner">
+            <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-2xl shadow-inner">
               ⚡
             </div>
             <div>
               <h3 className="text-xl font-black text-slate-800">v2.1.1 — CBT Monitoring Sync & Anti-Screenshot Blur</h3>
-              <p className="text-xs font-bold text-slate-400">Dipublikasikan pada: 9 new Juni 2026</p>
+              <p className="text-xs font-bold text-slate-400">Dipublikasikan pada: 9 newwwJuni 2026</p>
             </div>
           </div>
-          <span className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-black border border-indigo-100">
-            Latest 🔥
-          </span>
         </div>
 
         <div className="space-y-4 text-sm text-slate-600 leading-relaxed">

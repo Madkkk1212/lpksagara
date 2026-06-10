@@ -15,7 +15,19 @@ const wipedIds = [
   'ceecb38a-5d33-48b5-ac77-fcd45b96716a',
   '8b05d4b7-76b9-4c65-a843-0a01fda2d058',
   'a840186c-b321-42fd-8c63-55b7c91e6a16',
-  'd8944379-6f5b-41ba-b78b-ec7851651fd0'
+  'd8944379-6f5b-41ba-b78b-ec7851651fd0',
+  'bcb8e40d-818b-4fc4-a287-da4311c735cc',
+  '879ed556-d429-41e6-8fa4-cade66a37c38',
+  '4b6da599-38b4-457c-93f0-a2417a1ef42e',
+  'e27c3a7b-fcb0-4d7b-9670-f19776493dcf',
+  '597e72d8-6a71-4155-bee0-d932c8da1ce8',
+  '32dbe92a-6ac6-4950-b270-2b170b380cf6',
+  'a737a80e-ed53-4206-b124-d1fcee7e5362',
+  '282cc820-f321-4a57-964f-bad0e6b4b959',
+  '68bc3f17-5e8e-48d7-aa8a-aaca3571eaba',
+  '54fb8132-804f-4162-b1f0-b718a5375c74',
+  'ead63720-c471-4945-9632-e65f1d3ccd32',
+  '8ad0e724-c7e8-406e-89c2-ff3aadbd1339'
 ]
 
 async function run() {
