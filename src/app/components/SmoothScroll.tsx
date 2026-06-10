@@ -12,7 +12,9 @@ export default function SmoothScroll() {
     const isDashboardRoute = 
       pathname?.startsWith("/admin") || 
       pathname?.startsWith("/teacher") || 
-      pathname?.startsWith("/manajemen-sagara");
+      pathname?.startsWith("/manajemen-sagara") ||
+      pathname?.startsWith("/study") ||
+      pathname?.startsWith("/exam");
 
     if (isDashboardRoute) {
       // Clean up global window.lenis reference if navigating to dashboard

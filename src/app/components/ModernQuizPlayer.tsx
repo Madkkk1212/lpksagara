@@ -653,9 +653,9 @@ export default function ModernQuizPlayer({
       </header>
 
       {/* Main Split Screen Area - Responsive Layout */}
-      <div className="flex-1 overflow-y-auto md:overflow-hidden flex flex-col md:flex-row max-w-6xl w-full mx-auto">
+      <div className="flex-1 overflow-y-auto md:overflow-hidden flex flex-col md:flex-row max-w-6xl w-full mx-auto" data-lenis-prevent>
         {/* Left column (Scrollable) - Question Context Assets */}
-        <div className="w-full md:flex-1 md:overflow-y-auto border-b md:border-b-0 md:border-r border-slate-100 px-4 py-6 md:px-6 md:py-8 flex flex-col gap-6 custom-scrollbar bg-slate-50">
+        <div className="w-full md:flex-1 md:overflow-y-auto border-b md:border-b-0 md:border-r border-slate-100 px-4 py-6 md:px-6 md:py-8 flex flex-col gap-6 custom-scrollbar bg-slate-50" data-lenis-prevent style={{ overscrollBehavior: 'contain' }}>
           
           {/* GLOBAL SECTION PANEL */}
           {hasSectionMedia && (
@@ -860,7 +860,7 @@ export default function ModernQuizPlayer({
         </div>
 
         {/* Right column (Scrollable) - Answer Submission and Navigation */}
-        <div className="w-full md:w-[380px] md:overflow-y-auto border-t md:border-t-0 md:border-l border-slate-100 bg-white px-4 py-6 md:px-6 md:py-8 flex flex-col gap-8 custom-scrollbar">
+        <div className="w-full md:w-[380px] md:overflow-y-auto border-t md:border-t-0 md:border-l border-slate-100 bg-white px-4 py-6 md:px-6 md:py-8 flex flex-col gap-8 custom-scrollbar" data-lenis-prevent style={{ overscrollBehavior: 'contain' }}>
           
           {/* ANSWER INPUT SECTION */}
           <div className="space-y-4">
