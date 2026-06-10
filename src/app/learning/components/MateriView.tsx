@@ -738,8 +738,8 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                               </div>
                               {showPdf && (
                                 <iframe 
-                                  src={`${fixedPdfUrl}#toolbar=0`}
-                                  className="w-full h-[420px] sm:h-[600px] rounded-2xl border border-slate-100 shadow-inner mt-4 animate-in fade-in duration-500"
+                                  src={`/api/pdf-viewer?url=${encodeURIComponent(fixedPdfUrl)}`}
+                                  className="w-full h-[520px] sm:h-[700px] rounded-2xl border border-slate-100 shadow-inner mt-4 animate-in fade-in duration-500 bg-gray-50"
                                   title="PDF Viewer"
                                 />
                               )}
