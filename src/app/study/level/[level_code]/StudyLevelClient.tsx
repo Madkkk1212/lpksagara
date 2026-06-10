@@ -25,6 +25,18 @@ export default function StudyLevelClient({ levelData }: { levelData: StudyLevel 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    const checkNeedsRefresh = () => {
+      if (typeof window !== "undefined" && localStorage.getItem('luma_needs_refresh') === 'true') {
+        localStorage.removeItem('luma_needs_refresh');
+        window.location.reload();
+      }
+    };
+    checkNeedsRefresh();
+    window.addEventListener('focus', checkNeedsRefresh);
+    return () => window.removeEventListener('focus', checkNeedsRefresh);
+  }, []);
+
+  useEffect(() => {
     const savedProfile = localStorage.getItem("luma-user-profile");
     const saved = savedProfile ? JSON.parse(savedProfile) : null;
     if (saved) {

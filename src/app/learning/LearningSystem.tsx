@@ -30,6 +30,18 @@ export default function LearningSystem({ user, onLogout, theme, onRefreshUser }:
     }
   }, [user.profile_completed]);
 
+  useEffect(() => {
+    const checkNeedsRefresh = () => {
+      if (typeof window !== "undefined" && localStorage.getItem('luma_needs_refresh') === 'true') {
+        localStorage.removeItem('luma_needs_refresh');
+        window.location.reload();
+      }
+    };
+    checkNeedsRefresh();
+    window.addEventListener('focus', checkNeedsRefresh);
+    return () => window.removeEventListener('focus', checkNeedsRefresh);
+  }, []);
+
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: "🚀" },
     { id: "materi", label: "Materi", icon: "📚" },

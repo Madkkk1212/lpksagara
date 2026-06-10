@@ -61,7 +61,7 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
     async function loadDashboard() {
       // 1. Fetch active announcements via API (Bypass RLS)
       try {
-        const res = await fetch('/api/announcements');
+        const res = await fetch('/api/announcements', { cache: 'no-store' });
         const json = await res.json();
         const ann = json.data || [];
         if (ann.length > 0) {
@@ -108,7 +108,7 @@ export default function DashboardView({ user, theme, onUpgrade, onSwitchTab }: {
 
       // 4. Fetch Progress via Server API (Bypass RLS)
       try {
-        const res = await fetch(`/api/student-progress?email=${encodeURIComponent(user.email)}`);
+        const res = await fetch(`/api/student-progress?email=${encodeURIComponent(user.email)}`, { cache: 'no-store' });
         const json = await res.json();
         const progress = json.data || [];
         setLastProgress(progress);

@@ -546,6 +546,9 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
       // Jalankan semua penyimpanan secara paralel agar sangat cepat!
       await Promise.all([p1, p2, p3]);
 
+      // Set the refresh flag in localStorage so when the user goes back to the dashboard/level, it reloads the fresh progress
+      localStorage.setItem('luma_needs_refresh', 'true');
+
       if (materialData.material_type !== 'quiz') {
         setIsAlreadyCompleted(true);
       }
