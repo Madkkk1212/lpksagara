@@ -46,7 +46,7 @@ export default function GitUpdateManager() {
             <span className="p-2 bg-indigo-500/20 rounded-xl text-indigo-400 border border-indigo-500/30">🚀</span>
             <span className="px-3 py-1 bg-teal-500/20 text-teal-300 rounded-full text-[10px] font-black tracking-widest uppercase">System Update</span>
           </div>
-          <h2 className="text-3xl font-black tracking-tight">Git Update Log</h2>
+          <h2 className="text-3xl font-black tracking-tight">Git Update Log new</h2>
           <p className="text-xs font-medium text-slate-400 mt-1">
             Pantau versi rilis terbaru dan catatan pembaruan sistem yang telah di-push secara real-time dari GitHub.
           </p>
