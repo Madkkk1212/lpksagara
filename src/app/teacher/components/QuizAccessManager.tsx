@@ -151,10 +151,25 @@ export default function QuizAccessManager({ teacher, assignedStudentIds = [], is
     try {
       // 1. Update quiz duration in study_materials database if opening
       if (newStatus && durationMinutes !== undefined) {
-        const currentQuiz = quizzes.find(q => q.id === quizId);
-        if (currentQuiz) {
-          const currentContent = { ...((currentQuiz.content as any) || {}) };
-          currentContent.duration_minutes = durationMinutes;
+        // Fetch current content from DB first to prevent wiping out other fields (e.g. exercises/sections)
+        const { data: dbMaterial, error: fetchError } = await supabase
+          .from('study_materials')
+          .select('content')
+          .eq('id', quizId)
+          .single();
+
+        if (fetchError) {
+          console.error("Gagal mengambil data materi untuk pembaruan durasi:", fetchError);
+        } else {
+          let currentContent = dbMaterial?.content || {};
+          if (typeof currentContent === 'string') {
+            try {
+              currentContent = JSON.parse(currentContent);
+            } catch (e) {
+              currentContent = {};
+            }
+          }
+          currentContent = { ...currentContent, duration_minutes: durationMinutes };
           
           const { error: updateError } = await supabase
             .from('study_materials')
