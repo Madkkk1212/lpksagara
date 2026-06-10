@@ -254,6 +254,82 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
 
   const content: any = materialData.content || {};
 
+  // Retry utility: attempts an async function up to maxRetries times with exponential backoff
+  const retryAsync = async <T,>(fn: () => Promise<T>, maxRetries = 3, delayMs = 1500): Promise<T> => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        console.warn(`[Retry] Attempt ${attempt}/${maxRetries} failed:`, err);
+        if (attempt === maxRetries) throw err;
+        await new Promise(r => setTimeout(r, delayMs * attempt));
+      }
+    }
+    throw new Error("retryAsync: unreachable");
+  };
+
+  // Flush any pending grade saves that were queued due to previous network failures
+  useEffect(() => {
+    const flushPendingGrades = async () => {
+      const PENDING_KEY = "lpk_pending_grade_saves";
+      try {
+        const raw = localStorage.getItem(PENDING_KEY);
+        if (!raw) return;
+        const pending: any[] = JSON.parse(raw);
+        if (!pending.length) return;
+
+        console.log(`[Quiz Grade] Flushing ${pending.length} pending grade save(s)...`);
+        const failed: any[] = [];
+
+        for (const payload of pending) {
+          try {
+            // Check if already exists
+            let existingQuery = supabase
+              .from("assessment_chapter_grades")
+              .select("id")
+              .eq("student_email", payload.student_email)
+              .eq("column_label", payload.column_label);
+
+            if (payload.template_id) {
+              existingQuery = existingQuery.eq("template_id", payload.template_id);
+            } else {
+              existingQuery = existingQuery.is("template_id", null).eq("level_id", payload.level_id);
+            }
+
+            const { data: existingRows } = await existingQuery;
+
+            if (existingRows && existingRows.length > 0) {
+              const { error } = await supabase
+                .from("assessment_chapter_grades")
+                .update(payload)
+                .eq("id", existingRows[0].id);
+              if (error) throw error;
+            } else {
+              const { error } = await supabase
+                .from("assessment_chapter_grades")
+                .insert(payload);
+              if (error) throw error;
+            }
+            console.log("[Quiz Grade] ✅ Pending grade flushed:", payload.column_label);
+          } catch (e) {
+            console.error("[Quiz Grade] ❌ Pending grade still failing:", e);
+            failed.push(payload);
+          }
+        }
+
+        if (failed.length > 0) {
+          localStorage.setItem(PENDING_KEY, JSON.stringify(failed));
+        } else {
+          localStorage.removeItem(PENDING_KEY);
+        }
+      } catch (e) {
+        console.error("[Quiz Grade] Error flushing pending grades:", e);
+      }
+    };
+
+    flushPendingGrades();
+  }, []);
+
   const handleFinish = async (passedAnswers?: Record<string, any>, scorePercent?: number) => {
     if (!userEmail) { 
       setAlertData({ title: "Sesi Berakhir", message: "Silakan login kembali untuk melanjutkan.", type: 'warning' });
@@ -299,79 +375,122 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
           score = totalMC > 0 ? Math.round((correct / totalMC) * 100) : 100;
         }
 
-        // Search for a matching template and the chapter title in parallel
-        const [tplRes, chapterRes] = await Promise.all([
-          supabase
-            .from("assessment_chapter_templates")
-            .select("id")
-            .eq("chapter_id", materialData.chapter_id)
-            .eq("is_active", true)
-            .maybeSingle(),
-          supabase
-            .from("study_chapters")
-            .select("title, level_id")
-            .eq("id", materialData.chapter_id)
-            .maybeSingle()
-        ]);
+        // Wrap grade save in retry logic for network resilience
+        await retryAsync(async () => {
+          // Search for a matching template and the chapter title in parallel
+          const [tplRes, chapterRes] = await Promise.all([
+            supabase
+              .from("assessment_chapter_templates")
+              .select("id")
+              .eq("chapter_id", materialData.chapter_id)
+              .eq("is_active", true)
+              .maybeSingle(),
+            supabase
+              .from("study_chapters")
+              .select("title, level_id")
+              .eq("id", materialData.chapter_id)
+              .maybeSingle()
+          ]);
 
-        const tpl = tplRes.data;
-        const chapter = chapterRes.data;
+          const tpl = tplRes.data;
+          const chapter = chapterRes.data;
 
-        if (chapter) {
-          const columnLabel = isRemedialAccess
-            ? `${chapter.title} ::: ${materialData.title} (Remedial)`
-            : `${chapter.title} ::: ${materialData.title}`;
-
-          let existingQuery = supabase
-            .from("assessment_chapter_grades")
-            .select("id")
-            .eq("student_email", userEmail.trim().toLowerCase())
-            .eq("column_label", columnLabel);
-
-          if (tpl?.id) {
-            existingQuery = existingQuery.eq("template_id", tpl.id);
-          } else {
-            existingQuery = existingQuery.is("template_id", null).eq("level_id", chapter.level_id);
+          if (tplRes.error) {
+            console.error("[Quiz Grade] Template query error:", tplRes.error);
+          }
+          if (chapterRes.error) {
+            console.error("[Quiz Grade] Chapter query error:", chapterRes.error);
           }
 
-          const { data: existingRows } = await existingQuery;
+          if (chapter) {
+            const columnLabel = isRemedialAccess
+              ? `${chapter.title} ::: ${materialData.title} (Remedial)`
+              : `${chapter.title} ::: ${materialData.title}`;
 
-          const gradePayload = {
-            student_email: userEmail.trim().toLowerCase(),
-            template_id: tpl?.id || null,
-            level_id: chapter.level_id,
-            column_label: columnLabel,
-            value: String(score),
-            updated_at: new Date().toISOString()
-          };
-
-          if (existingRows && existingRows.length > 0) {
-            const { error: updateErr } = await supabase
+            let existingQuery = supabase
               .from("assessment_chapter_grades")
-              .update(gradePayload)
-              .eq("id", existingRows[0].id);
-            if (updateErr) {
-              console.error("[Quiz Grade] Gagal update nilai:", updateErr);
-              throw new Error("Gagal menyimpan nilai quiz: " + updateErr.message);
+              .select("id")
+              .eq("student_email", userEmail.trim().toLowerCase())
+              .eq("column_label", columnLabel);
+
+            if (tpl?.id) {
+              existingQuery = existingQuery.eq("template_id", tpl.id);
+            } else {
+              existingQuery = existingQuery.is("template_id", null).eq("level_id", chapter.level_id);
+            }
+
+            const { data: existingRows } = await existingQuery;
+
+            const gradePayload = {
+              student_email: userEmail.trim().toLowerCase(),
+              template_id: tpl?.id || null,
+              level_id: chapter.level_id,
+              column_label: columnLabel,
+              value: String(score),
+              updated_at: new Date().toISOString()
+            };
+
+            console.log("[Quiz Grade] Saving grade payload:", JSON.stringify(gradePayload));
+
+            if (existingRows && existingRows.length > 0) {
+              const { error: updateErr } = await supabase
+                .from("assessment_chapter_grades")
+                .update(gradePayload)
+                .eq("id", existingRows[0].id);
+              if (updateErr) {
+                console.error("[Quiz Grade] Gagal update nilai:", updateErr);
+                throw new Error("Gagal menyimpan nilai quiz: " + updateErr.message);
+              }
+              console.log("[Quiz Grade] ✅ Grade UPDATED successfully for:", columnLabel);
+            } else {
+              const { error: insertErr } = await supabase
+                .from("assessment_chapter_grades")
+                .insert(gradePayload);
+              if (insertErr) {
+                console.error("[Quiz Grade] Gagal insert nilai:", insertErr);
+                throw new Error("Gagal menyimpan nilai quiz: " + insertErr.message);
+              }
+              console.log("[Quiz Grade] ✅ Grade INSERTED successfully for:", columnLabel);
+            }
+
+            if (!tpl?.id) {
+              console.warn(
+                `[Quiz Grade] Tidak ada template untuk chapter "${chapter.title}" — ` +
+                `nilai tersimpan dengan template_id=null. Buka Kelola Penilaian ` +
+                `dan buat template agar nilai muncul di laporan guru.`
+              );
             }
           } else {
-            const { error: insertErr } = await supabase
-              .from("assessment_chapter_grades")
-              .insert(gradePayload);
-            if (insertErr) {
-              console.error("[Quiz Grade] Gagal insert nilai:", insertErr);
-              throw new Error("Gagal menyimpan nilai quiz: " + insertErr.message);
-            }
-          }
-
-          if (!tpl?.id) {
-            console.warn(
-              `[Quiz Grade] Tidak ada template untuk chapter "${chapter.title}" — ` +
-              `nilai tersimpan dengan template_id=null. Buka Kelola Penilaian ` +
-              `dan buat template agar nilai muncul di laporan guru.`
+            console.error(
+              `[Quiz Grade] ❌ Chapter tidak ditemukan untuk chapter_id: ${materialData.chapter_id}. ` +
+              `Nilai TIDAK tersimpan! Pastikan study_chapters memiliki data yang valid.`
             );
+            throw new Error("Gagal menyimpan nilai: data chapter tidak ditemukan.");
           }
-        }
+        }).catch((finalErr) => {
+          // All retries failed — save to localStorage pending queue as last resort
+          console.error("[Quiz Grade] All retries failed. Queueing to localStorage for later.", finalErr);
+          try {
+            const PENDING_KEY = "lpk_pending_grade_saves";
+            const existing = JSON.parse(localStorage.getItem(PENDING_KEY) || "[]");
+            existing.push({
+              student_email: userEmail.trim().toLowerCase(),
+              template_id: null, // Will be resolved on flush
+              level_id: null,
+              column_label: `PENDING:::${materialData.chapter_id}:::${materialData.title}${isRemedialAccess ? ' (Remedial)' : ''}`,
+              value: String(score),
+              material_id: materialData.id,
+              chapter_id: materialData.chapter_id,
+              is_remedial: isRemedialAccess,
+              updated_at: new Date().toISOString()
+            });
+            localStorage.setItem(PENDING_KEY, JSON.stringify(existing));
+            console.log("[Quiz Grade] Grade queued for retry on next page load.");
+          } catch (lsErr) {
+            console.error("[Quiz Grade] Failed to queue grade to localStorage:", lsErr);
+          }
+          // Don't rethrow — allow the rest of handleFinish (marking complete, XP) to proceed
+        });
       }
 
       if (studentProfileId) {
@@ -417,8 +536,13 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
       if (materialData.material_type !== 'quiz') {
         router.back();
       }
-    } catch(e) {
-      setAlertData({ title: "Error", message: "Gagal menyimpan progres belajar.", type: 'error' });
+    } catch(e: any) {
+      console.error("[handleFinish] Error saving quiz result:", e);
+      setAlertData({ 
+        title: "Gagal Menyimpan Nilai", 
+        message: e?.message || "Gagal menyimpan progres belajar. Silakan coba lagi atau hubungi admin.", 
+        type: 'error' 
+      });
       setIsFinishing(false);
     }
   };

@@ -310,12 +310,14 @@ export default function AssessmentManager({ students, levels, teacher }: { stude
 
       templates.forEach(tpl => {
         const tplGrades = stuMatrix[tpl.id || ""] || {};
+        const addGrades = stuMatrix["additional"] || {};
         tpl.columns.forEach(col => {
           const parts = col.label.split(" ::: ");
           const label = parts.length > 1 ? parts[1] : col.label;
           const base = getBaseName(label);
           if (uniqueBaseQuizNames.includes(base)) {
-            const val = parseFloat(tplGrades[col.label]);
+            const valStr = tplGrades[col.label] !== undefined ? tplGrades[col.label] : addGrades[col.label];
+            const val = parseFloat(valStr);
             if (!isNaN(val)) quizGroupScores[base].push(val);
           }
         });
@@ -673,7 +675,10 @@ export default function AssessmentManager({ students, levels, teacher }: { stude
                         {filteredStudents.map((stu, sIdx) => {
                           const stuMatrix = matrix[stu.email?.trim().toLowerCase()] || {};
                           const tplGrades = stuMatrix[tpl.id || ""] || {};
-                          const scores = tpl.columns.map(col => tplGrades[`${col.label} (Remedial)`] || tplGrades[col.label] || "");
+                          const addGrades = stuMatrix["additional"] || {};
+                          const getGrade = (label: string) => tplGrades[label] !== undefined ? tplGrades[label] : addGrades[label];
+                          
+                          const scores = tpl.columns.map(col => getGrade(`${col.label} (Remedial)`) || getGrade(col.label) || "");
                           const numScores = scores.map(s => parseFloat(s)).filter(n => !isNaN(n));
                           const total = numScores.reduce((a, b) => a + b, 0);
                           const avg = numScores.length > 0 ? Math.round(total / numScores.length) : 0;
@@ -717,25 +722,27 @@ export default function AssessmentManager({ students, levels, teacher }: { stude
                               {tpl.columns.map((col, ci) => {
                                 const isQuiz = col.label.toLowerCase().includes("quiz") || col.col_type === "number";
                                 const remedialLabel = `${col.label} (Remedial)`;
-                                const hasRemedial = tplGrades[remedialLabel] !== undefined;
+                                const val = getGrade(col.label);
+                                const remedialVal = getGrade(remedialLabel);
+                                const hasRemedial = remedialVal !== undefined;
 
                                 return (
                                   <td key={ci} className={`p-2 border-r border-slate-100 ${isQuiz ? 'bg-emerald-50/5' : ''}`}>
                                     {isQuiz ? (
                                       <div className="w-full flex flex-col items-center justify-center py-1">
                                         <div className={`text-sm font-black tabular-nums select-none ${hasRemedial ? 'line-through text-slate-300' : 'text-emerald-600/70'}`}>
-                                          {tplGrades[col.label] || "0"}
+                                          {val || "0"}
                                         </div>
                                         {hasRemedial && (
                                           <div className="text-[10px] font-black text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full mt-0.5 border border-teal-100">
-                                            R: {tplGrades[remedialLabel]}
+                                            R: {remedialVal}
                                           </div>
                                         )}
                                       </div>
                                     ) : (
                                       <input
                                         type="text"
-                                        value={tplGrades[col.label] || ""}
+                                        value={val || ""}
                                         onChange={e => handleValueChange(stu.email, tpl.id || null, col.label, e.target.value)}
                                         className="w-full h-10 bg-transparent border-b-2 border-transparent focus:border-emerald-500 outline-none text-center text-sm font-bold text-slate-700 transition-all placeholder:text-slate-200"
                                         placeholder="0"

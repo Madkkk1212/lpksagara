@@ -253,6 +253,7 @@ export default function StudyHierarchyManager() {
       setFormContent({ exercises: c.exercises || [], ...mediaFields });
     } else if (fullMat.material_type === 'quiz' || fullMat.material_type === 'latihan') {
       setFormContent({ 
+        ...c,
         exercises: c.exercises || [], 
         is_section_test: c.is_section_test || false,
         sections: c.sections || [],

@@ -258,7 +258,7 @@ export default function ModernQuizPlayer({
     calculateScoreAndCallback();
   };
 
-  const calculateScoreAndCallback = () => {
+  const calculateScoreAndCallback = async () => {
     // Calculate total correct MCQ answers
     let correctCount = 0;
     let mcqCount = 0;
@@ -283,7 +283,12 @@ export default function ModernQuizPlayer({
     localStorage.removeItem(`${localStorageKey}_checked`);
 
     if (onFinish) {
-      onFinish(userAnswers, finalPercent);
+      try {
+        await onFinish(userAnswers, finalPercent);
+        console.log("[QuizPlayer] onFinish completed successfully. Score:", finalPercent);
+      } catch (err) {
+        console.error("[QuizPlayer] onFinish callback error:", err);
+      }
     }
   };
 

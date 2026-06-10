@@ -14,7 +14,8 @@ const wipedIds = [
   '1e9170db-661b-419c-8137-c312bc2f2630',
   'ceecb38a-5d33-48b5-ac77-fcd45b96716a',
   '8b05d4b7-76b9-4c65-a843-0a01fda2d058',
-  'a840186c-b321-42fd-8c63-55b7c91e6a16'
+  'a840186c-b321-42fd-8c63-55b7c91e6a16',
+  'd8944379-6f5b-41ba-b78b-ec7851651fd0'
 ]
 
 async function run() {

@@ -34,7 +34,7 @@ export default function GitUpdateManager() {
             </div>
             <div>
               <h3 className="text-xl font-black text-slate-800">v2.1.1 — CBT Monitoring Sync & Anti-Screenshot Blur</h3>
-              <p className="text-xs font-bold text-slate-400">Dipublikasikan pada: 9 Juni 2026</p>
+              <p className="text-xs font-bold text-slate-400">Dipublikasikan pada: 9 new Juni 2026</p>
             </div>
           </div>
           <span className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-black border border-indigo-100">
