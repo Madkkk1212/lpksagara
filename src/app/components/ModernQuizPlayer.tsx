@@ -30,6 +30,7 @@ interface ModernQuizPlayerProps {
   mode: "latihan" | "ujian" | "quiz";
   durationMinutes?: number; // optional, mainly for ujian
   localStorageKey: string; // for auto-saving answers
+  accessOpenedAt?: string; // for clearing stale progress on teacher reopen
   onFinish?: (userAnswers: Record<string, any>, scorePercentage: number) => void;
   onClose?: () => void;
   onProgressUpdate?: (answeredCount: number, totalCount: number) => void;
@@ -41,6 +42,7 @@ export default function ModernQuizPlayer({
   mode,
   durationMinutes = 10,
   localStorageKey,
+  accessOpenedAt,
   onFinish,
   onClose,
   onProgressUpdate,
@@ -92,12 +94,32 @@ export default function ModernQuizPlayer({
   // Auto-Save: Load initial answers on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
+      // Clear stale answers if accessOpenedAt is newer or different from the local one
+      const localOpenedAt = localStorage.getItem(`${localStorageKey}_opened_at`);
+      if (accessOpenedAt && localOpenedAt !== accessOpenedAt) {
+        localStorage.removeItem(`${localStorageKey}_answers`);
+        localStorage.removeItem(`${localStorageKey}_flags`);
+        localStorage.removeItem(`${localStorageKey}_index`);
+        localStorage.removeItem(`${localStorageKey}_time`);
+        localStorage.removeItem(`${localStorageKey}_checked`);
+        localStorage.setItem(`${localStorageKey}_opened_at`, accessOpenedAt);
+        
+        setUserAnswers({});
+        setFlaggedQuestions({});
+        setCheckedQuestions({});
+        setCurrentIdx(0);
+        setTimeLeft(durationMinutes * 60);
+        setIsFinished(false);
+        setIsTimeUp(false);
+        return;
+      }
+
       const savedAnswers = localStorage.getItem(`${localStorageKey}_answers`);
       const savedFlags = localStorage.getItem(`${localStorageKey}_flags`);
       const savedIdx = localStorage.getItem(`${localStorageKey}_index`);
       const savedTime = localStorage.getItem(`${localStorageKey}_time`);
       const savedChecked = localStorage.getItem(`${localStorageKey}_checked`);
- 
+
       if (savedAnswers) {
         try { setUserAnswers(JSON.parse(savedAnswers)); } catch (e) {}
       }
@@ -114,7 +136,7 @@ export default function ModernQuizPlayer({
         try { setCheckedQuestions(JSON.parse(savedChecked)); } catch (e) {}
       }
     }
-  }, [localStorageKey, mode]);
+  }, [localStorageKey, mode, accessOpenedAt, durationMinutes]);
  
   // Auto-Save: Write answers to localStorage when updated
   useEffect(() => {

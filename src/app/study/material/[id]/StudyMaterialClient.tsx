@@ -21,6 +21,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
   const [alertData, setAlertData] = useState<{ title: string; message: string; type?: 'warning' | 'error' | 'success' } | null>(null);
   const [isAccessActive, setIsAccessActive] = useState(false);
   const [isRemedialAccess, setIsRemedialAccess] = useState(false);
+  const [accessOpenedAt, setAccessOpenedAt] = useState<string | null>(null);
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [studentProfileId, setStudentProfileId] = useState<string | null>(null);
   const [categoryCustomTypeNames, setCategoryCustomTypeNames] = useState<Record<string, string>>({});
@@ -204,9 +205,15 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
                 });
                 setIsAccessActive(!!activeControl);
                 setIsRemedialAccess(!!(activeControl?.is_remedial));
+                if (activeControl) {
+                  setAccessOpenedAt(activeControl.updated_at || activeControl.created_at);
+                } else {
+                  setAccessOpenedAt(null);
+                }
               } else {
                 setIsAccessActive(false);
                 setIsRemedialAccess(false);
+                setAccessOpenedAt(null);
               }
             }
           }
@@ -551,6 +558,7 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
           mode="quiz"
           durationMinutes={content.duration_minutes || 60}
           localStorageKey={`material_quiz_${materialData.id}`}
+          accessOpenedAt={accessOpenedAt || undefined}
           onFinish={async (answers, score) => {
             await handleFinish(answers, score);
           }}
