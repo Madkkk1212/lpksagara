@@ -362,7 +362,28 @@ export default function ExamMonitorDashboard({ teacherEmail }: { teacherEmail: s
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           <AnimatePresence mode="popLayout">
             {allStudents
-              .sort((a, b) => b.total_violations - a.total_violations)
+              .sort((a, b) => {
+                // 1. Siswa yang sedang 'flashing' (isAlerted) diutamakan
+                if (a.isAlerted && !b.isAlerted) return -1;
+                if (!a.isAlerted && b.isAlerted) return 1;
+
+                // 2. Siswa yang memiliki pelanggaran berada di atas yang tidak memiliki pelanggaran
+                const aHasViolation = a.total_violations > 0;
+                const bHasViolation = b.total_violations > 0;
+                
+                if (aHasViolation && !bHasViolation) return -1;
+                if (!aHasViolation && bHasViolation) return 1;
+
+                // 3. Jika sama-sama memiliki pelanggaran, urutkan berdasarkan pelanggaran TERBARU
+                if (aHasViolation && bHasViolation) {
+                  const aLatest = Math.max(...a.violations.map(v => new Date(v.updated_at).getTime()));
+                  const bLatest = Math.max(...b.violations.map(v => new Date(v.updated_at).getTime()));
+                  return bLatest - aLatest;
+                }
+
+                // 4. Jika sama-sama aman, urutkan berdasarkan aktivitas terakhir (heartbeat)
+                return new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime();
+              })
               .map((student) => {
                 const isViolator = student.total_violations > 0;
                 const isFlashing = student.isAlerted;

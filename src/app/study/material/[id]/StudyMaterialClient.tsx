@@ -554,11 +554,13 @@ export default function StudyMaterialClient({ materialData }: { materialData: St
         });
       }
 
-      // Otomatis kembali ke halaman learning setelah 1.5 detik
+      // Otomatis kembali ke halaman sebelumnya setelah 1.5 detik
       if (materialData.material_type !== 'quiz') {
         setTimeout(() => {
-          router.push('/learning');
+          // Refresh seluruh cache router Next.js agar halaman sebelumnya ter-update
           router.refresh();
+          // Kembali ke halaman/tab materi sebelumnya
+          router.back();
         }, alreadyDone ? 0 : 1500);
       } else {
         setIsFinishing(false);

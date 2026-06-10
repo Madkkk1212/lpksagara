@@ -213,7 +213,36 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
 
             if (activeCats.length > 0) {
               const userCat = activeCats.find((c: any) => c.id === user.category_id);
-              setActiveCategory(userCat ? userCat.id : activeCats[0].id);
+              
+              // Restore state from localStorage if available
+              try {
+                const savedState = localStorage.getItem('lms_last_view');
+                if (savedState) {
+                  const parsed = JSON.parse(savedState);
+                  setActiveCategory(parsed.activeCategory || (userCat ? userCat.id : activeCats[0].id));
+                  
+                  if (parsed.activeLevelId) {
+                    const level = apiMap.levels.find(l => l.id === parsed.activeLevelId);
+                    if (level) setActiveLevel(level);
+                  }
+                  
+                  if (parsed.expandedChapter) {
+                    setExpandedChapter(parsed.expandedChapter);
+                  }
+                  
+                  if (parsed.selectedMaterialId) {
+                    const material = allMaterials.find(m => m.id === parsed.selectedMaterialId);
+                    if (material) setSelectedMaterial(material);
+                  }
+                  
+                  // Clear the state so it only applies once (e.g. after returning from a material)
+                  localStorage.removeItem('lms_last_view');
+                } else {
+                  setActiveCategory(userCat ? userCat.id : activeCats[0].id);
+                }
+              } catch (e) {
+                setActiveCategory(userCat ? userCat.id : activeCats[0].id);
+              }
             }
             finishLoading();
           }
@@ -269,7 +298,36 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
 
           if (activeCats.length > 0) {
             const userCat = activeCats.find((c: any) => c.id === user.category_id);
-            setActiveCategory(userCat ? userCat.id : activeCats[0].id);
+            
+            // Restore state from localStorage if available
+            try {
+              const savedState = localStorage.getItem('lms_last_view');
+              if (savedState) {
+                const parsed = JSON.parse(savedState);
+                setActiveCategory(parsed.activeCategory || (userCat ? userCat.id : activeCats[0].id));
+                
+                if (parsed.activeLevelId) {
+                  const level = lvls.find((l: any) => l.id === parsed.activeLevelId);
+                  if (level) setActiveLevel(level);
+                }
+                
+                if (parsed.expandedChapter) {
+                  setExpandedChapter(parsed.expandedChapter);
+                }
+                
+                if (parsed.selectedMaterialId) {
+                  const material = (mats as StudyMaterial[]).find((m: any) => m.id === parsed.selectedMaterialId);
+                  if (material) setSelectedMaterial(material as StudyMaterial);
+                }
+                
+                // Clear the state
+                localStorage.removeItem('lms_last_view');
+              } else {
+                setActiveCategory(userCat ? userCat.id : activeCats[0].id);
+              }
+            } catch (e) {
+              setActiveCategory(userCat ? userCat.id : activeCats[0].id);
+            }
           }
           finishLoading();
         }
@@ -732,115 +790,122 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                         </>
                       );
                   })()}
-
                   {/* Dynamic Content Renderer */}
                   <div className="w-full relative z-10">
-                    {(() => {
-                      const content = (typeof selectedMaterial.content === 'string' 
-                          ? JSON.parse(selectedMaterial.content) 
-                          : selectedMaterial.content) || {};
-                      const mType = selectedMaterial.material_type;
-                      
-                      // 1. MOJI & GOI
-                      if (mType === 'moji_goi') {
-                         return (
-                           <div className="grid gap-4 md:grid-cols-2">
-                              {content?.items?.map((item: any, idx: number) => (
-                                 <div key={idx} className="bg-slate-50 rounded-[2rem] p-6 border border-slate-100 flex items-center justify-between gap-4 shadow-sm hover:shadow-md transition-shadow group">
-                                    <div>
-                                      <h3 className="text-3xl font-black text-slate-800 mb-1">{item.jp}</h3>
-                                      <p className="text-sm font-bold text-teal-600 uppercase tracking-widest">{item.id}</p>
-                                      {item.example && <p className="text-xs text-slate-500 font-medium mt-2">Contoh: {item.example}</p>}
-                                    </div>
-                                 </div>
-                              ))}
-                           </div>
-                         );
-                      }
+                        {(() => {
+                          const content = (typeof selectedMaterial.content === 'string' 
+                              ? JSON.parse(selectedMaterial.content) 
+                              : selectedMaterial.content) || {};
+                          const mType = selectedMaterial.material_type;
+                          
+                          // 1. MOJI & GOI
+                          if (mType === 'moji_goi') {
+                             return (
+                               <div className="grid gap-4 md:grid-cols-2">
+                                  {content?.items?.map((item: any, idx: number) => (
+                                     <div key={idx} className="bg-slate-50 rounded-[2rem] p-6 border border-slate-100 flex items-center justify-between gap-4 shadow-sm hover:shadow-md transition-shadow group">
+                                        <div>
+                                          <h3 className="text-3xl font-black text-slate-800 mb-1">{item.jp}</h3>
+                                          <p className="text-sm font-bold text-teal-600 uppercase tracking-widest">{item.id}</p>
+                                          {item.example && <p className="text-xs text-slate-500 font-medium mt-2">Contoh: {item.example}</p>}
+                                        </div>
+                                     </div>
+                                  ))}
+                               </div>
+                             );
+                          }
 
-                      // 2. BUNPOU
-                      if (mType === 'bunpou') {
-                         return (
-                           <div className="space-y-6">
-                              {content?.items?.map((item: any, idx: number) => (
-                                 <div key={idx} className="bg-indigo-50 border border-indigo-100/50 rounded-[2.5rem] p-8 shadow-sm relative overflow-hidden">
-                                    <div className="relative z-10">
-                                      <div className="inline-block bg-indigo-600 shadow-[0_10px_30px_rgba(79,70,229,0.3)] text-white px-5 py-3 rounded-2xl text-xl font-black tracking-widest mb-6">
-                                        {item.pattern}
-                                      </div>
-                                      <p className="text-slate-600 font-medium mb-8 leading-relaxed text-lg max-w-2xl whitespace-pre-wrap">{item.explanation}</p>
-                                      
-                                      <div className="space-y-4 bg-white/80 p-8 rounded-[2rem] shadow-sm border border-white">
-                                         {item.examples?.map((ex: any, i: number) => (
-                                            <div key={i} className="flex flex-col border-b border-indigo-50 pb-4 last:border-0 last:pb-0">
-                                               <span className="text-slate-800 font-black text-xl mb-1">{ex.jp}</span>
-                                               <span className="text-slate-500 text-sm font-medium">{ex.id}</span>
-                                            </div>
-                                         ))}
-                                      </div>
-                                    </div>
-                                 </div>
-                              ))}
-                           </div>
-                         );
-                      }
+                          // 2. BUNPOU
+                          if (mType === 'bunpou') {
+                             return (
+                               <div className="space-y-6">
+                                  {content?.items?.map((item: any, idx: number) => (
+                                     <div key={idx} className="bg-indigo-50 border border-indigo-100/50 rounded-[2.5rem] p-8 shadow-sm relative overflow-hidden">
+                                        <div className="relative z-10">
+                                          <div className="inline-block bg-indigo-600 shadow-[0_10px_30px_rgba(79,70,229,0.3)] text-white px-5 py-3 rounded-2xl text-xl font-black tracking-widest mb-6">
+                                            {item.pattern}
+                                          </div>
+                                          <p className="text-slate-600 font-medium mb-8 leading-relaxed text-lg max-w-2xl whitespace-pre-wrap">{item.explanation}</p>
+                                          
+                                          <div className="space-y-4 bg-white/80 p-8 rounded-[2rem] shadow-sm border border-white">
+                                             {item.examples?.map((ex: any, i: number) => (
+                                                <div key={i} className="flex flex-col border-b border-indigo-50 pb-4 last:border-0 last:pb-0">
+                                                   <span className="text-slate-800 font-black text-xl mb-1">{ex.jp}</span>
+                                                   <span className="text-slate-500 text-sm font-medium">{ex.id}</span>
+                                                </div>
+                                             ))}
+                                          </div>
+                                        </div>
+                                     </div>
+                                  ))}
+                               </div>
+                             );
+                          }
 
-                      // 3. DOKKAI
-                      if (mType === 'dokkai') {
-                         return (
-                           <div className="space-y-10">
-                              <div className="bg-slate-50 p-10 md:p-14 rounded-[3rem] border border-slate-100 shadow-inner">
-                                 <p className="text-2xl md:text-3xl font-medium leading-loose text-slate-800 mb-8">{content.text_jp}</p>
-                                 <div className="h-px w-16 bg-slate-200 mb-8" />
-                                 <p className="text-base font-medium text-slate-500 italic border-l-4 border-slate-200 pl-6 leading-relaxed">{content.text_id}</p>
-                              </div>
-                           </div>
-                         );
-                      }
+                          // 3. DOKKAI
+                          if (mType === 'dokkai') {
+                             return (
+                               <div className="space-y-10">
+                                  <div className="bg-slate-50 p-10 md:p-14 rounded-[3rem] border border-slate-100 shadow-inner">
+                                     <p className="text-2xl md:text-3xl font-medium leading-loose text-slate-800 mb-8">{content.text_jp}</p>
+                                     <div className="h-px w-16 bg-slate-200 mb-8" />
+                                     <p className="text-base font-medium text-slate-500 italic border-l-4 border-slate-200 pl-6 leading-relaxed">{content.text_id}</p>
+                                  </div>
+                               </div>
+                             );
+                          }
 
-                      // 4. CHOUKAI
-                      if (mType === 'choukai') {
-                         return (
-                           <div className="space-y-10">
-                              <div className="bg-gradient-to-br from-teal-500 via-emerald-500 to-teal-400 p-12 rounded-[3.5rem] shadow-[0_20px_50px_rgba(20,184,166,0.3)] text-center relative overflow-hidden">
-                                 <div className="relative z-10">
-                                   <div className="h-24 w-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-5xl mx-auto mb-8 shadow-inner ring-4 ring-white/10">🎧</div>
-                                   <h3 className="text-white font-black text-3xl italic tracking-tight mb-8">Dengarkan Audio Berikut</h3>
-                                   {(content?.audioUrl || content?.audio_url || selectedMaterial?.audio_url) ? (
-                                      <audio controls className="w-full" src={fixUrl(content?.audioUrl || content?.audio_url || selectedMaterial?.audio_url)}></audio>
-                                   ) : (
-                                      <div className="bg-black/20 text-white rounded-2xl px-6 py-3 inline-block font-bold text-sm tracking-widest uppercase">Audio tidak tersedia</div>
-                                   )}
-                                 </div>
-                              </div>
-                           </div>
-                         );
-                      }
-                      
-                      return <div className="p-10 bg-slate-50 rounded-3xl border border-slate-100 text-slate-400 italic">Materi ini tidak memiliki viewer khusus.</div>;
-                    })()}
+                          // 4. CHOUKAI
+                          if (mType === 'choukai') {
+                             return (
+                               <div className="space-y-10">
+                                  <div className="bg-gradient-to-br from-teal-500 via-emerald-500 to-teal-400 p-12 rounded-[3.5rem] shadow-[0_20px_50px_rgba(20,184,166,0.3)] text-center relative overflow-hidden">
+                                     <div className="relative z-10">
+                                       <div className="h-24 w-24 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-5xl mx-auto mb-8 shadow-inner ring-4 ring-white/10">🎧</div>
+                                       <h3 className="text-white font-black text-3xl italic tracking-tight mb-8">Dengarkan Audio Berikut</h3>
+                                       {(content?.audioUrl || content?.audio_url || selectedMaterial?.audio_url) ? (
+                                          <audio controls className="w-full" src={fixUrl(content?.audioUrl || content?.audio_url || selectedMaterial?.audio_url)}></audio>
+                                       ) : (
+                                          <div className="bg-black/20 text-white rounded-2xl px-6 py-3 inline-block font-bold text-sm tracking-widest uppercase">Audio tidak tersedia</div>
+                                       )}
+                                     </div>
+                                  </div>
+                               </div>
+                             );
+                          }
+                          
+                          return null;
+                        })()}
 
-                    {/* Completion Action */}
-                    <div className="mt-16 pt-10 border-t border-slate-100 flex flex-col items-center">
-                        {!isMaterialCompleted(selectedMaterial.id) ? (
-                            <a 
-                                href={`/study/material/${selectedMaterial.id}`}
-                                className="group relative px-12 py-5 bg-slate-900 text-white rounded-[2rem] font-black italic text-sm uppercase tracking-widest shadow-2xl hover:bg-teal-600 transition-all active:scale-95 flex items-center gap-3"
-                            >
-                                MENUJU KE MATERI INI
-                                <Trophy size={18} className="group-hover:rotate-12 transition-transform" />
-                            </a>
-                        ) : (
-                            <div className="flex flex-col items-center gap-4 text-emerald-600 font-black italic uppercase tracking-widest text-xs">
-                                <div className="h-16 w-16 bg-emerald-100 rounded-full flex items-center justify-center text-3xl">🎉</div>
-                                Materi Berhasil Diselesaikan!
-                            </div>
-                        )}
-                        <p className="mt-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                           {!isMaterialCompleted(selectedMaterial.id) ? 'Kunjungi halaman materi untuk menyelesaikan dan membuka chapter selanjutnya' : 'Selesaikan materi untuk membuka Chapter selanjutnya'}
-                        </p>
-                    </div>
-                  </div>
+                        {/* Completion Action */}
+                        <div className="mt-16 pt-10 border-t border-slate-100 flex flex-col items-center">
+                            {!isMaterialCompleted(selectedMaterial.id) ? (
+                                <a 
+                                    href={`/study/material/${selectedMaterial.id}`}
+                                    onClick={() => {
+                                      localStorage.setItem('lms_last_view', JSON.stringify({
+                                        activeCategory,
+                                        activeLevelId: activeLevel?.id,
+                                        expandedChapter,
+                                        selectedMaterialId: selectedMaterial.id
+                                      }));
+                                    }}
+                                    className="group relative px-12 py-5 bg-slate-900 text-white rounded-[2rem] font-black italic text-sm uppercase tracking-widest shadow-2xl hover:bg-teal-600 transition-all active:scale-95 flex items-center gap-3"
+                                >
+                                    {selectedMaterial.material_type === 'quiz' ? 'MENUJU KE KUIS INI' : 'MENUJU KE MATERI INI'}
+                                    <Trophy size={18} className="group-hover:rotate-12 transition-transform" />
+                                </a>
+                            ) : (
+                                <div className="flex flex-col items-center gap-4 text-emerald-600 font-black italic uppercase tracking-widest text-xs">
+                                    <div className="h-16 w-16 bg-emerald-100 rounded-full flex items-center justify-center text-3xl">🎉</div>
+                                    Materi Berhasil Diselesaikan!
+                                </div>
+                            )}
+                            <p className="mt-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                               {!isMaterialCompleted(selectedMaterial.id) ? 'Kunjungi halaman materi untuk menyelesaikan dan membuka chapter selanjutnya' : 'Selesaikan materi untuk membuka Chapter selanjutnya'}
+                            </p>
+                        </div>
+                      </div>
                 </div>
               </div>
            ) : activeLevel ? (
