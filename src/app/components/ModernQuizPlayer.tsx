@@ -47,7 +47,7 @@ export default function ModernQuizPlayer({
   onClose,
   onProgressUpdate,
 }: ModernQuizPlayerProps) {
-  const fixUrl = (url?: string | null): string | undefined => typeof url === 'string' ? url.replace(/^undefined\//, "https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev/") : undefined;
+  const fixUrl = (url?: string | null): string | undefined => typeof url === 'string' ? url.replace(/^undefined\//, "https://storage.sagaracloud.web.id/").replace("https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev", "https://storage.sagaracloud.web.id") : undefined;
   const isNonEmpty = (str: any) => {
     if (!str) return false;
     if (typeof str !== 'string') return true;
@@ -709,10 +709,18 @@ export default function ModernQuizPlayer({
                           Buka di Tab Baru ↗
                         </a>
                       </div>
-                      <iframe 
-                        src={`https://docs.google.com/gview?url=${encodeURIComponent(fixUrl(q.section_pdf_url)!)}&embedded=true`} 
+                      <object 
+                        data={`${fixUrl(q.section_pdf_url)}#toolbar=0`} 
+                        type="application/pdf"
                         className="w-full h-64 rounded-xl border border-slate-100 shadow-sm"
-                      />
+                      >
+                        <div className="flex flex-col items-center justify-center h-full p-4 text-center bg-slate-50 border border-slate-200 rounded-xl">
+                          <p className="text-slate-600 font-medium text-xs mb-3">Browser Anda tidak mendukung pratinjau PDF langsung.</p>
+                          <a href={fixUrl(q.section_pdf_url)} target="_blank" className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-lg font-black uppercase tracking-widest text-[10px] transition-all shadow-md">
+                            Download PDF
+                          </a>
+                        </div>
+                      </object>
                     </div>
                   )}
 

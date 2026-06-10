@@ -1,9 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+interface CommitData {
+  sha: string;
+  commit: {
+    message: string;
+    author: {
+      name: string;
+      date: string;
+    };
+  };
+  html_url: string;
+}
 
 export default function GitUpdateManager() {
-  const [version] = useState("v2.1.2 - Paling Baru");
+  const [commits, setCommits] = useState<CommitData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Memanggil API GitHub secara langsung untuk repo publik Madkkk1212/lpksagara
+    fetch("https://api.github.com/repos/Madkkk1212/lpksagara/commits?per_page=5")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setCommits(data);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error fetching commits:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  // Ambil 7 karakter pertama dari SHA commit terbaru sebagai "Active Build" version
+  const activeVersion = commits.length > 0 ? commits[0].sha.substring(0, 7) : "Memuat...";
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -16,314 +48,87 @@ export default function GitUpdateManager() {
           </div>
           <h2 className="text-3xl font-black tracking-tight">Git Update Log</h2>
           <p className="text-xs font-medium text-slate-400 mt-1">
-            Pantau versi rilis terbaru dan catatan pembaruan sistem yang telah di-push.
+            Pantau versi rilis terbaru dan catatan pembaruan sistem yang telah di-push secara real-time dari GitHub.
           </p>
         </div>
         <div className="relative z-10 px-4 py-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 text-right">
           <p className="text-[10px] uppercase font-bold tracking-widest text-indigo-300">Active Build</p>
-          <p className="text-sm font-black tracking-wider text-white mt-0.5">{version}</p>
+          <p className="text-sm font-mono font-black tracking-wider text-white mt-0.5">
+            {loading ? "..." : activeVersion}
+          </p>
         </div>
       </div>
 
-      {/* ── LATEST RELEASE: v2.1.2 ── */}
-      <div className="bg-white rounded-3xl p-8 border-2 border-teal-100 shadow-xl shadow-teal-50/50 space-y-6 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-400 to-emerald-500" />
-        <div className="flex items-center justify-between border-b border-slate-100 pb-6 relative z-10">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-teal-50 rounded-2xl flex items-center justify-center text-2xl shadow-inner border border-teal-100">
-              🛡️
-            </div>
-            <div>
-              <h3 className="text-xl font-black text-slate-800">v2.1.2 — Zero Data Loss & Auto-Retry Sync</h3>
-              <p className="text-xs font-bold text-slate-400">Dipublikasikan pada: 10 Juni 2026</p>
-            </div>
-          </div>
-          <span className="px-3 py-1.5 bg-teal-50 text-teal-700 rounded-full text-xs font-black border border-teal-200 animate-pulse">
-            Latest 🔥
-          </span>
+      {loading ? (
+        <div className="flex justify-center items-center p-12">
+          <div className="animate-spin w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full" />
         </div>
-
-        <div className="space-y-4 text-sm text-slate-600 leading-relaxed relative z-10">
-          <div className="p-5 bg-teal-50/50 rounded-2xl border border-teal-100 space-y-2">
-            <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider text-teal-700">📌 Ringkasan Pembaruan:</h4>
-            <p className="text-slate-700">
-              Pembaruan kritikal untuk memastikan keamanan data materi (Zero Data Loss) saat melakukan pengeditan di panel admin, serta implementasi sistem Auto-Retry cerdas yang akan otomatis menyimpan nilai kuis siswa meski koneksi internet terputus (Network Error 480).
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3 hover:border-teal-200 transition-all">
-              <span className="text-teal-500 text-lg shrink-0">🛡️</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Proteksi Konten Kuis (Zero Data Loss)</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Memperbaiki celah di halaman Kelola Materi dimana pengeditan metadata kuis berisiko menghapus soal. Kini soal tersimpan permanen dan sangat aman dari risiko overwriting.</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3 hover:border-teal-200 transition-all">
-              <span className="text-teal-500 text-lg shrink-0">🔄</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Aggressive Grade Auto-Retry</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Jika pengiriman nilai ujian gagal karena koneksi lambat, sistem otomatis melakukan retri pengiriman hingga 3x berturut-turut di latar belakang tanpa disadari siswa.</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3 hover:border-teal-200 transition-all">
-              <span className="text-teal-500 text-lg shrink-0">💾</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Local Storage Backup Queue</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Bila internet mati total (semua retri gagal), nilai langsung diamankan secara lokal di perangkat siswa dan akan di-sync secara ajaib saat internet menyala kembali.</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3 hover:border-teal-200 transition-all">
-              <span className="text-teal-500 text-lg shrink-0">🚑</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Disaster Recovery (Bab 1 & 2)</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Berhasil mengeksekusi sistem pemulihan darurat untuk mengembalikan soal-soal penting dari snapshot cloud terdahulu yang sempat lenyap.</p>
-              </div>
-            </div>
-          </div>
+      ) : commits.length === 0 ? (
+        <div className="text-center p-8 bg-white rounded-3xl border border-slate-100 shadow-sm text-slate-500 font-medium">
+          Gagal memuat data update dari GitHub. Pastikan ada koneksi internet.
         </div>
-      </div>
+      ) : (
+        commits.map((item, index) => {
+          const isLatest = index === 0;
+          const date = new Date(item.commit.author.date).toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          
+          // Memisahkan pesan commit: baris pertama jadi judul, sisanya jadi deskripsi
+          const messageParts = item.commit.message.split('\n');
+          const title = messageParts[0];
+          const description = messageParts.slice(1).join('\n').trim() || "Pembaruan minor kode sumber dan optimasi sistem.";
 
-      {/* ── PREVIOUS RELEASE: v2.1.1 ── */}
-      <div className="bg-white rounded-3xl p-8 border-2 border-slate-100 shadow-sm space-y-6 opacity-80 hover:opacity-100 transition-all">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-2xl shadow-inner">
-              ⚡
-            </div>
-            <div>
-              <h3 className="text-xl font-black text-slate-800">v2.1.1 — CBT Monitoring Sync & Anti-Screenshot Blur</h3>
-              <p className="text-xs font-bold text-slate-400">Dipublikasikan pada: 9 newwwJuni 2026</p>
-            </div>
-          </div>
-        </div>
+          return (
+            <div key={item.sha} className={`bg-white rounded-3xl p-8 border-2 ${isLatest ? 'border-teal-100 shadow-xl shadow-teal-50/50' : 'border-slate-100 shadow-sm opacity-80 hover:opacity-100'} space-y-6 relative overflow-hidden transition-all duration-300`}>
+              {isLatest && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-400 to-emerald-500" />}
+              
+              <div className="flex items-center justify-between border-b border-slate-100 pb-6 relative z-10 flex-wrap gap-4">
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 ${isLatest ? 'bg-teal-50 border border-teal-100 text-teal-600' : 'bg-slate-50 text-slate-500'} rounded-2xl flex items-center justify-center text-2xl shadow-inner shrink-0`}>
+                    {isLatest ? '🛡️' : '⚡'}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800 line-clamp-1">{title}</h3>
+                    <p className="text-xs font-bold text-slate-400 mt-1">Oleh {item.commit.author.name} • {date}</p>
+                  </div>
+                </div>
+                {isLatest && (
+                  <span className="px-3 py-1.5 bg-teal-50 text-teal-700 rounded-full text-xs font-black border border-teal-200 animate-pulse whitespace-nowrap">
+                    Latest 🔥
+                  </span>
+                )}
+              </div>
 
-        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-          <div className="p-5 bg-indigo-50 rounded-2xl border border-indigo-100 space-y-2">
-            <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider text-indigo-600">📌 Ringkasan Pembaruan:</h4>
-            <p className="text-slate-700">
-              Sinkronisasi realtime data monitoring ujian antara siswa dan guru, penambahan efek sensor blur & fade-out layar instan saat screenshot/kehilangan fokus, pembersihan otomatis siswa keluar, serta perbaikan RLS database untuk akses masuk data anonim.
-            </p>
-          </div>
+              <div className="space-y-4 text-sm text-slate-600 leading-relaxed relative z-10">
+                <div className={`p-5 ${isLatest ? 'bg-teal-50/50 border-teal-100' : 'bg-indigo-50 border-indigo-100'} rounded-2xl border space-y-2`}>
+                  <h4 className={`font-black text-xs uppercase tracking-wider ${isLatest ? 'text-teal-700' : 'text-indigo-600'}`}>📌 Catatan Commit:</h4>
+                  <p className="text-slate-700 whitespace-pre-wrap font-medium">{description}</p>
+                </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
-              <span className="text-emerald-500 text-lg shrink-0">✅</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Registrasi Sesi Siswa Otomatis</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Siswa kini otomatis terdaftar di layar pantau guru dengan status "Aman" (0 pelanggaran) sesaat setelah menekan tombol mulai kuis/ujian.</p>
+                <div className="flex items-center gap-3 pt-2">
+                  <a 
+                    href={item.html_url} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="text-xs font-bold text-white bg-indigo-500 hover:bg-indigo-600 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                  >
+                    Lihat Kode ↗
+                  </a>
+                  <span className="text-slate-300">•</span>
+                  <span className="text-xs font-mono font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">
+                    SHA: {item.sha.substring(0, 7)}
+                  </span>
+                </div>
               </div>
             </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
-              <span className="text-emerald-500 text-lg shrink-0">✅</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Efek Sensor Blur & Fade Layar Instan</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Ketika tombol screenshot (Win+Shift+S / Mac shortcuts) ditekan atau browser blur, seluruh layar ujian langsung kabur (60px) & transparan (opacity 0.01) dalam milidetik sehingga tangkapan layar menjadi kosong/tidak terbaca.</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
-              <span className="text-emerald-500 text-lg shrink-0">✅</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Auto-Cleanup Siswa Keluar</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Siswa yang menyelesaikan kuis atau menutup tab browser akan otomatis dihapus dari daftar monitoring aktif guru secara realtime.</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
-              <span className="text-emerald-500 text-lg shrink-0">✅</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Perbaikan RLS & Database Constraints</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Memperbaiki database constraint RLS untuk akses masuk data anonim dan memetakan student_id dengan benar agar data sinkron tanpa error 23502.</p>
-              </div>
-            </div>
-
-          </div>
-
-          {/* SQL Migrations callout */}
-          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100 flex items-start gap-3">
-            <span className="text-amber-500 text-lg shrink-0">⚠️</span>
-            <div>
-              <p className="font-black text-xs text-amber-800 mb-1">Wajib Dijalankan di Supabase SQL Editor:</p>
-              <ul className="text-[11px] text-amber-700 space-y-1 list-disc ml-4">
-                <li><code className="bg-amber-100 px-1 rounded font-mono">051_fix_exam_violations_rls.sql</code> — Memperbaiki hak akses publik anonim & null constraint student_id.</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── PREVIOUS RELEASE: v2.1.0 ── */}
-      <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-xl shadow-slate-100/50 space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-2xl shadow-inner">
-              🛡️
-            </div>
-            <div>
-              <h3 className="text-xl font-black text-slate-800">v2.1.0 — CBT Security & Real-time Monitor</h3>
-              <p className="text-xs font-bold text-slate-400">Dipublikasikan pada: 7 Juni 2026</p>
-            </div>
-          </div>
-          <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-black border border-emerald-100">
-            Stable Release
-          </span>
-        </div>
-
-        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-          <div className="p-5 bg-indigo-50 rounded-2xl border border-indigo-100 space-y-2">
-            <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider text-indigo-600">📌 Ringkasan Pembaruan:</h4>
-            <p className="text-slate-700">
-              Peningkatan besar-besaran pada sistem keamanan ujian CBT, penambahan fitur monitoring ujian real-time untuk guru, perbaikan popup level terkunci dengan desain glassmorphism, watermark nama siswa otomatis, serta penguatan akun monitoring super tersembunyi.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
-              <span className="text-emerald-500 text-lg shrink-0">✅</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Popup Level Terkunci (Glassmorphism)</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Alert bawaan browser diganti modal premium di halaman utama & halaman belajar. Ikon gembok animasi, tidak mengarah ke WhatsApp lagi.</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
-              <span className="text-emerald-500 text-lg shrink-0">✅</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">KioskBarrier Anti-Cheat — Total Overhaul</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Fullscreen cross-device (iOS/Android), blokir PrintScreen + flash hitam, Ctrl+C/V/P/S diblokir, deteksi tab switch & blur, countdown 10 detik saat pelanggaran.</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
-              <span className="text-emerald-500 text-lg shrink-0">✅</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Watermark Dinamis Nama Siswa</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Nama siswa + tanggal ujian muncul diagonal di seluruh layar saat ujian berlangsung. Screenshot bisa ditelusuri ke pelakunya.</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
-              <span className="text-emerald-500 text-lg shrink-0">✅</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Monitor Ujian Real-time (Tab Guru)</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Tab baru "Monitor Ujian" di dashboard guru. Kartu siswa berkedip merah saat pelanggaran. Musik latar otomatis aktif (mbg-guru.mp3). Data via Supabase Realtime.</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
-              <span className="text-emerald-500 text-lg shrink-0">✅</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Tabel exam_violations (Database Baru)</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Mencatat semua insiden: tab_switch, screenshot, blur, fullscreen_exit, page_hide. Realtime subscription aktif untuk update instan ke guru.</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
-              <span className="text-emerald-500 text-lg shrink-0">✅</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Laporan Pelanggaran Langsung ke Supabase</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">KioskBarrier kini langsung INSERT/UPDATE ke tabel exam_violations saat terjadi pelanggaran, lengkap dengan jenis, jumlah, dan identitas siswa.</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
-              <span className="text-emerald-500 text-lg shrink-0">✅</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Akun Monitoring Super (guru.super & siswa.super)</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Dua akun khusus pengawasan yang hanya terlihat Super Admin. guru.super otomatis terhubung ke siswa.super untuk simulasi dan testing monitoring.</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
-              <span className="text-emerald-500 text-lg shrink-0">✅</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Filter Akun Tersembunyi Diperkuat</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">UserManager, TeacherAssignmentManager, AllStudentsAssessment — semua kini menyembunyikan 4 akun monitoring dari admin biasa.</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
-              <span className="text-emerald-500 text-lg shrink-0">✅</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Anti-Cheat Tambahan di ModernQuizPlayer</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Mode ujian: blokir drag & drop konten soal, blokir klik kanan, flash hitam saat PrintScreen. Berlapis dengan KioskBarrier.</p>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
-              <span className="text-emerald-500 text-lg shrink-0">✅</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Fix framer-motion di MateriView</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Import AnimatePresence & motion ditambahkan di MateriView.tsx untuk mendukung animasi popup level terkunci yang baru.</p>
-              </div>
-            </div>
-
-          </div>
-
-          {/* SQL Migrations callout */}
-          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100 flex items-start gap-3">
-            <span className="text-amber-500 text-lg shrink-0">⚠️</span>
-            <div>
-              <p className="font-black text-xs text-amber-800 mb-1">Wajib Dijalankan di Supabase SQL Editor:</p>
-              <ul className="text-[11px] text-amber-700 space-y-1 list-disc ml-4">
-                <li><code className="bg-amber-100 px-1 rounded font-mono">049_exam_violations.sql</code> — Tabel pelanggaran + realtime subscription</li>
-                <li><code className="bg-amber-100 px-1 rounded font-mono">050_assign_super_monitoring_accounts.sql</code> — Akun guru.super & siswa.super + assignment</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── PREVIOUS RELEASE: v2.0.1 ── */}
-      <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-xl shadow-slate-100/50 space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-teal-50 rounded-2xl flex items-center justify-center text-teal-600 text-2xl font-bold shadow-inner">
-              ✨
-            </div>
-            <div>
-              <h3 className="text-xl font-black text-slate-800">v2.0.1 — Media & CBT Stability</h3>
-              <p className="text-xs font-bold text-slate-400">Dipublikasikan pada: Mei 2026</p>
-            </div>
-          </div>
-          <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-black border border-emerald-100">
-            Stable Release
-          </span>
-        </div>
-
-        <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-          <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
-            <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider text-indigo-600">📌 Keterangan Rilis &amp; Catatan Pembaruan:</h4>
-            <p className="text-slate-700">
-              Pembaruan arsitektur sistem penyimpanan media, stabilisasi pemutar audio CBT, serta penambahan pemindai rekursif (Deep Recursive Media Scanner). Seluruh berkas kuis, latihan mendengarkan (Choukai), dan kosakata (Moji-Goi) telah tersinkronisasi 100% dengan Cloudflare R2.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
-              <span className="text-emerald-500 text-lg">✅</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">CBT Audio &amp; Video Resolved</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">MIME type dan pemisahan file audio/video terlindungi ketat.</p>
-              </div>
-            </div>
-            <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-start gap-3">
-              <span className="text-emerald-500 text-lg">✅</span>
-              <div>
-                <p className="font-black text-xs text-slate-800">Super Admin Override</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Akses pengumuman dan catatan rilis selalu tersedia di sidebar.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+          );
+        })
+      )}
     </div>
   );
 }

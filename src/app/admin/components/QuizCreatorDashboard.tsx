@@ -70,7 +70,7 @@ export default function QuizCreatorDashboard({
 
   // Parse initial data into Section format with backward compatibility
   useEffect(() => {
-    const fixUrl = (url?: string | null): string | undefined => typeof url === 'string' ? url.replace(/^undefined\//, "https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev/") : undefined;
+    const fixUrl = (url?: string | null): string | undefined => typeof url === 'string' ? url.replace(/^undefined\//, "https://storage.sagaracloud.web.id/").replace("https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev", "https://storage.sagaracloud.web.id") : undefined;
 
     if (initialData?.is_section_test && Array.isArray(initialData.sections)) {
       const sanitizedSections = initialData.sections.map((sec: any) => ({

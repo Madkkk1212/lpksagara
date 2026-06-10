@@ -313,7 +313,7 @@ export default function ExamLevelClient({ level }: { level: string }) {
 
   // 3. ACTIVE EXAM & RESULT REVIEW
   if (activeView === "exam" && selectedTest) {
-    const fixUrl = (url?: string | null): string | undefined => typeof url === 'string' ? url.replace(/^undefined\//, "https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev/") : undefined;
+    const fixUrl = (url?: string | null): string | undefined => typeof url === 'string' ? url.replace(/^undefined\//, "https://storage.sagaracloud.web.id/").replace("https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev", "https://storage.sagaracloud.web.id") : undefined;
 
     const normalizedQuestions: NormalizedQuestion[] = selectedTest.questions.map((q, idx) => ({
       id: q.id,

@@ -513,7 +513,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
     </div>
   );
 
-  const fixUrl = (url?: string | null): string | undefined => typeof url === 'string' ? url.replace(/^undefined\//, "https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev/") : undefined;
+  const fixUrl = (url?: string | null): string | undefined => typeof url === 'string' ? url.replace(/^undefined\//, "https://storage.sagaracloud.web.id/").replace("https://pub-bf4a771e8dc944ecb4b9810d20caa60e.r2.dev", "https://storage.sagaracloud.web.id") : undefined;
 
   return (
     <div className="space-y-10">
@@ -676,9 +676,8 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                               </div>
                               {showPdf && (
                                 <iframe 
-                                  src={`${fixUrl(activePdfUrl)}#toolbar=0`} 
+                                  src={`https://docs.google.com/gview?url=${encodeURIComponent(fixUrl(activePdfUrl)!)}&embedded=true`} 
                                   className="w-full h-[500px] rounded-2xl border border-slate-100 shadow-inner mt-4 animate-in fade-in duration-500"
-                                  title="PDF Viewer"
                                 />
                               )}
                             </div>
