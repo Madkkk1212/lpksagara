@@ -700,7 +700,7 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                             </div>
                           )}
 
-                          {/* PDF Document Viewer */}
+                          {/* PDF Document — buka langsung di browser/tab baru */}
                           {(() => {
                             let parsedContent = content || {};
                             if (typeof parsedContent === 'string') {
@@ -710,44 +710,38 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                             if (!activePdfUrl) return null;
                             const fixedPdfUrl = fixUrl(activePdfUrl) || '';
                             return (
-                            <div className="mb-5 sm:mb-8 rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden bg-white border border-slate-100 shadow-lg p-4 sm:p-6 relative z-10">
-                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3 sm:mb-4">
-                                <div className="flex items-center gap-3">
-                                  <span className="text-2xl">📕</span>
-                                  <div>
-                                    <h3 className="text-base sm:text-lg font-black text-slate-800">{content.pdf_name || "Dokumen PDF"}</h3>
-                                    <p className="text-xs font-bold text-slate-400">Silakan pelajari materi PDF di bawah ini.</p>
-                                  </div>
+                            <div className="mb-5 sm:mb-8 rounded-[1.5rem] sm:rounded-[2rem] bg-gradient-to-br from-rose-50 to-white border border-rose-100 shadow-lg p-4 sm:p-6 relative z-10">
+                              <div className="flex items-center gap-4">
+                                <div className="h-14 w-14 shrink-0 bg-white rounded-2xl flex items-center justify-center text-3xl shadow-sm border border-rose-100">
+                                  📕
                                 </div>
-                                <div className="flex gap-2">
-                                  <button 
-                                    onClick={() => setShowPdf(!showPdf)}
-                                    className="flex-1 sm:flex-none px-4 py-2.5 bg-teal-50 hover:bg-teal-100 text-teal-600 rounded-xl text-xs font-black transition-all text-center"
-                                  >
-                                    {showPdf ? "Tutup PDF" : "Buka PDF"}
-                                  </button>
-                                  <a 
-                                    href={fixedPdfUrl} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 rounded-xl text-xs font-black transition-all text-center"
-                                  >
-                                    Tab Baru ↗
-                                  </a>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-base sm:text-lg font-black text-slate-800 truncate">{content.pdf_name || "Dokumen PDF"}</h3>
+                                  <p className="text-xs font-bold text-slate-400 mt-0.5">Ketuk tombol untuk membuka materi PDF</p>
                                 </div>
                               </div>
-                              {showPdf && (
-                                <iframe 
-                                  src={`/api/pdf-viewer?url=${encodeURIComponent(fixedPdfUrl)}`}
-                                  className="w-full h-[520px] sm:h-[700px] rounded-2xl border border-slate-100 shadow-inner mt-4 animate-in fade-in duration-500 bg-gray-50"
-                                  title="PDF Viewer"
-                                />
-                              )}
+                              <div className="flex gap-2 mt-4">
+                                <a
+                                  href={fixedPdfUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="flex-1 py-3 bg-slate-900 hover:bg-teal-600 text-white rounded-2xl text-xs font-black text-center transition-all active:scale-95 shadow-md"
+                                >
+                                  📖 Buka PDF
+                                </a>
+                                <a
+                                  href={fixedPdfUrl}
+                                  download
+                                  className="px-4 py-3 bg-white hover:bg-rose-50 text-rose-500 rounded-2xl text-xs font-black text-center transition-all active:scale-95 border border-rose-100"
+                                >
+                                  ⬇️
+                                </a>
+                              </div>
                             </div>
                             );
                           })()}
 
-                          {/* PPT Slides iframe viewer */}
+                          {/* PPT Slides — Office Online viewer */}
                           {(() => {
                             let parsedContent = content || {};
                             if (typeof parsedContent === 'string') {
@@ -759,35 +753,35 @@ export default function MateriView({ user, theme, onUpgrade, onRefreshUser }: Ma
                             const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fixedPptUrl)}`;
                             return (
                             <div className="mb-5 sm:mb-8 rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden bg-white border border-slate-100 shadow-lg p-4 sm:p-6 relative z-10">
-                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3 sm:mb-4">
-                                <div className="flex items-center gap-3">
-                                  <span className="text-2xl">📊</span>
-                                  <div>
-                                    <h3 className="text-base sm:text-lg font-black text-slate-800">{content.ppt_name || "Slide PPT / Presentasi"}</h3>
-                                    <p className="text-xs font-bold text-slate-400">Silakan pelajari slide presentasi PPT di bawah ini.</p>
-                                  </div>
+                              <div className="flex items-center gap-4 mb-4">
+                                <div className="h-14 w-14 shrink-0 bg-amber-50 rounded-2xl flex items-center justify-center text-3xl shadow-sm border border-amber-100">
+                                  📊
                                 </div>
-                                <div className="flex gap-2">
-                                  <button 
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-base sm:text-lg font-black text-slate-800 truncate">{content.ppt_name || "Slide PPT / Presentasi"}</h3>
+                                  <p className="text-xs font-bold text-slate-400 mt-0.5">Slide presentasi materi</p>
+                                </div>
+                                <div className="flex gap-2 shrink-0">
+                                  <button
                                     onClick={() => setShowPpt(!showPpt)}
-                                    className="flex-1 sm:flex-none px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-xl text-xs font-black transition-all text-center"
+                                    className="px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-xl text-xs font-black transition-all"
                                   >
-                                    {showPpt ? "Tutup PPT" : "Buka PPT"}
+                                    {showPpt ? 'Tutup' : 'Lihat'}
                                   </button>
-                                  <a 
-                                    href={fixedPptUrl} 
-                                    target="_blank" 
+                                  <a
+                                    href={fixedPptUrl}
+                                    target="_blank"
                                     rel="noreferrer"
-                                    className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-100 hover:bg-amber-50 hover:text-amber-600 text-slate-600 rounded-xl text-xs font-black transition-all text-center"
+                                    className="px-4 py-2.5 bg-slate-100 hover:bg-amber-50 hover:text-amber-600 text-slate-500 rounded-xl text-xs font-black transition-all"
                                   >
-                                    Download PPT ↗
+                                    ↓
                                   </a>
                                 </div>
                               </div>
                               {showPpt && (
-                                <iframe 
+                                <iframe
                                   src={officeViewerUrl}
-                                  className="w-full h-[420px] sm:h-[600px] rounded-2xl border border-slate-100 shadow-inner mt-4 animate-in fade-in duration-500"
+                                  className="w-full h-[400px] sm:h-[560px] rounded-2xl border border-slate-100 shadow-inner animate-in fade-in duration-500"
                                   title="PPT Viewer"
                                 />
                               )}
