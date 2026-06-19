@@ -85,9 +85,21 @@ export default function Home() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   
-  // Supabase Data
-  const [theme, setTheme] = useState<AppTheme | null>(null);
-  const [banners, setBanners] = useState<BannerSlide[]>([]);
+  // Supabase Data (With SWR local cache hydration)
+  const [theme, setTheme] = useState<AppTheme | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const saved = localStorage.getItem("sagara-theme");
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+  const [banners, setBanners] = useState<BannerSlide[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = localStorage.getItem("sagara-banners");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [categories, setCategories] = useState<MaterialCategory[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [studyLevels, setStudyLevels] = useState<StudyLevel[]>([]);
@@ -276,7 +288,13 @@ export default function Home() {
         setLoggedIn(authed);
         // Apply global data
         setTheme(t);
+        if (t) {
+          try { localStorage.setItem("sagara-theme", JSON.stringify(t)); } catch (e) {}
+        }
         setBanners(b || []);
+        if (b && b.length > 0) {
+          try { localStorage.setItem("sagara-banners", JSON.stringify(b)); } catch (e) {}
+        }
         setCategories((c || []).filter((cat: any) => cat.is_active !== false));
         setPublicMaterials(m as any || []);
         setLevels(l || []);
@@ -632,8 +650,14 @@ export default function Home() {
                     <section className="overflow-hidden rounded-3xl md:rounded-[3rem] bg-white shadow-2xl ring-1 ring-black/[0.03] transition-all">
                       <div className="relative h-[440px] md:h-[500px]">
                         {banners.length === 0 ? (
-                          <div className="absolute inset-0 bg-slate-100 animate-pulse flex items-center justify-center rounded-[3rem]">
-                            <span className="text-slate-300 text-xs font-black uppercase tracking-[0.4em]">Loading Banners...</span>
+                          /* Premium modern skeleton loader matching banner structure */
+                          <div className="absolute inset-0 bg-gradient-to-br from-slate-200 to-slate-100 animate-pulse flex flex-col justify-end p-8 md:p-12 rounded-3xl md:rounded-[3rem]">
+                            <div className="space-y-4 max-w-xl">
+                              <div className="h-6 w-28 bg-slate-300/60 rounded-full" />
+                              <div className="h-10 md:h-14 w-4/5 bg-slate-300/60 rounded-2xl" />
+                              <div className="h-4 md:h-6 w-3/5 bg-slate-300/60 rounded-xl" />
+                              <div className="h-12 w-36 bg-slate-300/70 rounded-2xl mt-6" />
+                            </div>
                           </div>
                         ) : (
                           banners.map((banner, idx) => (
